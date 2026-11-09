@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_046_Q46_temporal_embedding_drift - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Vector &amp; Embeddings</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_046_Q46_temporal_embedding_drift</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_045_Q45_cross_encoder_candidate_generation.html" class="nav-btn">← Prev: Two-Stage Retrieval: Bi-E...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_047_Q47_hierarchical_vector_coarse_fine.html" class="nav-btn">Next: Hierarchical Coarse-to-Fi... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Vector &amp; Embeddings</span>
+                    <span class="badge badge-id">task_046_Q46_temporal_embedding_drift</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Temporal Semantic Drift Tracking across Document Embedding Centroids</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">1151.99 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">1126.27 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">11.4 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 11.4s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>As companies evolve, the meaning of terms like &#x27;security&#x27; or &#x27;remote work&#x27; shifts. Tracking the cosine distance between monthly embedding centroids reveals semantic concept drift.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Ignoring semantic drift causes older documentation to silently diverge from current employee search queries.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">As companies evolve, the meaning of terms like &#x27;security&#x27; or &#x27;remote work&#x27; shifts. Tracking the cosine distance between monthly embedding centroids reveals semantic concept drift.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: month_date, centroid, prev_month_centroid, drift_distance_from_prev_month.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 11.4 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 monthly_centroids</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">11.4 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>month_date</code> <small>(DATE)</small></span> <span class="col-pill"><code>centroid</code> <small>(FLOAT[2])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>month_date</th>
+<th>centroid</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.9 0.1]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-02-01 00:00:00</td>
+<td>[0.88 0.12]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-03-01 00:00:00</td>
+<td>[0.7  0.35]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8424 0.0694]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2026-01-02 00:00:00</td>
+<td>[0.8895 0.1201]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2026-01-03 00:00:00</td>
+<td>[0.8591 0.1216]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>2026-01-04 00:00:00</td>
+<td>[0.887  0.0911]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>2026-01-05 00:00:00</td>
+<td>[0.8526 0.0982]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>2026-01-06 00:00:00</td>
+<td>[0.8441 0.0441]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>2026-01-07 00:00:00</td>
+<td>[0.8703 0.0642]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2026-01-08 00:00:00</td>
+<td>[0.8224 0.1119]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>2026-01-09 00:00:00</td>
+<td>[0.8206 0.1089]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>2026-01-10 00:00:00</td>
+<td>[0.8558 0.0955]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>2026-01-11 00:00:00</td>
+<td>[0.8805 0.1414]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>2026-01-12 00:00:00</td>
+<td>[0.7967 0.0943]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 323.38 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 57.68503404553421%; background: #f85149;" title="WINDOW: 186.54ms (57.7%)"></div><div class="cost-bar-seg" style="width: 36.02209083650057%; background: #f85149;" title="ORDER_BY: 116.49ms (36.0%)"></div><div class="cost-bar-seg" style="width: 5.470935572822781%; background: #3fb950;" title="PROJECTION: 17.69ms (5.5%)"></div><div class="cost-bar-seg" style="width: 0.7802247059868879%; background: #d29922;" title="TABLE_SCAN: 2.52ms (0.8%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 36.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">116.49 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (36.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">5.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">17.69 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;month_date&#x27;, &#x27;centroid&#x27;, &#x27;prev_mo">📁 Projections: [&#x27;month_date&#x27;, &#x27;cen...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.13 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="high-cost-tag">🔥 57.7% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">186.54 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
+                <div class="nm-tbl" title="Projections: lag(centroid, 1, NULL::FLOAT[2]) OV">📁 Projections: lag(centroid, 1, NU...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (57.7% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.52 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                <div class="nm-tbl" title="memory.main.monthly_centroids">📁 memory.main.monthly_centroids</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>57.7%</strong></td>
+            <td>186.54 ms</td>
+            <td>1,000,000</td>
+            <td>19.07 MB</td>
+            <td><small>Projections: lag(centroid, 1, NULL::FLOAT[2]) OV</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>36.0%</strong></td>
+            <td>116.49 ms</td>
+            <td>1,000,000</td>
+            <td>22.89 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>5.5%</strong></td>
+            <td>17.69 ms</td>
+            <td>1,000,000</td>
+            <td>22.89 MB</td>
+            <td><small>Projections: [&#x27;month_date&#x27;, &#x27;centroid&#x27;, &#x27;prev_mo</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.8%</strong></td>
+            <td>2.52 ms</td>
+            <td>1,000,000</td>
+            <td>11.44 MB</td>
+            <td><small>memory.main.monthly_centroids</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.13 ms</td>
+            <td>1,000,000</td>
+            <td>19.07 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 1151.99 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">lagged_centroids</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">month_date</span><span class="p">,</span>
+<span class="w">          </span><span class="n">centroid</span><span class="p">,</span>
+<span class="w">          </span><span class="n">lag</span><span class="p">(</span><span class="n">centroid</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                              </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">month_date</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prev_month_centroid</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">monthly_centroids</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">month_date</span><span class="p">,</span>
+<span class="w">       </span><span class="n">centroid</span><span class="p">,</span>
+<span class="w">       </span><span class="n">prev_month_centroid</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">prev_month_centroid</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">list_cosine_distance</span><span class="p">(</span><span class="n">centroid</span><span class="p">,</span><span class="w"> </span><span class="n">prev_month_centroid</span><span class="p">)</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">drift_distance_from_prev_month</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">lagged_centroids</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">month_date</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 1126.27 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Track month-over-month semantic drift in concept centroids</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">month_date</span><span class="p">,</span>
+<span class="w">       </span><span class="n">centroid</span><span class="p">,</span>
+<span class="w">       </span><span class="n">lag</span><span class="p">(</span><span class="n">centroid</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                           </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">month_date</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prev_month_centroid</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">centroid</span><span class="p">,</span><span class="w"> </span><span class="n">lag</span><span class="p">(</span><span class="n">centroid</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                                                         </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">month_date</span><span class="p">)),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">drift_distance_from_prev_month</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">monthly_centroids</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">month_date</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">monthly_centroids</span><span class="w"> </span><span class="p">(</span><span class="n">month_date</span><span class="w"> </span><span class="nb">DATE</span><span class="p">,</span><span class="w"> </span><span class="n">centroid</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">monthly_centroids</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="s1">'2026-01-01'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">90</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">10</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'2026-02-01'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">88</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">12</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'2026-03-01'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">70</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">35</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span><span class="w"> </span><span class="c1">-- Significant semantic drift</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000,000 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>month_date</th>
+<th>centroid</th>
+<th>prev_month_centroid</th>
+<th>drift_distance_from_prev_month</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8322 0.0805]</td>
+<td><span class="cell-null">NULL</span></td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8994 0.1083]</td>
+<td>[0.8322 0.0805]</td>
+<td>0.0003</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8692 0.0593]</td>
+<td>[0.8994 0.1083]</td>
+<td>0.0013</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8524 0.0679]</td>
+<td>[0.8692 0.0593]</td>
+<td>0.0001</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8498 0.1249]</td>
+<td>[0.8524 0.0679]</td>
+<td>0.0022</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8205 0.1207]</td>
+<td>[0.8498 0.1249]</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8476 0.0533]</td>
+<td>[0.8205 0.1207]</td>
+<td>0.0035</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.854  0.0783]</td>
+<td>[0.8476 0.0533]</td>
+<td>0.0004</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8575 0.1427]</td>
+<td>[0.854  0.0783]</td>
+<td>0.0027</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8497 0.1003]</td>
+<td>[0.8575 0.1427]</td>
+<td>0.0011</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8028 0.1028]</td>
+<td>[0.8497 0.1003]</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8284 0.1292]</td>
+<td>[0.8028 0.1028]</td>
+<td>0.0004</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8786 0.0806]</td>
+<td>[0.8284 0.1292]</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.7655 0.0758]</td>
+<td>[0.8786 0.0806]</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8243 0.1812]</td>
+<td>[0.7655 0.0758]</td>
+<td>0.0069</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8158 0.0795]</td>
+<td>[0.8243 0.1812]</td>
+<td>0.0071</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.887  0.0606]</td>
+<td>[0.8158 0.0795]</td>
+<td>0.0004</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8053 0.0281]</td>
+<td>[0.887  0.0606]</td>
+<td>0.0006</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.7947 0.1044]</td>
+<td>[0.8053 0.0281]</td>
+<td>0.0046</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.9172 0.1684]</td>
+<td>[0.7947 0.1044]</td>
+<td>0.0013</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.857 0.12 ]</td>
+<td>[0.9172 0.1684]</td>
+<td>0.0009</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8194 0.1577]</td>
+<td>[0.857 0.12 ]</td>
+<td>0.0013</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8825 0.1043]</td>
+<td>[0.8194 0.1577]</td>
+<td>0.0026</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.872  0.1186]</td>
+<td>[0.8825 0.1043]</td>
+<td>0.0002</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.7697 0.1248]</td>
+<td>[0.872  0.1186]</td>
+<td>0.0003</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1,000,000 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>month_date</th>
+<th>centroid</th>
+<th>prev_month_centroid</th>
+<th>drift_distance_from_prev_month</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8322 0.0805]</td>
+<td><span class="cell-null">NULL</span></td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8994 0.1083]</td>
+<td>[0.8322 0.0805]</td>
+<td>0.0003</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8692 0.0593]</td>
+<td>[0.8994 0.1083]</td>
+<td>0.0013</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8524 0.0679]</td>
+<td>[0.8692 0.0593]</td>
+<td>0.0001</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8498 0.1249]</td>
+<td>[0.8524 0.0679]</td>
+<td>0.0022</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8205 0.1207]</td>
+<td>[0.8498 0.1249]</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8476 0.0533]</td>
+<td>[0.8205 0.1207]</td>
+<td>0.0035</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.854  0.0783]</td>
+<td>[0.8476 0.0533]</td>
+<td>0.0004</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8575 0.1427]</td>
+<td>[0.854  0.0783]</td>
+<td>0.0027</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8497 0.1003]</td>
+<td>[0.8575 0.1427]</td>
+<td>0.0011</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8028 0.1028]</td>
+<td>[0.8497 0.1003]</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8284 0.1292]</td>
+<td>[0.8028 0.1028]</td>
+<td>0.0004</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8786 0.0806]</td>
+<td>[0.8284 0.1292]</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.7655 0.0758]</td>
+<td>[0.8786 0.0806]</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8243 0.1812]</td>
+<td>[0.7655 0.0758]</td>
+<td>0.0069</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8158 0.0795]</td>
+<td>[0.8243 0.1812]</td>
+<td>0.0071</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.887  0.0606]</td>
+<td>[0.8158 0.0795]</td>
+<td>0.0004</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8053 0.0281]</td>
+<td>[0.887  0.0606]</td>
+<td>0.0006</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.7947 0.1044]</td>
+<td>[0.8053 0.0281]</td>
+<td>0.0046</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.9172 0.1684]</td>
+<td>[0.7947 0.1044]</td>
+<td>0.0013</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.857 0.12 ]</td>
+<td>[0.9172 0.1684]</td>
+<td>0.0009</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8194 0.1577]</td>
+<td>[0.857 0.12 ]</td>
+<td>0.0013</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.8825 0.1043]</td>
+<td>[0.8194 0.1577]</td>
+<td>0.0026</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.872  0.1186]</td>
+<td>[0.8825 0.1043]</td>
+<td>0.0002</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>2026-01-01 00:00:00</td>
+<td>[0.7697 0.1248]</td>
+<td>[0.872  0.1186]</td>
+<td>0.0003</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_045_Q45_cross_encoder_candidate_generation.html" class="nav-btn">← Prev: Two-Stage Retrieval: Bi-E...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_047_Q47_hierarchical_vector_coarse_fine.html" class="nav-btn">Next: Hierarchical Coarse-to-Fi... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

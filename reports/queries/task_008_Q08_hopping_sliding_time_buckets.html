@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_008_Q08_hopping_sliding_time_buckets - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Temporal &amp; Time-Series</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_008_Q08_hopping_sliding_time_buckets</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_007_Q07_scd2_open_ended_intervals.html" class="nav-btn">← Prev: Slowly Changing Dimension...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_009_Q09_ledger_balance_duplicate_timestamps.html" class="nav-btn">Next: Financial Ledger Cumulati... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Temporal &amp; Time-Series</span>
+                    <span class="badge badge-id">task_008_Q08_hopping_sliding_time_buckets</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Hopping / Overlapping Window Aggregations via time_bucket</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">0.56 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.1x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">0.59 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">34.3 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 16.0s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Real-time surveillance monitors rolling 15-minute average latency stepped forward every 5 minutes (a hopping window).</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Standard GROUP BY time_bucket only produces non-overlapping tumbling windows, missing cross-boundary bursts.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Real-time surveillance monitors rolling 15-minute average latency stepped forward every 5 minutes (a hopping window).
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: window_start, window_end, server_id, sample_count, avg_cpu, peak_cpu.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 34.3 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 server_metrics</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">34.3 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>server_id</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>metric_time</code> <small>(TIMESTAMP)</small></span> <span class="col-pill"><code>cpu_utilization</code> <small>(DOUBLE)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>server_id</th>
+<th>metric_time</th>
+<th>cpu_utilization</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>web-01</td>
+<td>2026-03-01 10:02:00</td>
+<td>45</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>web-01</td>
+<td>2026-03-01 10:07:00</td>
+<td>78</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>web-01</td>
+<td>2026-03-01 10:12:00</td>
+<td>92</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>web-01</td>
+<td>2026-03-01 10:17:00</td>
+<td>60</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>node-cluster-1</td>
+<td>2026-03-01 09:30:00.000011</td>
+<td>97.56</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>node-cluster-2</td>
+<td>2026-03-01 09:30:00.000020</td>
+<td>69.34</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>node-cluster-3</td>
+<td>2026-03-01 09:30:00.000041</td>
+<td>66.5</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>node-cluster-4</td>
+<td>2026-03-01 09:30:00.000063</td>
+<td>60.83</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>node-cluster-5</td>
+<td>2026-03-01 09:30:00.000088</td>
+<td>47.52</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>node-cluster-6</td>
+<td>2026-03-01 09:30:00.000104</td>
+<td>79.26</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>node-cluster-7</td>
+<td>2026-03-01 09:30:00.000130</td>
+<td>95</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>node-cluster-8</td>
+<td>2026-03-01 09:30:00.000153</td>
+<td>101.11</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>node-cluster-9</td>
+<td>2026-03-01 09:30:00.000162</td>
+<td>64.81</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>node-cluster-10</td>
+<td>2026-03-01 09:30:00.000185</td>
+<td>55.34</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>node-cluster-11</td>
+<td>2026-03-01 09:30:00.000208</td>
+<td>48.89</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 0.56 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 50.681838512872815%; background: #58a6ff;" title="HASH_GROUP_BY: 0.28ms (50.7%)"></div><div class="cost-bar-seg" style="width: 23.350509008283687%; background: #f85149;" title="ORDER_BY: 0.13ms (23.4%)"></div><div class="cost-bar-seg" style="width: 15.896802819673306%; background: #3fb950;" title="NESTED_LOOP_JOIN: 0.09ms (15.9%)"></div><div class="cost-bar-seg" style="width: 3.664143989408334%; background: #d29922;" title="TABLE_SCAN: 0.02ms (3.7%)"></div><div class="cost-bar-seg" style="width: 1.8175800189648077%; background: #bc8cff;" title="PROJECTION: 0.01ms (1.8%)"></div><div class="cost-bar-seg" style="width: 1.3316515484944447%; background: #39c5cf;" title="PROJECTION: 0.01ms (1.3%)"></div><div class="cost-bar-seg" style="width: 1.0124702556670782%; background: #f0883e;" title="UNNEST: 0.01ms (1.0%)"></div><div class="cost-bar-seg" style="width: 0.9480614746032597%; background: #79c0ff;" title="PROJECTION: 0.01ms (0.9%)"></div><div class="cost-bar-seg" style="width: 0.5839729483119531%; background: #58a6ff;" title="PROJECTION: 0.00ms (0.6%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">224 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_decompress">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__int...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">23.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.13 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">224 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">224 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_compress_s">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__int...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">224 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;window_start&#x27;, &#x27;window_end&#x27;, &#x27;ser">📁 Projections: [&#x27;window_start&#x27;, &#x27;w...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">192 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;&quot;/&quot;(#3, CAST(#5">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">224 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">50.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.28 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">192 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">9</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">360 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;window_start&#x27;, &#x27;server_id&#x27;, &#x27;cpu_">📁 Projections: [&#x27;window_start&#x27;, &#x27;s...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">9</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">288 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;__internal_compress_string_uhugei">📁 Projections: [&#x27;__internal_compre...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>NESTED_LOOP_JOIN</strong></span>
+                <span class="node-cost-tag">15.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.09 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">9</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">360 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">3.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">128 B</span></div>
+                <div class="nm-tbl" title="memory.main.server_metrics">📁 memory.main.server_metrics</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="Projections: window_start">📁 Projections: window_start</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="node-cost-tag">1.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>DUMMY_SCAN</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>50.7%</strong></td>
+            <td>0.28 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>23.4%</strong></td>
+            <td>0.13 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>NESTED_LOOP_JOIN</strong></td>
+            <td><strong>15.9%</strong></td>
+            <td>0.09 ms</td>
+            <td>9</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>3.7%</strong></td>
+            <td>0.02 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.server_metrics</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.8%</strong></td>
+            <td>0.01 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;window_start&#x27;, &#x27;window_end&#x27;, &#x27;ser</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.3%</strong></td>
+            <td>0.01 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;&quot;/&quot;(#3, CAST(#5</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>1.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.9%</strong></td>
+            <td>0.01 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.6%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_compress_s</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.4%</strong></td>
+            <td>0.00 ms</td>
+            <td>9</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;__internal_compress_string_uhugei</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.2%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_decompress</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>DUMMY_SCAN</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: window_start</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>9</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;window_start&#x27;, &#x27;server_id&#x27;, &#x27;cpu_</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 0.56 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">window_steps</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="k">unnest</span><span class="p">(</span><span class="n">generate_series</span><span class="p">(</span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">'2026-03-01 10:00:00'</span><span class="p">,</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">'2026-03-01 10:15:00'</span><span class="p">,</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">'5 minutes'</span><span class="p">))</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">window_start</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">'15 minutes'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">window_end</span><span class="p">,</span>
+<span class="w">       </span><span class="n">m</span><span class="p">.</span><span class="n">server_id</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">cpu_utilization</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">sample_count</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="k">avg</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">cpu_utilization</span><span class="p">),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">avg_cpu</span><span class="p">,</span>
+<span class="w">       </span><span class="k">max</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">cpu_utilization</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">peak_cpu</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">window_steps</span><span class="w"> </span><span class="n">w</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">server_metrics</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">metric_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span>
+<span class="k">AND</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">metric_time</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">'15 minutes'</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="p">,</span>
+<span class="w">         </span><span class="n">m</span><span class="p">.</span><span class="n">server_id</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 0.59 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Generate 15-minute sliding windows stepped every 5 minutes (hopping window)</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">window_steps</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="k">unnest</span><span class="p">(</span><span class="n">generate_series</span><span class="p">(</span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">'2026-03-01 10:00:00'</span><span class="p">,</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">'2026-03-01 10:15:00'</span><span class="p">,</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">'5 minutes'</span><span class="p">))</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">window_start</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">'15 minutes'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">window_end</span><span class="p">,</span>
+<span class="w">       </span><span class="n">m</span><span class="p">.</span><span class="n">server_id</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">cpu_utilization</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">sample_count</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="k">avg</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">cpu_utilization</span><span class="p">),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">avg_cpu</span><span class="p">,</span>
+<span class="w">       </span><span class="k">max</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">cpu_utilization</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">peak_cpu</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">window_steps</span><span class="w"> </span><span class="n">w</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">server_metrics</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">metric_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span>
+<span class="k">AND</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">metric_time</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">'15 minutes'</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="p">,</span>
+<span class="w">         </span><span class="n">m</span><span class="p">.</span><span class="n">server_id</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">window_start</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">server_metrics</span><span class="w"> </span><span class="p">(</span><span class="n">server_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">metric_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span><span class="w"> </span><span class="n">cpu_utilization</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">server_metrics</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="s1">'web-01'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 10:02:00'</span><span class="p">,</span><span class="w"> </span><span class="mi">45</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'web-01'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 10:07:00'</span><span class="p">,</span><span class="w"> </span><span class="mi">78</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'web-01'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 10:12:00'</span><span class="p">,</span><span class="w"> </span><span class="mi">92</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'web-01'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 10:17:00'</span><span class="p">,</span><span class="w"> </span><span class="mi">60</span><span class="p">.</span><span class="mi">0</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(4 rows × 6 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>window_start</th>
+<th>window_end</th>
+<th>server_id</th>
+<th>sample_count</th>
+<th>avg_cpu</th>
+<th>peak_cpu</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-03-01 10:00:00</td>
+<td>2026-03-01 10:15:00</td>
+<td>web-01</td>
+<td>3</td>
+<td>71.67</td>
+<td>92</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-03-01 10:05:00</td>
+<td>2026-03-01 10:20:00</td>
+<td>web-01</td>
+<td>3</td>
+<td>76.67</td>
+<td>92</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-03-01 10:10:00</td>
+<td>2026-03-01 10:25:00</td>
+<td>web-01</td>
+<td>2</td>
+<td>76</td>
+<td>92</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-03-01 10:15:00</td>
+<td>2026-03-01 10:30:00</td>
+<td>web-01</td>
+<td>1</td>
+<td>60</td>
+<td>60</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(4 rows × 6 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>window_start</th>
+<th>window_end</th>
+<th>server_id</th>
+<th>sample_count</th>
+<th>avg_cpu</th>
+<th>peak_cpu</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-03-01 10:00:00</td>
+<td>2026-03-01 10:15:00</td>
+<td>web-01</td>
+<td>3</td>
+<td>71.67</td>
+<td>92</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-03-01 10:05:00</td>
+<td>2026-03-01 10:20:00</td>
+<td>web-01</td>
+<td>3</td>
+<td>76.67</td>
+<td>92</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-03-01 10:10:00</td>
+<td>2026-03-01 10:25:00</td>
+<td>web-01</td>
+<td>2</td>
+<td>76</td>
+<td>92</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-03-01 10:15:00</td>
+<td>2026-03-01 10:30:00</td>
+<td>web-01</td>
+<td>1</td>
+<td>60</td>
+<td>60</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_007_Q07_scd2_open_ended_intervals.html" class="nav-btn">← Prev: Slowly Changing Dimension...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_009_Q09_ledger_balance_duplicate_timestamps.html" class="nav-btn">Next: Financial Ledger Cumulati... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

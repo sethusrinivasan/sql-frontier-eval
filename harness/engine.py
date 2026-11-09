@@ -2,6 +2,7 @@ import duckdb
 import pandas as pd
 import json
 import time
+import threading
 from typing import Optional, Tuple, Dict, Any, List
 
 class SQLEvalEngine:
@@ -22,6 +23,7 @@ class SQLEvalEngine:
                 pass
         self.con = duckdb.connect(database=":memory:")
         self.con.execute(f"PRAGMA threads={self.threads};")
+        self.con.execute("SET max_memory = '2GB';")
         try:
             self.con.execute("INSTALL fts; LOAD fts;")
         except Exception:
@@ -38,19 +40,26 @@ class SQLEvalEngine:
         except Exception as e:
             return str(e)
 
-    def execute_query(self, query: str) -> Tuple[Optional[pd.DataFrame], Optional[str], float]:
+    def execute_query(self, query: str, timeout_sec: float = 15.0) -> Tuple[Optional[pd.DataFrame], Optional[str], float]:
         """
-        Executes an analytical SQL query.
+        Executes an analytical SQL query with memory ceiling and statement timeout guard.
         Returns (result_df, error_message, execution_time_ms).
         """
         start_time = time.perf_counter()
+        timer = threading.Timer(timeout_sec, self.con.interrupt)
+        timer.start()
         try:
             df = self.con.execute(query).df()
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             return df, None, elapsed_ms
         except Exception as e:
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            return None, str(e), elapsed_ms
+            err_msg = str(e)
+            if "Interrupt" in type(e).__name__ or "Interrupted" in err_msg:
+                err_msg = f"Execution timed out (> {timeout_sec:.1f}s) - runaway query terminated safely."
+            return None, err_msg, elapsed_ms
+        finally:
+            timer.cancel()
 
     def profile_query(self, query: str) -> Tuple[Optional[Any], Optional[str]]:
         """

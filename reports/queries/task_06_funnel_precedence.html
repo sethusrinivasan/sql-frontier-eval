@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_06_funnel_precedence - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Strict Funnel Precedence</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_06_funnel_precedence</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_069_Q69_query_relaxation_fallback.html" class="nav-btn">← Prev: Zero-Result Search Query ...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_070_Q70_search_snippet_keyword_extraction.html" class="nav-btn">Next: Search Snippet Extraction... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Strict Funnel Precedence</span>
+                    <span class="badge badge-id">task_06_funnel_precedence</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: No</span>
+                </div>
+                <h1 class="task-title">Sequential Multi-Stage User Onboarding Conversion Funnel</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">43.89 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.6x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">71.44 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">34.3 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 5.2s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Calculates user conversion through a multi-step sequence where events must strictly obey chronological order.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Frontier models frequently calculate funnel conversions using independent conditional aggregations (COUNT DISTINCT CASE WHEN event = &#x27;purchase&#x27;). This completely ignores the chronological order requirement (t_view &lt; t_cart &lt; t_purchase), mistakenly counting users who purchased via separate shortcuts or had events recorded out of sequence as successful sequential conversions.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Analyze user conversion across a 3-step marketing funnel using `user_journey_events`:
+1. Step 1 (View): The user viewed an item (`event_name = &#x27;view_item&#x27;`).
+2. Step 2 (Cart): The user added an item to cart (`event_name = &#x27;add_to_cart&#x27;`) strictly AFTER their initial view event.
+3. Step 3 (Purchase): The user completed a purchase (`event_name = &#x27;purchase&#x27;`) strictly AFTER their cart event.
+
+Calculate the count of distinct users reaching each sequential stage in the funnel.
+
+Required output columns:
+- total_viewers (BIGINT or INT): Distinct users who viewed an item
+- converted_cart (BIGINT or INT): Distinct users who added to cart after viewing
+- converted_purchase (BIGINT or INT): Distinct users who purchased after adding to cart
+
+Only a single summary row is returned.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 34.3 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 user_journey_events</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">34.3 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>event_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>user_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>event_name</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>event_time</code> <small>(TIMESTAMP)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>event_id</th>
+<th>user_id</th>
+<th>event_name</th>
+<th>event_time</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>1</td>
+<td>view_item</td>
+<td>2025-01-01 10:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>1</td>
+<td>add_to_cart</td>
+<td>2025-01-01 10:05:00</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>1</td>
+<td>purchase</td>
+<td>2025-01-01 10:10:00</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>2</td>
+<td>view_item</td>
+<td>2025-01-01 11:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>5</td>
+<td>2</td>
+<td>add_to_cart</td>
+<td>2025-01-01 11:15:00</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>6</td>
+<td>3</td>
+<td>view_item</td>
+<td>2025-01-01 12:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>7</td>
+<td>4</td>
+<td>purchase</td>
+<td>2025-01-01 08:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>8</td>
+<td>4</td>
+<td>view_item</td>
+<td>2025-01-01 09:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>4</td>
+<td>click</td>
+<td>2026-03-01 09:30:00.000005</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>5</td>
+<td>view</td>
+<td>2026-03-01 09:30:00.000023</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>6</td>
+<td>add_to_cart</td>
+<td>2026-03-01 09:30:00.000050</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>7</td>
+<td>checkout</td>
+<td>2026-03-01 09:30:00.000061</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>8</td>
+<td>search</td>
+<td>2026-03-01 09:30:00.000085</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>9</td>
+<td>click</td>
+<td>2026-03-01 09:30:00.000119</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>10</td>
+<td>view</td>
+<td>2026-03-01 09:30:00.000121</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 168.40 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 82.62718923068374%; background: #f85149;" title="HASH_GROUP_BY: 139.15ms (82.6%)"></div><div class="cost-bar-seg" style="width: 13.953794686708388%; background: #f85149;" title="TABLE_SCAN: 23.50ms (14.0%)"></div><div class="cost-bar-seg" style="width: 1.5629344816250583%; background: #3fb950;" title="PROJECTION: 2.63ms (1.6%)"></div><div class="cost-bar-seg" style="width: 0.9970872578992337%; background: #d29922;" title="FILTER: 1.68ms (1.0%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>UNGROUPED_AGGREGATE</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">1,344 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;first_cart_time&#x27;, &#x27;first_purchase">📁 Projections: [&#x27;first_cart_time&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">1,344 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;first_cart_time&#x27;, &#x27;first_purchase">📁 Projections: [&#x27;first_cart_time&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.24 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">1,360 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">1,360 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;first_cart_time&#x27;, &#x27;eve">📁 Projections: [&#x27;user_id&#x27;, &#x27;first_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.25 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">1,360 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.22 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">12 B</span></div>
+                <div class="nm-tbl" title="memory.main.user_journey_events">📁 memory.main.user_journey_events</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.28 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">592 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">592 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;first_view_time&#x27;, &#x27;eve">📁 Projections: [&#x27;user_id&#x27;, &#x27;first_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.17 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">592 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.28 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                <div class="nm-tbl" title="memory.main.user_journey_events">📁 memory.main.user_journey_events</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">1.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.68 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 82.6% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">139.15 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,995</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.57 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (82.6% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.63 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.56 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &quot;CASE  WHEN ((event_nam">📁 Projections: [&#x27;user_id&#x27;, &quot;CASE  ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">14.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">23.50 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="memory.main.user_journey_events">📁 memory.main.user_journey_events</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>82.6%</strong></td>
+            <td>139.15 ms</td>
+            <td>999,995</td>
+            <td>11.57 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>14.0%</strong></td>
+            <td>23.50 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>memory.main.user_journey_events</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.6%</strong></td>
+            <td>2.63 ms</td>
+            <td>1,000,000</td>
+            <td>11.56 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &quot;CASE  WHEN ((event_nam</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>1.0%</strong></td>
+            <td>1.68 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.2%</strong></td>
+            <td>0.28 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.user_journey_events</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.2%</strong></td>
+            <td>0.28 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.25 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.24 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.22 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.user_journey_events</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.17 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNGROUPED_AGGREGATE</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;first_cart_time&#x27;, &#x27;eve</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;first_view_time&#x27;, &#x27;eve</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;first_cart_time&#x27;, &#x27;first_purchase</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;first_cart_time&#x27;, &#x27;first_purchase</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 43.89 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">user_funnel</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">min</span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">                  </span><span class="k">WHEN</span><span class="w"> </span><span class="n">event_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'view_item'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">event_time</span>
+<span class="w">              </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">first_view_time</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">user_journey_events</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span>
+<span class="w">   </span><span class="k">HAVING</span><span class="w"> </span><span class="k">min</span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">                  </span><span class="k">WHEN</span><span class="w"> </span><span class="n">event_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'view_item'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">event_time</span>
+<span class="w">              </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">),</span>
+<span class="w">     </span><span class="n">cart_events</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">f</span><span class="p">.</span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">f</span><span class="p">.</span><span class="n">first_view_time</span><span class="p">,</span>
+<span class="w">          </span><span class="k">min</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">first_cart_time</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">user_funnel</span><span class="w"> </span><span class="n">f</span>
+<span class="w">   </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">user_journey_events</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">f</span><span class="p">.</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">user_id</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">event_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'add_to_cart'</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">event_time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">f</span><span class="p">.</span><span class="n">first_view_time</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">f</span><span class="p">.</span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">            </span><span class="n">f</span><span class="p">.</span><span class="n">first_view_time</span><span class="p">),</span>
+<span class="w">     </span><span class="n">purchase_events</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">c</span><span class="p">.</span><span class="n">first_cart_time</span><span class="p">,</span>
+<span class="w">          </span><span class="k">min</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">first_purchase_time</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">cart_events</span><span class="w"> </span><span class="k">c</span>
+<span class="w">   </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">user_journey_events</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">user_id</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">event_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'purchase'</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">first_cart_time</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">event_time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">first_cart_time</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">            </span><span class="k">c</span><span class="p">.</span><span class="n">first_cart_time</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="k">count</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_viewers</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="n">first_cart_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">converted_cart</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="n">first_purchase_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">converted_purchase</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">purchase_events</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 71.44 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">user_stages</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">min</span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">                  </span><span class="k">WHEN</span><span class="w"> </span><span class="n">event_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'view_item'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">event_time</span>
+<span class="w">              </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">view_time</span><span class="p">,</span>
+<span class="w">          </span><span class="k">min</span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">                  </span><span class="k">WHEN</span><span class="w"> </span><span class="n">event_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'add_to_cart'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">event_time</span>
+<span class="w">              </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">cart_time</span><span class="p">,</span>
+<span class="w">          </span><span class="k">min</span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">                  </span><span class="k">WHEN</span><span class="w"> </span><span class="n">event_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'purchase'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">event_time</span>
+<span class="w">              </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">purchase_time</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">user_journey_events</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="k">count</span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">                 </span><span class="k">WHEN</span><span class="w"> </span><span class="n">view_time</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">             </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_viewers</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">                 </span><span class="k">WHEN</span><span class="w"> </span><span class="n">view_time</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">                      </span><span class="k">AND</span><span class="w"> </span><span class="n">cart_time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">view_time</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">             </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">converted_cart</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">                 </span><span class="k">WHEN</span><span class="w"> </span><span class="n">view_time</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">                      </span><span class="k">AND</span><span class="w"> </span><span class="n">cart_time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">view_time</span>
+<span class="w">                      </span><span class="k">AND</span><span class="w"> </span><span class="n">purchase_time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">cart_time</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">             </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">converted_purchase</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">user_stages</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">user_journey_events</span><span class="w"> </span><span class="p">(</span><span class="n">event_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">event_name</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">event_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">user_journey_events</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="c1">-- User 1: valid sequence (view -&gt; cart -&gt; purchase)</span>
+<span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'view_item'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 10:00:00'</span><span class="p">),</span>
+<span class="w">                                                           </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'add_to_cart'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 10:05:00'</span><span class="p">),</span>
+<span class="w">                                                           </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'purchase'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 10:10:00'</span><span class="p">),</span>
+<span class="w">                                                           </span><span class="c1">-- User 2: abandoned after cart (view -&gt; cart)</span>
+<span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'view_item'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 11:00:00'</span><span class="p">),</span>
+<span class="w">                                                                                                         </span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'add_to_cart'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 11:15:00'</span><span class="p">),</span>
+<span class="w">                                                                                                         </span><span class="c1">-- User 3: viewed only</span>
+<span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'view_item'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 12:00:00'</span><span class="p">),</span>
+<span class="w">                                                                                                                               </span><span class="c1">-- User 4: out of order! Purchased before viewing (1-click reorder)</span>
+<span class="p">(</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="s1">'purchase'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 08:00:00'</span><span class="p">),</span>
+<span class="w">                                                                                                                                                                                                  </span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="s1">'view_item'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 09:00:00'</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>total_viewers</th>
+<th>converted_cart</th>
+<th>converted_purchase</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>4</td>
+<td>2</td>
+<td>1</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>total_viewers</th>
+<th>converted_cart</th>
+<th>converted_purchase</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>4</td>
+<td>2</td>
+<td>1</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_069_Q69_query_relaxation_fallback.html" class="nav-btn">← Prev: Zero-Result Search Query ...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_070_Q70_search_snippet_keyword_extraction.html" class="nav-btn">Next: Search Snippet Extraction... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

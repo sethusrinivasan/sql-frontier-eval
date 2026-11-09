@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_03_scd2_join - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">SCD Type 2 Point-in-Time Joins</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_03_scd2_join</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_039_Q39_maximal_marginal_relevance_mmr.html" class="nav-btn">← Prev: Maximal Marginal Relevanc...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_040_Q40_cosine_matrix_cluster_pruning.html" class="nav-btn">Next: Pairwise Vector Similarit... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">SCD Type 2 Point-in-Time Joins</span>
+                    <span class="badge badge-id">task_03_scd2_join</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Historical SCD Type 2 Point-in-Time Currency Conversion</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">72.13 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">68.78 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,003 rows</div>
+                    <div class="stat-sub">45.8 MiB across 2 tables</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 4.2s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Joins financial transactions to Slowly Changing Dimension (SCD Type 2) exchange rate tables matching effective date ranges, correctly handling open-ended NULL upper bounds.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Frontier models routinely fail SCD Type 2 point-in-time join logic in two ways: (1) omitting the open-ended current record condition `OR valid_to IS NULL`, which causes current active records to be silently dropped during INNER JOINs, and (2) using `&lt;=` instead of `&lt;` on the upper boundary, which causes duplicate rows when a transaction occurs exactly on the boundary timestamp of an SCD revision.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Convert each financial transaction in `transactions` to USD using the historically effective rate from `exchange_rates` (SCD Type 2 table).
+
+An exchange rate record is effective for a transaction if:
+1. The transaction currency matches the rate currency,
+2. The transaction timestamp is greater than or equal to `valid_from`, AND
+3. The transaction timestamp is strictly less than `valid_to`, OR `valid_to` is NULL (indicating the current, ongoing rate).
+
+Required output columns:
+- txn_id (INT)
+- currency (VARCHAR)
+- amount (DECIMAL)
+- rate_to_usd (DECIMAL)
+- amount_usd (DECIMAL): Calculated as ROUND(amount * rate_to_usd, 2)
+
+Sort the results by txn_id ASC.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">2 Tables (1,000,003 rows &bull; 45.8 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 exchange_rates</span>
+                    <span class="badge badge-pass">3 rows</span>
+                    <span class="badge badge-golden">168 B Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>rate_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>currency</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>rate_to_usd</code> <small>(DECIMAL(10,4))</small></span> <span class="col-pill"><code>valid_from</code> <small>(TIMESTAMP)</small></span> <span class="col-pill"><code>valid_to</code> <small>(TIMESTAMP)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 3 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>rate_id</th>
+<th>currency</th>
+<th>rate_to_usd</th>
+<th>valid_from</th>
+<th>valid_to</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>10</td>
+<td>EUR</td>
+<td>1.05</td>
+<td>2025-01-01 00:00:00</td>
+<td>2025-01-15 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>11</td>
+<td>EUR</td>
+<td>1.08</td>
+<td>2025-01-15 00:00:00</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>12</td>
+<td>GBP</td>
+<td>1.25</td>
+<td>2025-01-01 00:00:00</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 transactions</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">45.8 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>txn_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>currency</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>amount</code> <small>(DECIMAL(10,2))</small></span> <span class="col-pill"><code>txn_time</code> <small>(TIMESTAMP)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>txn_id</th>
+<th>currency</th>
+<th>amount</th>
+<th>txn_time</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>EUR</td>
+<td>100</td>
+<td>2025-01-05 12:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>EUR</td>
+<td>200</td>
+<td>2025-01-20 15:30:00</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>GBP</td>
+<td>50</td>
+<td>2025-01-10 09:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>USD</td>
+<td>55.11</td>
+<td>2026-03-01 09:30:00.000006</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>EUR</td>
+<td>129.46</td>
+<td>2026-03-01 09:30:00.000021</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>GBP</td>
+<td>128.53</td>
+<td>2026-03-01 09:30:00.000041</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>JPY</td>
+<td>176.25</td>
+<td>2026-03-01 09:30:00.000066</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>CAD</td>
+<td>10.24</td>
+<td>2026-03-01 09:30:00.000091</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>AUD</td>
+<td>0.01</td>
+<td>2026-03-01 09:30:00.000116</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>USD</td>
+<td>208.45</td>
+<td>2026-03-01 09:30:00.000130</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>EUR</td>
+<td>78.61</td>
+<td>2026-03-01 09:30:00.000144</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>GBP</td>
+<td>0.01</td>
+<td>2026-03-01 09:30:00.000173</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>JPY</td>
+<td>232.53</td>
+<td>2026-03-01 09:30:00.000192</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>CAD</td>
+<td>124.88</td>
+<td>2026-03-01 09:30:00.000201</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>AUD</td>
+<td>72.53</td>
+<td>2026-03-01 09:30:00.000225</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 70.44 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 38.6709372870384%; background: #f85149;" title="ORDER_BY: 27.24ms (38.7%)"></div><div class="cost-bar-seg" style="width: 27.824039314141146%; background: #f85149;" title="HASH_JOIN: 19.60ms (27.8%)"></div><div class="cost-bar-seg" style="width: 25.984096462704603%; background: #f85149;" title="TABLE_SCAN: 18.30ms (26.0%)"></div><div class="cost-bar-seg" style="width: 4.556932955920515%; background: #d29922;" title="PROJECTION: 3.21ms (4.6%)"></div><div class="cost-bar-seg" style="width: 2.431268582432995%; background: #bc8cff;" title="PROJECTION: 1.71ms (2.4%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.35 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,335</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">13.99 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 38.7% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">27.24 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,335</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10.17 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (38.7% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">2.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.71 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,335</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10.17 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_compress_string_">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">4.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">3.21 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,335</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">13.99 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;txn_id&#x27;, &#x27;currency&#x27;, &#x27;amount&#x27;, &#x27;r">📁 Projections: [&#x27;txn_id&#x27;, &#x27;currenc...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="high-cost-tag">🔥 27.8% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">19.60 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,335</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (27.8% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="high-cost-tag">🔥 26.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">18.30 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,335</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                <div class="nm-tbl" title="memory.main.transactions">📁 memory.main.transactions</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (26.0% of query runtime)</div>
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">376 B</span></div>
+                <div class="nm-tbl" title="memory.main.exchange_rates">📁 memory.main.exchange_rates</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>38.7%</strong></td>
+            <td>27.24 ms</td>
+            <td>333,335</td>
+            <td>10.17 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>27.8%</strong></td>
+            <td>19.60 ms</td>
+            <td>333,335</td>
+            <td>11.44 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>26.0%</strong></td>
+            <td>18.30 ms</td>
+            <td>333,335</td>
+            <td>11.44 MB</td>
+            <td><small>memory.main.transactions</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>4.6%</strong></td>
+            <td>3.21 ms</td>
+            <td>333,335</td>
+            <td>13.99 MB</td>
+            <td><small>Projections: [&#x27;txn_id&#x27;, &#x27;currency&#x27;, &#x27;amount&#x27;, &#x27;r</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>2.4%</strong></td>
+            <td>1.71 ms</td>
+            <td>333,335</td>
+            <td>10.17 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_compress_string_</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.5%</strong></td>
+            <td>0.35 ms</td>
+            <td>333,335</td>
+            <td>13.99 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.03 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.exchange_rates</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 72.13 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">txn_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">t</span><span class="p">.</span><span class="n">currency</span><span class="p">,</span>
+<span class="w">       </span><span class="n">t</span><span class="p">.</span><span class="n">amount</span><span class="p">,</span>
+<span class="w">       </span><span class="n">r</span><span class="p">.</span><span class="n">rate_to_usd</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">t</span><span class="p">.</span><span class="n">amount</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">rate_to_usd</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">amount_usd</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">transactions</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">t</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">exchange_rates</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">currency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">currency</span>
+<span class="k">AND</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">txn_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">valid_from</span>
+<span class="k">AND</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="p">.</span><span class="n">txn_time</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">valid_to</span>
+<span class="w">     </span><span class="k">OR</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">valid_to</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="p">)</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">txn_id</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 68.78 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">txn_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">t</span><span class="p">.</span><span class="n">currency</span><span class="p">,</span>
+<span class="w">       </span><span class="n">t</span><span class="p">.</span><span class="n">amount</span><span class="p">,</span>
+<span class="w">       </span><span class="n">r</span><span class="p">.</span><span class="n">rate_to_usd</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">t</span><span class="p">.</span><span class="n">amount</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">rate_to_usd</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">amount_usd</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">transactions</span><span class="w"> </span><span class="n">t</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">exchange_rates</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">currency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">currency</span>
+<span class="k">AND</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">txn_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">valid_from</span>
+<span class="k">AND</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="p">.</span><span class="n">txn_time</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">valid_to</span>
+<span class="w">     </span><span class="k">OR</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">valid_to</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="p">)</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">txn_id</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">transactions</span><span class="w"> </span><span class="p">(</span><span class="n">txn_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">currency</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">amount</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">),</span>
+<span class="w">                                                                </span><span class="n">txn_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">);</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">exchange_rates</span><span class="w"> </span><span class="p">(</span><span class="n">rate_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">currency</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">rate_to_usd</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">),</span>
+<span class="w">                                                                        </span><span class="n">valid_from</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span><span class="w"> </span><span class="n">valid_to</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">transactions</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'EUR'</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-05 12:00:00'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'EUR'</span><span class="p">,</span><span class="w"> </span><span class="mi">200</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-20 15:30:00'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'GBP'</span><span class="p">,</span><span class="w"> </span><span class="mi">50</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-10 09:00:00'</span><span class="p">);</span>
+
+<span class="c1">-- SCD2 rates: EUR changed on Jan 15; GBP has no end date (current ongoing rate)</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">exchange_rates</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="s1">'EUR'</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0500</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 00:00:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-15 00:00:00'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">11</span><span class="p">,</span><span class="w"> </span><span class="s1">'EUR'</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0800</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-15 00:00:00'</span><span class="p">,</span><span class="w"> </span><span class="k">NULL</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="s1">'GBP'</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">2500</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01 00:00:00'</span><span class="p">,</span><span class="w"> </span><span class="k">NULL</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(333,335 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>txn_id</th>
+<th>currency</th>
+<th>amount</th>
+<th>rate_to_usd</th>
+<th>amount_usd</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>EUR</td>
+<td>100</td>
+<td>1.05</td>
+<td>105</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>EUR</td>
+<td>200</td>
+<td>1.08</td>
+<td>216</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>GBP</td>
+<td>50</td>
+<td>1.25</td>
+<td>62.5</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>EUR</td>
+<td>129.46</td>
+<td>1.08</td>
+<td>139.82</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>5</td>
+<td>GBP</td>
+<td>128.53</td>
+<td>1.25</td>
+<td>160.66</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>10</td>
+<td>EUR</td>
+<td>78.61</td>
+<td>1.08</td>
+<td>84.9</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>11</td>
+<td>GBP</td>
+<td>0.01</td>
+<td>1.25</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>16</td>
+<td>EUR</td>
+<td>19.19</td>
+<td>1.08</td>
+<td>20.73</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>17</td>
+<td>GBP</td>
+<td>266.2</td>
+<td>1.25</td>
+<td>332.75</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>22</td>
+<td>EUR</td>
+<td>96.4</td>
+<td>1.08</td>
+<td>104.11</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>23</td>
+<td>GBP</td>
+<td>187.36</td>
+<td>1.25</td>
+<td>234.2</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>28</td>
+<td>EUR</td>
+<td>74.92</td>
+<td>1.08</td>
+<td>80.91</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>29</td>
+<td>GBP</td>
+<td>266.55</td>
+<td>1.25</td>
+<td>333.19</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>34</td>
+<td>EUR</td>
+<td>117.25</td>
+<td>1.08</td>
+<td>126.63</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>35</td>
+<td>GBP</td>
+<td>75.64</td>
+<td>1.25</td>
+<td>94.55</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>40</td>
+<td>EUR</td>
+<td>0.01</td>
+<td>1.08</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>41</td>
+<td>GBP</td>
+<td>5.45</td>
+<td>1.25</td>
+<td>6.81</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>46</td>
+<td>EUR</td>
+<td>0.01</td>
+<td>1.08</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>47</td>
+<td>GBP</td>
+<td>233.62</td>
+<td>1.25</td>
+<td>292.03</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>52</td>
+<td>EUR</td>
+<td>101.52</td>
+<td>1.08</td>
+<td>109.64</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>53</td>
+<td>GBP</td>
+<td>165.94</td>
+<td>1.25</td>
+<td>207.43</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>58</td>
+<td>EUR</td>
+<td>77.66</td>
+<td>1.08</td>
+<td>83.87</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>59</td>
+<td>GBP</td>
+<td>157.56</td>
+<td>1.25</td>
+<td>196.95</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>64</td>
+<td>EUR</td>
+<td>0.01</td>
+<td>1.08</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>65</td>
+<td>GBP</td>
+<td>116.7</td>
+<td>1.25</td>
+<td>145.88</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 333,335 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(333,335 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>txn_id</th>
+<th>currency</th>
+<th>amount</th>
+<th>rate_to_usd</th>
+<th>amount_usd</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>EUR</td>
+<td>100</td>
+<td>1.05</td>
+<td>105</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>EUR</td>
+<td>200</td>
+<td>1.08</td>
+<td>216</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>GBP</td>
+<td>50</td>
+<td>1.25</td>
+<td>62.5</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>EUR</td>
+<td>129.46</td>
+<td>1.08</td>
+<td>139.82</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>5</td>
+<td>GBP</td>
+<td>128.53</td>
+<td>1.25</td>
+<td>160.66</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>10</td>
+<td>EUR</td>
+<td>78.61</td>
+<td>1.08</td>
+<td>84.9</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>11</td>
+<td>GBP</td>
+<td>0.01</td>
+<td>1.25</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>16</td>
+<td>EUR</td>
+<td>19.19</td>
+<td>1.08</td>
+<td>20.73</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>17</td>
+<td>GBP</td>
+<td>266.2</td>
+<td>1.25</td>
+<td>332.75</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>22</td>
+<td>EUR</td>
+<td>96.4</td>
+<td>1.08</td>
+<td>104.11</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>23</td>
+<td>GBP</td>
+<td>187.36</td>
+<td>1.25</td>
+<td>234.2</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>28</td>
+<td>EUR</td>
+<td>74.92</td>
+<td>1.08</td>
+<td>80.91</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>29</td>
+<td>GBP</td>
+<td>266.55</td>
+<td>1.25</td>
+<td>333.19</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>34</td>
+<td>EUR</td>
+<td>117.25</td>
+<td>1.08</td>
+<td>126.63</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>35</td>
+<td>GBP</td>
+<td>75.64</td>
+<td>1.25</td>
+<td>94.55</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>40</td>
+<td>EUR</td>
+<td>0.01</td>
+<td>1.08</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>41</td>
+<td>GBP</td>
+<td>5.45</td>
+<td>1.25</td>
+<td>6.81</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>46</td>
+<td>EUR</td>
+<td>0.01</td>
+<td>1.08</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>47</td>
+<td>GBP</td>
+<td>233.62</td>
+<td>1.25</td>
+<td>292.03</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>52</td>
+<td>EUR</td>
+<td>101.52</td>
+<td>1.08</td>
+<td>109.64</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>53</td>
+<td>GBP</td>
+<td>165.94</td>
+<td>1.25</td>
+<td>207.43</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>58</td>
+<td>EUR</td>
+<td>77.66</td>
+<td>1.08</td>
+<td>83.87</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>59</td>
+<td>GBP</td>
+<td>157.56</td>
+<td>1.25</td>
+<td>196.95</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>64</td>
+<td>EUR</td>
+<td>0.01</td>
+<td>1.08</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>65</td>
+<td>GBP</td>
+<td>116.7</td>
+<td>1.25</td>
+<td>145.88</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 333,335 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_039_Q39_maximal_marginal_relevance_mmr.html" class="nav-btn">← Prev: Maximal Marginal Relevanc...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_040_Q40_cosine_matrix_cluster_pruning.html" class="nav-btn">Next: Pairwise Vector Similarit... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

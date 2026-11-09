@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_075_Q75_hybrid_search_metadata_soft_boost - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Search &amp; Retrieval</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_075_Q75_hybrid_search_metadata_soft_boost</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_074_Q74_did_you_mean_spell_suggestion.html" class="nav-btn">← Prev: &#x27;Did You Mean?&#x27; Query Spe...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_076_Q76_bill_of_materials_recursive_rollup.html" class="nav-btn">Next: Hierarchical Bill of Mate... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Search &amp; Retrieval</span>
+                    <span class="badge badge-id">task_075_Q75_hybrid_search_metadata_soft_boost</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Hybrid Search with Hard Categorical Filter &amp; Soft Merchant Quality Boost</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">135.78 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">139.07 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">50.5 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 14.8s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Top marketplaces enforce strict hard filters (in-stock, prime shipping) while soft-boosting items based on merchant review rating: final_score = text_relevance * (1.0 + 0.1 * merchant_rating).</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Hard-filtering by rating eliminates high-relevance new merchants with few reviews.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Top marketplaces enforce strict hard filters (in-stock, prime shipping) while soft-boosting items based on merchant review rating: final_score = text_relevance * (1.0 + 0.1 * merchant_rating).
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: item_id, title, merchant_rating, base_relevance, boosted_final_score.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 50.5 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 merchant_inventory</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">50.5 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>item_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>category</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>title</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>merchant_rating</code> <small>(DOUBLE)</small></span> <span class="col-pill"><code>is_available</code> <small>(BOOLEAN)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>item_id</th>
+<th>category</th>
+<th>title</th>
+<th>merchant_rating</th>
+<th>is_available</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Audio</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>4.9</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>Audio</td>
+<td>Budget Studio Headphones</td>
+<td>3.8</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>Audio</td>
+<td>Discontinued Vintage Headphones</td>
+<td>4.8</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>Audio</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>4.4</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>Audio</td>
+<td>Budget Studio Headphones</td>
+<td>4.1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>Audio</td>
+<td>Discontinued Vintage Headphones</td>
+<td>4.51</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>Audio</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>5.41</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>Audio</td>
+<td>Budget Studio Headphones</td>
+<td>3.51</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>Audio</td>
+<td>Discontinued Vintage Headphones</td>
+<td>4.67</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>Audio</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>2.93</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>Audio</td>
+<td>Budget Studio Headphones</td>
+<td>5.04</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>Audio</td>
+<td>Discontinued Vintage Headphones</td>
+<td>3.55</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>Audio</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>4.62</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>Audio</td>
+<td>Budget Studio Headphones</td>
+<td>4.52</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>Audio</td>
+<td>Discontinued Vintage Headphones</td>
+<td>3.97</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 160.93 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 58.96717752466637%; background: #f85149;" title="ORDER_BY: 94.90ms (59.0%)"></div><div class="cost-bar-seg" style="width: 19.74377695254574%; background: #f85149;" title="TABLE_SCAN: 31.77ms (19.7%)"></div><div class="cost-bar-seg" style="width: 13.368536627941765%; background: #3fb950;" title="PROJECTION: 21.51ms (13.4%)"></div><div class="cost-bar-seg" style="width: 7.920508894846119%; background: #d29922;" title="PROJECTION: 12.75ms (7.9%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 59.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">94.90 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,001</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">18.12 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (59.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">13.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">21.51 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,001</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">18.12 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;, &#x27;merchant_rati">📁 Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">7.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">12.75 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,001</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.31 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;, &#x27;merchant_rati">📁 Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">19.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">31.77 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,001</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">13.35 MB</span></div>
+                <div class="nm-tbl" title="memory.main.merchant_inventory">📁 memory.main.merchant_inventory</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>59.0%</strong></td>
+            <td>94.90 ms</td>
+            <td>500,001</td>
+            <td>18.12 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>19.7%</strong></td>
+            <td>31.77 ms</td>
+            <td>500,001</td>
+            <td>13.35 MB</td>
+            <td><small>memory.main.merchant_inventory</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>13.4%</strong></td>
+            <td>21.51 ms</td>
+            <td>500,001</td>
+            <td>18.12 MB</td>
+            <td><small>Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;, &#x27;merchant_rati</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>7.9%</strong></td>
+            <td>12.75 ms</td>
+            <td>500,001</td>
+            <td>14.31 MB</td>
+            <td><small>Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;, &#x27;merchant_rati</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 135.78 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="c1">-- Search 'Headphones' in 'Audio': Hard filter available=true, soft-boost by merchant rating</span>
+<span class="k">WITH</span><span class="w"> </span><span class="n">text_matches</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">title</span><span class="p">,</span>
+<span class="w">          </span><span class="n">merchant_rating</span><span class="p">,</span><span class="w"> </span><span class="c1">-- Base relevance score from keyword matches</span>
+<span class="w"> </span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">      </span><span class="k">WHEN</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="k">ILIKE</span><span class="w"> </span><span class="s1">'%studio%'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">2</span><span class="p">.</span><span class="mi">0</span>
+<span class="w">      </span><span class="k">ELSE</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span>
+<span class="w">  </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">base_relevance</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">merchant_inventory</span>
+<span class="w">   </span><span class="k">WHERE</span><span class="w"> </span><span class="n">category</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'Audio'</span>
+<span class="w">     </span><span class="k">AND</span><span class="w"> </span><span class="n">is_available</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">TRUE</span>
+<span class="w">     </span><span class="k">AND</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="k">ILIKE</span><span class="w"> </span><span class="s1">'%Headphones%'</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">title</span><span class="p">,</span>
+<span class="w">       </span><span class="n">merchant_rating</span><span class="p">,</span>
+<span class="w">       </span><span class="n">base_relevance</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">base_relevance</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">merchant_rating</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">5</span><span class="p">.</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">50</span><span class="p">),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">boosted_final_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">text_matches</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">boosted_final_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 139.07 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Search 'Headphones' in 'Audio': Hard filter available=true, soft-boost by merchant rating</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">text_matches</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">title</span><span class="p">,</span>
+<span class="w">          </span><span class="n">merchant_rating</span><span class="p">,</span><span class="w"> </span><span class="c1">-- Base relevance score from keyword matches</span>
+<span class="w"> </span><span class="p">(</span><span class="k">CASE</span>
+<span class="w">      </span><span class="k">WHEN</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="k">ILIKE</span><span class="w"> </span><span class="s1">'%studio%'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">2</span><span class="p">.</span><span class="mi">0</span>
+<span class="w">      </span><span class="k">ELSE</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span>
+<span class="w">  </span><span class="k">END</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">base_relevance</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">merchant_inventory</span>
+<span class="w">   </span><span class="k">WHERE</span><span class="w"> </span><span class="n">category</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'Audio'</span>
+<span class="w">     </span><span class="k">AND</span><span class="w"> </span><span class="n">is_available</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">TRUE</span>
+<span class="w">     </span><span class="k">AND</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="k">ILIKE</span><span class="w"> </span><span class="s1">'%Headphones%'</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">title</span><span class="p">,</span>
+<span class="w">       </span><span class="n">merchant_rating</span><span class="p">,</span>
+<span class="w">       </span><span class="n">base_relevance</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">base_relevance</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">merchant_rating</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">5</span><span class="p">.</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">50</span><span class="p">),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">boosted_final_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">text_matches</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">boosted_final_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">merchant_inventory</span><span class="w"> </span><span class="p">(</span><span class="n">item_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">category</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">merchant_rating</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">,</span>
+<span class="w">                                                                                               </span><span class="n">is_available</span><span class="w"> </span><span class="nb">BOOLEAN</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">merchant_inventory</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'Audio'</span><span class="p">,</span><span class="w"> </span><span class="s1">'Pro Studio Monitor Headphones'</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">.</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="k">TRUE</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'Audio'</span><span class="p">,</span><span class="w"> </span><span class="s1">'Budget Studio Headphones'</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">.</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="k">TRUE</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'Audio'</span><span class="p">,</span><span class="w"> </span><span class="s1">'Discontinued Vintage Headphones'</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">.</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="k">FALSE</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(500,001 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>item_id</th>
+<th>title</th>
+<th>merchant_rating</th>
+<th>base_relevance</th>
+<th>boosted_final_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>784,213</td>
+<td>Budget Studio Headphones</td>
+<td>7.19</td>
+<td>2</td>
+<td>3.44</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>303,279</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>7.16</td>
+<td>2</td>
+<td>3.43</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>731,113</td>
+<td>Budget Studio Headphones</td>
+<td>7.15</td>
+<td>2</td>
+<td>3.43</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>489,013</td>
+<td>Budget Studio Headphones</td>
+<td>7.05</td>
+<td>2</td>
+<td>3.41</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>357,721</td>
+<td>Budget Studio Headphones</td>
+<td>7.01</td>
+<td>2</td>
+<td>3.4</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>65,473</td>
+<td>Budget Studio Headphones</td>
+<td>6.96</td>
+<td>2</td>
+<td>3.39</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>158,607</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.96</td>
+<td>2</td>
+<td>3.39</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>393,373</td>
+<td>Budget Studio Headphones</td>
+<td>6.9</td>
+<td>2</td>
+<td>3.38</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>625,867</td>
+<td>Budget Studio Headphones</td>
+<td>6.89</td>
+<td>2</td>
+<td>3.38</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>332,067</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.86</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>358,081</td>
+<td>Budget Studio Headphones</td>
+<td>6.86</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>991,677</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.83</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>949,417</td>
+<td>Budget Studio Headphones</td>
+<td>6.84</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>933,771</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.83</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>366,745</td>
+<td>Budget Studio Headphones</td>
+<td>6.82</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>255,531</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.8</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>580,095</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.81</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>48,799</td>
+<td>Budget Studio Headphones</td>
+<td>6.82</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>40,287</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.79</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>238,269</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.82</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>142,479</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.81</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>924,705</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.82</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>201,187</td>
+<td>Budget Studio Headphones</td>
+<td>6.78</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>920,583</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.81</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>834,657</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.74</td>
+<td>2</td>
+<td>3.35</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 500,001 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(500,001 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>item_id</th>
+<th>title</th>
+<th>merchant_rating</th>
+<th>base_relevance</th>
+<th>boosted_final_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>784,213</td>
+<td>Budget Studio Headphones</td>
+<td>7.19</td>
+<td>2</td>
+<td>3.44</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>303,279</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>7.16</td>
+<td>2</td>
+<td>3.43</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>731,113</td>
+<td>Budget Studio Headphones</td>
+<td>7.15</td>
+<td>2</td>
+<td>3.43</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>489,013</td>
+<td>Budget Studio Headphones</td>
+<td>7.05</td>
+<td>2</td>
+<td>3.41</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>357,721</td>
+<td>Budget Studio Headphones</td>
+<td>7.01</td>
+<td>2</td>
+<td>3.4</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>158,607</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.96</td>
+<td>2</td>
+<td>3.39</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>65,473</td>
+<td>Budget Studio Headphones</td>
+<td>6.96</td>
+<td>2</td>
+<td>3.39</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>393,373</td>
+<td>Budget Studio Headphones</td>
+<td>6.9</td>
+<td>2</td>
+<td>3.38</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>625,867</td>
+<td>Budget Studio Headphones</td>
+<td>6.89</td>
+<td>2</td>
+<td>3.38</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>358,081</td>
+<td>Budget Studio Headphones</td>
+<td>6.86</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>332,067</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.86</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>949,417</td>
+<td>Budget Studio Headphones</td>
+<td>6.84</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>933,771</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.83</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>991,677</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.83</td>
+<td>2</td>
+<td>3.37</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>580,095</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.81</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>255,531</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.8</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>366,745</td>
+<td>Budget Studio Headphones</td>
+<td>6.82</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>924,705</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.82</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>920,583</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.81</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>201,187</td>
+<td>Budget Studio Headphones</td>
+<td>6.78</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>238,269</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.82</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>142,479</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.81</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>40,287</td>
+<td>Pro Studio Monitor Headphones</td>
+<td>6.79</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>48,799</td>
+<td>Budget Studio Headphones</td>
+<td>6.82</td>
+<td>2</td>
+<td>3.36</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>557,839</td>
+<td>Budget Studio Headphones</td>
+<td>6.73</td>
+<td>2</td>
+<td>3.35</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 500,001 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_074_Q74_did_you_mean_spell_suggestion.html" class="nav-btn">← Prev: &#x27;Did You Mean?&#x27; Query Spe...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_076_Q76_bill_of_materials_recursive_rollup.html" class="nav-btn">Next: Hierarchical Bill of Mate... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

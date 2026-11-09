@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_006_Q06_bitemporal_state_reconstruction - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Temporal &amp; Time-Series</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_006_Q06_bitemporal_state_reconstruction</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_005_Q05_iot_sensor_gap_fill_locf.html" class="nav-btn">← Prev: IoT Sensor Telemetry Gap-...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_007_Q07_scd2_open_ended_intervals.html" class="nav-btn">Next: Slowly Changing Dimension... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-fail">✖ VALUE_MISMATCH</span>
+                    <span class="badge badge-domain">Temporal &amp; Time-Series</span>
+                    <span class="badge badge-id">task_006_Q06_bitemporal_state_reconstruction</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: No</span>
+                </div>
+                <h1 class="task-title">Bitemporal Auditing: Valid-Time vs. Transaction-Time Alignment</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">0.04 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.5x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">0.02 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">42.0 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 5.0s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-error">
+            <div class="callout-title">⚠️ Failure Analysis (VALUE_MISMATCH)</div>
+            <div class="callout-body">
+                <p><strong>Reason:</strong> Data discrepancy: DataFrame.iloc[:, 1] (column name=&quot;limit_as_known_then&quot;) are different</p>
+                <ul><li><strong>Diverged Column:</strong> <code>limit_as_known_then</code> at row index <code>0</code></li><li><strong>Expected:</strong> <code>5000.0</code> | <strong>Actual:</strong> <code>8000.0</code></li><li><strong>Arithmetic Delta:</strong> +3000.0000 (1.60x skew)</li></ul>
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Financial compliance requires knowing: &#x27;What did we believe customer Alice&#x27;s credit limit was on May 15th, based on what was entered into our database as of June 1st?&#x27; (Bitemporal query).</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Relying on a single timestamp column confuses retroactive corrections with real-world effective dates, causing compliance audit failures.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Financial compliance requires knowing: &#x27;What did we believe customer Alice&#x27;s credit limit was on May 15th, based on what was entered into our database as of June 1st?&#x27; (Bitemporal query).
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: customer_id, limit_as_known_then, valid_from, valid_to, system_from, system_to.
+Row order does not matter.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 42.0 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 credit_limits_audit</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">42.0 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>customer_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>credit_limit</code> <small>(DECIMAL(10,2))</small></span> <span class="col-pill"><code>valid_from</code> <small>(DATE)</small></span> <span class="col-pill"><code>valid_to</code> <small>(DATE)</small></span> <span class="col-pill"><code>system_from</code> <small>(TIMESTAMP)</small></span> <span class="col-pill"><code>system_to</code> <small>(TIMESTAMP)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>customer_id</th>
+<th>credit_limit</th>
+<th>valid_from</th>
+<th>valid_to</th>
+<th>system_from</th>
+<th>system_to</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>501</td>
+<td>5,000</td>
+<td>2026-05-01 00:00:00</td>
+<td>2026-12-31 00:00:00</td>
+<td>2026-05-01 09:00:00</td>
+<td>2026-06-01 10:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>501</td>
+<td>8,000</td>
+<td>2026-05-15 00:00:00</td>
+<td>2026-12-31 00:00:00</td>
+<td>2026-06-01 10:00:00</td>
+<td>9999-12-31 23:59:59</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>501</td>
+<td>6,773.74</td>
+<td>2026-01-01 00:00:00</td>
+<td>2026-01-01 00:00:00</td>
+<td>2026-03-01 09:30:00.000001</td>
+<td>2026-03-01 09:30:00.000001</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>502</td>
+<td>5,522.97</td>
+<td>2026-01-02 00:00:00</td>
+<td>2026-01-02 00:00:00</td>
+<td>2026-03-01 09:30:00.000024</td>
+<td>2026-03-01 09:30:00.000024</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>503</td>
+<td>7,581.66</td>
+<td>2026-01-03 00:00:00</td>
+<td>2026-01-03 00:00:00</td>
+<td>2026-03-01 09:30:00.000044</td>
+<td>2026-03-01 09:30:00.000044</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>504</td>
+<td>3,177.25</td>
+<td>2026-01-04 00:00:00</td>
+<td>2026-01-04 00:00:00</td>
+<td>2026-03-01 09:30:00.000073</td>
+<td>2026-03-01 09:30:00.000073</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>505</td>
+<td>6,716.41</td>
+<td>2026-01-05 00:00:00</td>
+<td>2026-01-05 00:00:00</td>
+<td>2026-03-01 09:30:00.000081</td>
+<td>2026-03-01 09:30:00.000081</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>506</td>
+<td>6,087.83</td>
+<td>2026-01-06 00:00:00</td>
+<td>2026-01-06 00:00:00</td>
+<td>2026-03-01 09:30:00.000102</td>
+<td>2026-03-01 09:30:00.000102</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>507</td>
+<td>3,529.12</td>
+<td>2026-01-07 00:00:00</td>
+<td>2026-01-07 00:00:00</td>
+<td>2026-03-01 09:30:00.000131</td>
+<td>2026-03-01 09:30:00.000131</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>508</td>
+<td>7,054.69</td>
+<td>2026-01-08 00:00:00</td>
+<td>2026-01-08 00:00:00</td>
+<td>2026-03-01 09:30:00.000142</td>
+<td>2026-03-01 09:30:00.000142</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>509</td>
+<td>6,907.31</td>
+<td>2026-01-09 00:00:00</td>
+<td>2026-01-09 00:00:00</td>
+<td>2026-03-01 09:30:00.000162</td>
+<td>2026-03-01 09:30:00.000162</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>510</td>
+<td>12,644.46</td>
+<td>2026-01-10 00:00:00</td>
+<td>2026-01-10 00:00:00</td>
+<td>2026-03-01 09:30:00.000203</td>
+<td>2026-03-01 09:30:00.000203</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>511</td>
+<td>6,288.32</td>
+<td>2026-01-11 00:00:00</td>
+<td>2026-01-11 00:00:00</td>
+<td>2026-03-01 09:30:00.000201</td>
+<td>2026-03-01 09:30:00.000201</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>512</td>
+<td>6,765.46</td>
+<td>2026-01-12 00:00:00</td>
+<td>2026-01-12 00:00:00</td>
+<td>2026-03-01 09:30:00.000221</td>
+<td>2026-03-01 09:30:00.000221</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>513</td>
+<td>5,186.09</td>
+<td>2026-01-13 00:00:00</td>
+<td>2026-01-13 00:00:00</td>
+<td>2026-03-01 09:30:00.000245</td>
+<td>2026-03-01 09:30:00.000245</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 0.04 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 97.88567608223299%; background: #58a6ff;" title="TABLE_SCAN: 0.04ms (97.9%)"></div><div class="cost-bar-seg" style="width: 2.114323917767006%; background: #f85149;" title="PROJECTION: 0.00ms (2.1%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">2.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">36 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;customer_id&#x27;, &#x27;limit_as_known_the">📁 Projections: [&#x27;customer_id&#x27;, &#x27;li...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">97.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.04 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">36 B</span></div>
+                <div class="nm-tbl" title="memory.main.credit_limits_audit">📁 memory.main.credit_limits_audit</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>97.9%</strong></td>
+            <td>0.04 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.credit_limits_audit</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>2.1%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;customer_id&#x27;, &#x27;limit_as_known_the</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 0.04 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">customer_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">credit_limit</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">limit_as_known_then</span><span class="p">,</span>
+<span class="w">       </span><span class="n">valid_from</span><span class="p">,</span>
+<span class="w">       </span><span class="n">valid_to</span><span class="p">,</span>
+<span class="w">       </span><span class="n">system_from</span><span class="p">,</span>
+<span class="w">       </span><span class="n">system_to</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">credit_limits_audit</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">501</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="nb">DATE</span><span class="w"> </span><span class="s1">'2026-05-15'</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">valid_from</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="nb">DATE</span><span class="w"> </span><span class="s1">'2026-05-15'</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">valid_to</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">'2026-06-01 10:00:00'</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">system_from</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">'2026-06-01 10:00:00'</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">system_to</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 0.02 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Query credit limit effective on 2026-05-20 as known to the system on 2026-05-25 (before retroactive update)</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">customer_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">credit_limit</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">limit_as_known_then</span><span class="p">,</span>
+<span class="w">       </span><span class="n">valid_from</span><span class="p">,</span>
+<span class="w">       </span><span class="n">valid_to</span><span class="p">,</span>
+<span class="w">       </span><span class="n">system_from</span><span class="p">,</span>
+<span class="w">       </span><span class="n">system_to</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">credit_limits_audit</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">501</span><span class="w"> </span><span class="c1">-- As-of Business Date: 2026-05-20</span>
+
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="nb">DATE</span><span class="w"> </span><span class="s1">'2026-05-20'</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">valid_from</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="nb">DATE</span><span class="w"> </span><span class="s1">'2026-05-20'</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">valid_to</span><span class="w"> </span><span class="c1">-- As-of System State: 2026-05-25</span>
+
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">'2026-05-25 00:00:00'</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">system_from</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">'2026-05-25 00:00:00'</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">system_to</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">credit_limits_audit</span><span class="w"> </span><span class="p">(</span><span class="n">customer_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">credit_limit</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">),</span>
+<span class="w">                                                                </span><span class="n">valid_from</span><span class="w"> </span><span class="nb">DATE</span><span class="p">,</span><span class="w"> </span><span class="n">valid_to</span><span class="w"> </span><span class="nb">DATE</span><span class="p">,</span><span class="w"> </span><span class="n">system_from</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span><span class="w"> </span><span class="n">system_to</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">credit_limits_audit</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="c1">-- Original belief entered on May 1st</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">501</span><span class="p">,</span><span class="w"> </span><span class="mi">5000</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-05-01'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-12-31'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-05-01 09:00:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-06-01 10:00:00'</span><span class="p">),</span>
+<span class="w"> </span><span class="c1">-- Retroactive correction entered on June 1st backdating Alice's limit to $8,000 effective May 15th</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">501</span><span class="p">,</span><span class="w"> </span><span class="mi">8000</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-05-15'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-12-31'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-06-01 10:00:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'9999-12-31 23:59:59'</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-fail">(1 rows × 6 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>customer_id</th>
+<th>limit_as_known_then</th>
+<th>valid_from</th>
+<th>valid_to</th>
+<th>system_from</th>
+<th>system_to</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>501</td>
+<td>8,000</td>
+<td>2026-05-15 00:00:00</td>
+<td>2026-12-31 00:00:00</td>
+<td>2026-06-01 10:00:00</td>
+<td>9999-12-31 23:59:59</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1 rows × 6 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>customer_id</th>
+<th>limit_as_known_then</th>
+<th>valid_from</th>
+<th>valid_to</th>
+<th>system_from</th>
+<th>system_to</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>501</td>
+<td>5,000</td>
+<td>2026-05-01 00:00:00</td>
+<td>2026-12-31 00:00:00</td>
+<td>2026-05-01 09:00:00</td>
+<td>2026-06-01 10:00:00</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_005_Q05_iot_sensor_gap_fill_locf.html" class="nav-btn">← Prev: IoT Sensor Telemetry Gap-...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_007_Q07_scd2_open_ended_intervals.html" class="nav-btn">Next: Slowly Changing Dimension... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

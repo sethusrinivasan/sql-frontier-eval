@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_113_vector_prefilter_recall_drop - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Vector &amp; Retrieval</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_113_vector_prefilter_recall_drop</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_112_dual_constraint_sessionization.html" class="nav-btn">← Prev: Dual-Constraint Sessioniz...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_114_asof_tolerance_expiry.html" class="nav-btn">Next: ASOF Point-in-Time Quote ... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Vector &amp; Retrieval</span>
+                    <span class="badge badge-id">task_113_vector_prefilter_recall_drop</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Vector Nearest Neighbors: The Post-Filtering Empty Set Trap</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">12.57 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.1x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">13.88 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">46.7 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 4.7s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Demonstrates the classic vector database failure mode where applying relational metadata filters AFTER Top-K vector retrieval discards valid results, returning an empty result set.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Post-filtering vector retrieval (LIMIT 2 inside a subquery before WHERE filters) selects the globally highest similarity items (item 1 and item 2). Because item 1 is $150 (exceeds $50) and item 2 is &#x27;clothing&#x27;, the outer WHERE filter discards both, returning 0 rows! Relational filters must be applied as PRE-FILTERS.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Retrieve the top 2 most semantically relevant products matching query vector [1.0, 0.0]::FLOAT[2] satisfying:
+- category = &#x27;electronics&#x27;
+- price &lt;= 50.00
+- in_stock = true
+
+Required output columns:
+- item_id (INT)
+- price (DECIMAL)
+- similarity (DOUBLE)
+
+Order by similarity DESC, item_id ASC. Limit to 2 results.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 46.7 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 products_search</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">46.7 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>item_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>category</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>price</code> <small>(DECIMAL(10,2))</small></span> <span class="col-pill"><code>in_stock</code> <small>(BOOLEAN)</small></span> <span class="col-pill"><code>vec</code> <small>(FLOAT[2])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>item_id</th>
+<th>category</th>
+<th>price</th>
+<th>in_stock</th>
+<th>vec</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>electronics</td>
+<td>150</td>
+<td>1</td>
+<td>[0.99 0.01]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>clothing</td>
+<td>20</td>
+<td>1</td>
+<td>[0.98 0.02]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>electronics</td>
+<td>45</td>
+<td>0</td>
+<td>[0.95 0.05]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>electronics</td>
+<td>35</td>
+<td>1</td>
+<td>[0.7 0.3]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>5</td>
+<td>electronics</td>
+<td>25</td>
+<td>1</td>
+<td>[0.65 0.35]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>electronics</td>
+<td>62.77</td>
+<td>1</td>
+<td>[0.8558 0.0677]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>clothing</td>
+<td>78.84</td>
+<td>0</td>
+<td>[0.8677 0.0544]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>electronics</td>
+<td>2.87</td>
+<td>1</td>
+<td>[0.8114 0.0938]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>clothing</td>
+<td>81.48</td>
+<td>0</td>
+<td>[0.8696 0.    ]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>electronics</td>
+<td>0.01</td>
+<td>1</td>
+<td>[0.7734 0.1545]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>clothing</td>
+<td>56.7</td>
+<td>0</td>
+<td>[0.8513 0.0891]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>electronics</td>
+<td>38.71</td>
+<td>1</td>
+<td>[0.8379 0.1214]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>clothing</td>
+<td>127.35</td>
+<td>0</td>
+<td>[0.9036 0.0836]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>electronics</td>
+<td>34.68</td>
+<td>1</td>
+<td>[0.8349 0.0897]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>clothing</td>
+<td>144.12</td>
+<td>0</td>
+<td>[0.9161 0.1901]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 41.57 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 78.65209362497056%; background: #f85149;" title="TABLE_SCAN: 32.70ms (78.7%)"></div><div class="cost-bar-seg" style="width: 14.60026851263168%; background: #f85149;" title="PROJECTION: 6.07ms (14.6%)"></div><div class="cost-bar-seg" style="width: 6.747637862397764%; background: #3fb950;" title="TOP_N: 2.81ms (6.7%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">✂️ <strong>TOP_N</strong></span>
+                <span class="node-cost-tag">6.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.81 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">40 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">14.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">6.07 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">231,842</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4.42 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;item_id&#x27;, &#x27;price&#x27;, &#x27;similarity&#x27;]">📁 Projections: [&#x27;item_id&#x27;, &#x27;price&#x27;...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="high-cost-tag">🔥 78.7% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">32.70 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">231,842</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4.42 MB</span></div>
+                <div class="nm-tbl" title="memory.main.products_search">📁 memory.main.products_search</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (78.7% of query runtime)</div>
+        </div>
+        </div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>78.7%</strong></td>
+            <td>32.70 ms</td>
+            <td>231,842</td>
+            <td>4.42 MB</td>
+            <td><small>memory.main.products_search</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>14.6%</strong></td>
+            <td>6.07 ms</td>
+            <td>231,842</td>
+            <td>4.42 MB</td>
+            <td><small>Projections: [&#x27;item_id&#x27;, &#x27;price&#x27;, &#x27;similarity&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TOP_N</strong></td>
+            <td><strong>6.7%</strong></td>
+            <td>2.81 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 12.57 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">price</span><span class="p">,</span>
+<span class="w">       </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">])::</span><span class="n">DOUBLE</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">similarity</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">products_search</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">category</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'electronics'</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">price</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">50</span><span class="p">.</span><span class="mi">00</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">in_stock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">TRUE</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">similarity</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span>
+<span class="w">         </span><span class="n">item_id</span><span class="w"> </span><span class="k">ASC</span>
+<span class="k">LIMIT</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 13.88 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">price</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">similarity</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">products_search</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">category</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'electronics'</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">price</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">50</span><span class="p">.</span><span class="mi">00</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">in_stock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">TRUE</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">similarity</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span>
+<span class="w">         </span><span class="n">item_id</span><span class="w"> </span><span class="k">ASC</span>
+<span class="k">LIMIT</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">products_search</span><span class="w"> </span><span class="p">(</span><span class="n">item_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">category</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">price</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">),</span>
+<span class="w">                                                                   </span><span class="n">in_stock</span><span class="w"> </span><span class="nb">BOOLEAN</span><span class="p">,</span><span class="w"> </span><span class="n">vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+
+<span class="c1">-- Top 3 highest similarity vectors globally fail the filters (too expensive or out of stock)</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">products_search</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'electronics'</span><span class="p">,</span><span class="w"> </span><span class="mi">150</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="k">TRUE</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">99</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">01</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'clothing'</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="k">TRUE</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">98</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">02</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'electronics'</span><span class="p">,</span><span class="w"> </span><span class="mi">45</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="k">FALSE</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">95</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">05</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="c1">-- Truly qualifying products (lower global cosine similarity, but fully satisfy constraints)</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="s1">'electronics'</span><span class="p">,</span><span class="w"> </span><span class="mi">35</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="k">TRUE</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">70</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">30</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="s1">'electronics'</span><span class="p">,</span><span class="w"> </span><span class="mi">25</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="k">TRUE</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">65</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">35</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(2 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>item_id</th>
+<th>price</th>
+<th>similarity</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>39,899</td>
+<td>12.46</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>82,093</td>
+<td>40.78</td>
+<td>1</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(2 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>item_id</th>
+<th>price</th>
+<th>similarity</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>249</td>
+<td>43.02</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1,441</td>
+<td>0.01</td>
+<td>1</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_112_dual_constraint_sessionization.html" class="nav-btn">← Prev: Dual-Constraint Sessioniz...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_114_asof_tolerance_expiry.html" class="nav-btn">Next: ASOF Point-in-Time Quote ... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

@@ -1,0 +1,3616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_051_Q51_fts_bm25_lexical_search - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Search &amp; Retrieval</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_051_Q51_fts_bm25_lexical_search</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_050_Q50_contrastive_triplet_loss_evaluation.html" class="nav-btn">← Prev: Contrastive Triplet Evalu...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_052_Q52_reciprocal_rank_fusion_rrf.html" class="nav-btn">Next: Reciprocal Rank Fusion (R... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Search &amp; Retrieval</span>
+                    <span class="badge badge-id">task_051_Q51_fts_bm25_lexical_search</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">DuckDB Full-Text Search (FTS) BM25 Term Relevance Scoring</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">54.74 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">55.81 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">42.0 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 16.6s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Traditional databases use simple `LIKE &#x27;%search%&#x27;` which treats 1 mention the same as 10 mentions and ignores document frequency. BM25 scores term saturation and document rarity.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>ILIKE matches substrings blindly (e.g. &#x27;cat&#x27; matches &#x27;scattered&#x27; or &#x27;certificate&#x27;) with zero relevancy ranking.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Traditional databases use simple `LIKE &#x27;%search%&#x27;` which treats 1 mention the same as 10 mentions and ignores document frequency. BM25 scores term saturation and document rarity.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: doc_id, title, bm25_score.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 42.0 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 articles</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">42.0 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>doc_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>title</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>body</code> <small>(VARCHAR)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>doc_id</th>
+<th>title</th>
+<th>body</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Fast Columnar Databases</td>
+<td>DuckDB is a vectorized analytical database designed for fast analytics.</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>Postgres Tuning Guide</td>
+<td>Relational database indexing and buffer pool optimization.</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>Vector Search Frontiers</td>
+<td>Combining dense vector embeddings with sparse BM25 indexing.</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>Fast Columnar Databases</td>
+<td>DuckDB is a vectorized analytical database designed for fast analytics.</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>Postgres Tuning Guide</td>
+<td>Relational database indexing and buffer pool optimization.</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>Vector Search Frontiers</td>
+<td>Combining dense vector embeddings with sparse BM25 indexing.</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>Fast Columnar Databases</td>
+<td>DuckDB is a vectorized analytical database designed for fast analytics.</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>Postgres Tuning Guide</td>
+<td>Relational database indexing and buffer pool optimization.</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>Vector Search Frontiers</td>
+<td>Combining dense vector embeddings with sparse BM25 indexing.</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>Fast Columnar Databases</td>
+<td>DuckDB is a vectorized analytical database designed for fast analytics.</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>Postgres Tuning Guide</td>
+<td>Relational database indexing and buffer pool optimization.</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>Vector Search Frontiers</td>
+<td>Combining dense vector embeddings with sparse BM25 indexing.</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>Fast Columnar Databases</td>
+<td>DuckDB is a vectorized analytical database designed for fast analytics.</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>Postgres Tuning Guide</td>
+<td>Relational database indexing and buffer pool optimization.</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>Vector Search Frontiers</td>
+<td>Combining dense vector embeddings with sparse BM25 indexing.</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 208.91 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 45.07857127416317%; background: #f85149;" title="HASH_GROUP_BY: 94.17ms (45.1%)"></div><div class="cost-bar-seg" style="width: 41.93965600845186%; background: #f85149;" title="CTE: 87.62ms (41.9%)"></div><div class="cost-bar-seg" style="width: 4.361691843184907%; background: #3fb950;" title="HASH_JOIN: 9.11ms (4.4%)"></div><div class="cost-bar-seg" style="width: 3.835855503889471%; background: #d29922;" title="TABLE_SCAN: 8.01ms (3.8%)"></div><div class="cost-bar-seg" style="width: 1.6718212763315956%; background: #bc8cff;" title="CTE: 3.49ms (1.7%)"></div><div class="cost-bar-seg" style="width: 0.659087718911271%; background: #39c5cf;" title="FILTER: 1.38ms (0.7%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.09 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">56 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,152 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;, &#x27;bm25_score&#x27;]">📁 Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="high-cost-tag">🔥 41.9% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">87.62 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (41.9% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">3.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">8.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="memory.main.articles">📁 memory.main.articles</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="node-cost-tag">1.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">3.49 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 45.1% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">94.17 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (45.1% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.17 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#[331.0]&#x27;, &#x27;#[1.0]&#x27;]">📁 Projections: [&#x27;#[331.0]&#x27;, &#x27;#[1.0...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">0.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.80 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,152 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">4.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">9.11 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.83 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.98 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">64 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;fieldid&#x27;, &#x27;1.0&#x27;, &#x27;default_b&#x27;, &#x27;av">📁 Projections: [&#x27;fieldid&#x27;, &#x27;1.0&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">82 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">112 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">40 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8 B</span></div>
+                <div class="nm-tbl" title="Projections: default_b">📁 Projections: default_b</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>DUMMY_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.stats">📁 memory.fts_main_articles.stats</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.fields">📁 memory.fts_main_articles.fields</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: field">📁 Projections: field</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: #1">📁 Projections: #1</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>DUMMY_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.05 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="Projections: t">📁 Projections: t</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="Projections: t">📁 Projections: t</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.19 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="Projections: raw_token">📁 Projections: raw_token</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="Projections: #0">📁 Projections: #0</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">290 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.15 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">290 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="Projections: #1">📁 Projections: #1</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">40 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">40 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>DUMMY_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">571</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">9,136 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.stopwords">📁 memory.fts_main_articles.stopwor...</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">100 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;termid&#x27;, &#x27;docid&#x27;, &#x27;fieldid&#x27;]">📁 Projections: [&#x27;termid&#x27;, &#x27;docid&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.08 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">100 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">100 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">100 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.terms">📁 memory.fts_main_articles.terms</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">16 B</span></div>
+                <div class="nm-tbl" title="Projections: termid">📁 Projections: termid</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.05 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.04 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.dict">📁 memory.fts_main_articles.dict</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">16 B</span></div>
+                <div class="nm-tbl" title="Projections: fieldid">📁 Projections: fieldid</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">64 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.12 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">480 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;, &#x27;rawtermid&#x27;, &#x27;d">📁 Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">672 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;termid&#x27;, &#x27;rawtermid&#x27;, &#x27;docid&#x27;, &#x27;f">📁 Projections: [&#x27;termid&#x27;, &#x27;rawterm...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">352 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">120 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.docs">📁 memory.fts_main_articles.docs</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.14 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">240 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">64 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">144 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;CAST(#2 AS BIGINT)&#x27;, ">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;CAST(...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.16 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">88 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">70 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;docid&#x27;, &#x27;fieldid&#x27;, &#x27;termid&#x27;, &#x27;df&#x27;">📁 Projections: [&#x27;docid&#x27;, &#x27;fieldid&#x27;...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">70 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#1 AS TINYINT)&#x27;, &#x27;CAST(#0 AS">📁 Projections: [&#x27;CAST(#1 AS TINYIN...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.05 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">140 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.dict">📁 memory.fts_main_articles.dict</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.05 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">140 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">100 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">16 B</span></div>
+                <div class="nm-tbl" title="Projections: docid">📁 Projections: docid</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                <div class="nm-tbl" title="Projections: 42">📁 Projections: 42</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>UNGROUPED_AGGREGATE</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.29 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">16 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                <div class="nm-tbl" title="Projections: #0">📁 Projections: #0</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                <div class="nm-tbl" title="Projections: #0">📁 Projections: #0</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.07 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">27 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;]">📁 Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;]</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS TINYINT)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS TINYIN...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">100 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;score&#x27;, &#x27;delim_index&#x27;]">📁 Projections: [&#x27;score&#x27;, &#x27;delim_in...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">0.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.38 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.51 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.10 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.docs">📁 memory.fts_main_articles.docs</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;docid&#x27;, &#x27;score&#x27;]">📁 Projections: [&#x27;docid&#x27;, &#x27;score&#x27;]</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">40 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;docid&#x27;, &#x27;((expansion_weight * log">📁 Projections: [&#x27;docid&#x27;, &#x27;((expans...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">120 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">96 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;docid&#x27;, &#x27;df&#x27;, &#x27;expansion_weight&#x27;,">📁 Projections: [&#x27;docid&#x27;, &#x27;df&#x27;, &#x27;ex...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.13 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">400 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">448 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;, &#x27;rawtermid&#x27;, &#x27;d">📁 Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">480 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.stats">📁 memory.fts_main_articles.stats</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                <div class="nm-tbl" title="Projections: 42">📁 Projections: 42</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                <div class="nm-tbl" title="Projections: 42">📁 Projections: 42</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>DUMMY_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>EMPTY_RESULT</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(&quot;error&quot;(message) AS DOUBLE)&#x27;">📁 Projections: [&#x27;CAST(&quot;error&quot;(mess...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">8,192</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.09 MB</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: #0">📁 Projections: #0</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">✂️ <strong>TOP_N</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;message&#x27;, &#x27;priority&#x27;]">📁 Projections: [&#x27;message&#x27;, &#x27;priori...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: #0">📁 Projections: #0</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.05 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: key">📁 Projections: key</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.13 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">1,064 B</span></div>
+                <div class="nm-tbl" title="Projections: field_weights">📁 Projections: field_weights</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>DUMMY_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="memory.fts_main_articles.fields">📁 memory.fts_main_articles.fields</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;priority&#x27;, &#x27;message&#x27;]">📁 Projections: [&#x27;priority&#x27;, &#x27;messa...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: key">📁 Projections: key</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: #1">📁 Projections: #1</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">1,064 B</span></div>
+                <div class="nm-tbl" title="Projections: field_weights">📁 Projections: field_weights</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>DUMMY_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;priority&#x27;, &#x27;message&#x27;]">📁 Projections: [&#x27;priority&#x27;, &#x27;messa...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;priority&#x27;, &#x27;message&#x27;]">📁 Projections: [&#x27;priority&#x27;, &#x27;messa...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: key">📁 Projections: key</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: #1">📁 Projections: #1</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">1,064 B</span></div>
+                <div class="nm-tbl" title="Projections: field_b">📁 Projections: field_b</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>DUMMY_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;priority&#x27;, &#x27;message&#x27;]">📁 Projections: [&#x27;priority&#x27;, &#x27;messa...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>45.1%</strong></td>
+            <td>94.17 ms</td>
+            <td>1,000,000</td>
+            <td>11.44 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>41.9%</strong></td>
+            <td>87.62 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>4.4%</strong></td>
+            <td>9.11 ms</td>
+            <td>1,000,000</td>
+            <td>26.83 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>3.8%</strong></td>
+            <td>8.01 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>memory.main.articles</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>1.7%</strong></td>
+            <td>3.49 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>0.7%</strong></td>
+            <td>1.38 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.5%</strong></td>
+            <td>0.98 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>0.4%</strong></td>
+            <td>0.80 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.2%</strong></td>
+            <td>0.51 ms</td>
+            <td>1,000,000</td>
+            <td>11.44 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.29 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.19 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.17 ms</td>
+            <td>1,000,000</td>
+            <td>11.44 MB</td>
+            <td><small>Projections: [&#x27;#[331.0]&#x27;, &#x27;#[1.0]&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.16 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.15 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.14 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.13 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.13 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.12 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.10 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.09 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.08 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.07 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.05 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.05 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.05 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.05 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.05 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.04 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.dict</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.03 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.03 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.terms</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;, &#x27;rawtermid&#x27;, &#x27;d</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: t</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>571</td>
+            <td>0.01 MB</td>
+            <td><small>memory.fts_main_articles.stopwords</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.docs</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;docid&#x27;, &#x27;((expansion_weight * log</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.dict</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.docs</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>8,192</td>
+            <td>0.09 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.stats</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: field_b</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;, &#x27;bm25_score&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;CAST(#2 AS BIGINT)&#x27;, </small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;fieldid&#x27;, &#x27;1.0&#x27;, &#x27;default_b&#x27;, &#x27;av</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.fields</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: field_weights</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.fields</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>memory.fts_main_articles.stats</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: field_weights</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNGROUPED_AGGREGATE</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;CAST(#1 AS TINYINT)&#x27;, &#x27;CAST(#0 AS</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;termid&#x27;, &#x27;rawtermid&#x27;, &#x27;docid&#x27;, &#x27;f</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS TINYINT)&#x27;, &#x27;#1&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;docid&#x27;, &#x27;score&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: default_b</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #0</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;, &#x27;rawtermid&#x27;, &#x27;d</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;docid&#x27;, &#x27;df&#x27;, &#x27;expansion_weight&#x27;,</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;score&#x27;, &#x27;delim_index&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>DUMMY_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: 42</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: 42</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: fieldid</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #1</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;termid&#x27;, &#x27;docid&#x27;, &#x27;fieldid&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: termid</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #0</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: t</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>DUMMY_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: 42</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: docid</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>EMPTY_RESULT</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TOP_N</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;docid&#x27;, &#x27;fieldid&#x27;, &#x27;termid&#x27;, &#x27;df&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>DUMMY_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>DUMMY_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #0</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>DUMMY_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>DUMMY_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>DUMMY_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;docid&#x27;, &#x27;termid&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: raw_token</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: field</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #1</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;CAST(&quot;error&quot;(message) AS DOUBLE)&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #0</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;message&#x27;, &#x27;priority&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #0</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: key</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;priority&#x27;, &#x27;message&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: key</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #1</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;priority&#x27;, &#x27;message&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;priority&#x27;, &#x27;message&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: key</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: #1</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;priority&#x27;, &#x27;message&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 54.74 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">scored_articles</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">title</span><span class="p">,</span>
+<span class="w">          </span><span class="n">BODY</span><span class="p">,</span>
+<span class="w">          </span><span class="n">fts_main_articles</span><span class="p">.</span><span class="n">match_bm25</span><span class="p">(</span><span class="n">doc_id</span><span class="p">,</span><span class="w"> </span><span class="s1">'analytical database'</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">bm25_score</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">articles</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">title</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">bm25_score</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">bm25_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">scored_articles</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">bm25_score</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">bm25_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 55.81 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- BM25 full-text search for 'analytical database'</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">scored_articles</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">title</span><span class="p">,</span>
+<span class="w">          </span><span class="n">BODY</span><span class="p">,</span>
+<span class="w">          </span><span class="n">fts_main_articles</span><span class="p">.</span><span class="n">match_bm25</span><span class="p">(</span><span class="n">doc_id</span><span class="p">,</span><span class="w"> </span><span class="s1">'analytical database'</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">bm25_score</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">articles</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">title</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">bm25_score</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">bm25_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">scored_articles</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">bm25_score</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">bm25_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="n">install</span><span class="w"> </span><span class="n">fts</span><span class="p">;</span>
+
+<span class="k">LOAD</span><span class="w"> </span><span class="n">fts</span><span class="p">;</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">articles</span><span class="w"> </span><span class="p">(</span><span class="n">doc_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">BODY</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">articles</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'Fast Columnar Databases'</span><span class="p">,</span><span class="w"> </span><span class="s1">'DuckDB is a vectorized analytical database designed for fast analytics.'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'Postgres Tuning Guide'</span><span class="p">,</span><span class="w"> </span><span class="s1">'Relational database indexing and buffer pool optimization.'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'Vector Search Frontiers'</span><span class="p">,</span><span class="w"> </span><span class="s1">'Combining dense vector embeddings with sparse BM25 indexing.'</span><span class="p">);</span>
+
+<span class="n">pragma</span><span class="w"> </span><span class="n">create_fts_index</span><span class="p">(</span><span class="s1">'articles'</span><span class="p">,</span><span class="w"> </span><span class="s1">'doc_id'</span><span class="p">,</span><span class="w"> </span><span class="s1">'title'</span><span class="p">,</span><span class="w"> </span><span class="s1">'body'</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(2 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>doc_id</th>
+<th>title</th>
+<th>bm25_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Fast Columnar Databases</td>
+<td>0.8563</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>Postgres Tuning Guide</td>
+<td>0.2128</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(2 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>doc_id</th>
+<th>title</th>
+<th>bm25_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Fast Columnar Databases</td>
+<td>0.8563</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>Postgres Tuning Guide</td>
+<td>0.2128</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_050_Q50_contrastive_triplet_loss_evaluation.html" class="nav-btn">← Prev: Contrastive Triplet Evalu...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_052_Q52_reciprocal_rank_fusion_rrf.html" class="nav-btn">Next: Reciprocal Rank Fusion (R... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

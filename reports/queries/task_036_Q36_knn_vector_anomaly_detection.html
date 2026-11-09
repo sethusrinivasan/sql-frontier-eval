@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_036_Q36_knn_vector_anomaly_detection - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Vector &amp; Embeddings</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_036_Q36_knn_vector_anomaly_detection</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_035_Q35_kmeans_cluster_assignment_step.html" class="nav-btn">← Prev: K-Means Clustering Assign...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_037_Q37_hybrid_relational_vector_cohort_join.html" class="nav-btn">Next: Cohort-Constrained Vector... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Vector &amp; Embeddings</span>
+                    <span class="badge badge-id">task_036_Q36_knn_vector_anomaly_detection</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Vector Anomaly Detection via Average K-Nearest Neighbor Distance</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">802.82 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">821.72 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">2,500 rows</div>
+                    <div class="stat-sub">29.3 KiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 12.2s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Anomalous sensor readings or fraudulent transaction vectors reside in sparse regions of the embedding space. Measuring the average distance to a vector&#x27;s 3 nearest neighbors flags outliers.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Setting a global static distance threshold fails when data clusters have variable local densities.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Anomalous sensor readings or fraudulent transaction vectors reside in sparse regions of the embedding space. Measuring the average distance to a vector&#x27;s 3 nearest neighbors flags outliers.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: tx_id, outlier_score, classification.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (2,500 rows &bull; 29.3 KiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 transaction_embeddings</span>
+                    <span class="badge badge-pass">2,500 rows</span>
+                    <span class="badge badge-golden">29.3 KiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>tx_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>vec</code> <small>(FLOAT[2])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 2,500 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>vec</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>[0.05 0.02]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>[0.01 0.04]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>[0.03 0.01]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>[10. 10.]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>[0.7947 0.1747]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>[0.9107 0.096 ]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>[0.8065 0.1282]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>[0.8067 0.0655]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>[0.8703 0.0569]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>[0.8026 0.0572]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>[0.9017 0.0982]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>[0.8521 0.0285]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>[0.7849 0.1049]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>[0.8606 0.136 ]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>[0.9308 0.1349]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 795.49 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 83.4415281652021%; background: #f85149;" title="PERFECT_HASH_GROUP_BY: 663.77ms (83.4%)"></div><div class="cost-bar-seg" style="width: 10.384725948868171%; background: #f85149;" title="PROJECTION: 82.61ms (10.4%)"></div><div class="cost-bar-seg" style="width: 6.063329099828743%; background: #3fb950;" title="NESTED_LOOP_JOIN: 48.23ms (6.1%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,499</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.07 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.35 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,499</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.06 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,499</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.06 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;">📁 Projections: [&#x27;CAST(#0 AS SMALLI...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.11 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,499</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.07 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;outlier_score&#x27;, &#x27;classif">📁 Projections: [&#x27;tx_id&#x27;, &#x27;outlier_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,499</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.03 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>PERFECT_HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.08 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,499</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.05 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;CAST(dist AS DOUBLE)&#x27;]">📁 Projections: [&#x27;tx_id&#x27;, &#x27;CAST(dis...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.03 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS SMALLI...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.07 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.04 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;dist&#x27;]">📁 Projections: [&#x27;tx_id&#x27;, &#x27;dist&#x27;]</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.10 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#[2.1]&#x27;, &#x27;#[3.1]&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#[2.1]&#x27;, &#x27;#...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.14 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.31 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>PERFECT_HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 83.4% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">663.77 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,499</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.12 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (83.4% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="high-cost-tag">🔥 10.4% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">82.61 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">6,247,498</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">190.66 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;struct_pack(#[2.1], #[3.">📁 Projections: [&#x27;tx_id&#x27;, &#x27;struct_p...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (10.4% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>NESTED_LOOP_JOIN</strong></span>
+                <span class="node-cost-tag">6.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">48.23 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">6,247,498</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">142.99 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.04 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,500</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.03 MB</span></div>
+                <div class="nm-tbl" title="memory.main.transaction_embeddings">📁 memory.main.transaction_embeddin...</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.04 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,500</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.03 MB</span></div>
+                <div class="nm-tbl" title="memory.main.transaction_embeddings">📁 memory.main.transaction_embeddin...</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>PERFECT_HASH_GROUP_BY</strong></td>
+            <td><strong>83.4%</strong></td>
+            <td>663.77 ms</td>
+            <td>2,499</td>
+            <td>0.12 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>10.4%</strong></td>
+            <td>82.61 ms</td>
+            <td>6,247,498</td>
+            <td>190.66 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;struct_pack(#[2.1], #[3.</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>NESTED_LOOP_JOIN</strong></td>
+            <td><strong>6.1%</strong></td>
+            <td>48.23 ms</td>
+            <td>6,247,498</td>
+            <td>142.99 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.35 ms</td>
+            <td>2,499</td>
+            <td>0.06 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.14 ms</td>
+            <td>4,998</td>
+            <td>0.31 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.11 ms</td>
+            <td>2,499</td>
+            <td>0.07 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;outlier_score&#x27;, &#x27;classif</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PERFECT_HASH_GROUP_BY</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.08 ms</td>
+            <td>2,499</td>
+            <td>0.02 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.07 ms</td>
+            <td>4,998</td>
+            <td>0.04 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;dist&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.04 ms</td>
+            <td>2,500</td>
+            <td>0.03 MB</td>
+            <td><small>memory.main.transaction_embeddings</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.04 ms</td>
+            <td>2,500</td>
+            <td>0.03 MB</td>
+            <td><small>memory.main.transaction_embeddings</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>4,998</td>
+            <td>0.05 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;CAST(dist AS DOUBLE)&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>4,998</td>
+            <td>0.10 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#[2.1]&#x27;, &#x27;#[3.1]&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>2,499</td>
+            <td>0.03 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>2,499</td>
+            <td>0.07 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>4,998</td>
+            <td>0.03 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>2,499</td>
+            <td>0.06 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 802.82 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">pairwise_distances</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">b</span><span class="p">.</span><span class="n">tx_id</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">neighbor_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">array_distance</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">vec</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">dist</span><span class="p">,</span>
+<span class="w">          </span><span class="n">row_number</span><span class="p">()</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">tx_id</span>
+<span class="w">                             </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">array_distance</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">vec</span><span class="p">)</span><span class="w"> </span><span class="k">ASC</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">k_rank</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">transaction_embeddings</span><span class="w"> </span><span class="n">a</span>
+<span class="w">   </span><span class="k">JOIN</span><span class="w"> </span><span class="n">transaction_embeddings</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">tx_id</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">tx_id</span><span class="p">),</span>
+<span class="w">     </span><span class="n">knn_avg</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">avg</span><span class="p">(</span><span class="n">dist</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">mean_2nn_distance</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">pairwise_distances</span>
+<span class="w">   </span><span class="k">WHERE</span><span class="w"> </span><span class="n">k_rank</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">2</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">tx_id</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">mean_2nn_distance</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">outlier_score</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">mean_2nn_distance</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">5</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'ANOMALOUS_OUTLIER'</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="s1">'NORMAL'</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">classification</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">knn_avg</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">outlier_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 821.72 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Calculate average distance to 2 nearest neighbors to score anomaly level</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">pairwise_distances</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">b</span><span class="p">.</span><span class="n">tx_id</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">neighbor_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">array_distance</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">vec</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">dist</span><span class="p">,</span>
+<span class="w">          </span><span class="n">row_number</span><span class="p">()</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">tx_id</span>
+<span class="w">                             </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">array_distance</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">vec</span><span class="p">)</span><span class="w"> </span><span class="k">ASC</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">k_rank</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">transaction_embeddings</span><span class="w"> </span><span class="n">a</span>
+<span class="w">   </span><span class="k">JOIN</span><span class="w"> </span><span class="n">transaction_embeddings</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">tx_id</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">tx_id</span><span class="p">),</span>
+<span class="w">      </span><span class="n">knn_avg</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">avg</span><span class="p">(</span><span class="n">dist</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">mean_2nn_distance</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">pairwise_distances</span>
+<span class="w">   </span><span class="k">WHERE</span><span class="w"> </span><span class="n">k_rank</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">2</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">tx_id</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">mean_2nn_distance</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">outlier_score</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">mean_2nn_distance</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">5</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'ANOMALOUS_OUTLIER'</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="s1">'NORMAL'</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">classification</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">knn_avg</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">outlier_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">transaction_embeddings</span><span class="w"> </span><span class="p">(</span><span class="n">tx_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+
+<span class="c1">-- Normal cluster around (0,0); tx_id 4 is an outlier at (10, 10)</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">transaction_embeddings</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">05</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">02</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">01</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">04</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">03</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">01</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">10</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(2,499 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>outlier_score</th>
+<th>classification</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2</td>
+<td>0.0404</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1,158</td>
+<td>0.04</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>21</td>
+<td>0.0391</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>1</td>
+<td>0.0335</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2,180</td>
+<td>0.0332</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>988</td>
+<td>0.0324</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>1,822</td>
+<td>0.0303</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>3</td>
+<td>0.0292</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>281</td>
+<td>0.0288</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>184</td>
+<td>0.0279</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2,219</td>
+<td>0.0274</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>1,541</td>
+<td>0.0256</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>1,591</td>
+<td>0.0244</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>1,238</td>
+<td>0.0207</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>1,138</td>
+<td>0.0201</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>683</td>
+<td>0.02</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>2,222</td>
+<td>0.0186</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>1,718</td>
+<td>0.0174</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>1,262</td>
+<td>0.0172</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>1,494</td>
+<td>0.0171</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>2,158</td>
+<td>0.016</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>1,997</td>
+<td>0.0156</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>1,396</td>
+<td>0.0145</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>42</td>
+<td>0.014</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>1,430</td>
+<td>0.014</td>
+<td>NORMAL</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 2,499 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(2,499 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>outlier_score</th>
+<th>classification</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2</td>
+<td>0.0404</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1,158</td>
+<td>0.04</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>21</td>
+<td>0.0391</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>1</td>
+<td>0.0335</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2,180</td>
+<td>0.0332</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>988</td>
+<td>0.0324</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>1,822</td>
+<td>0.0303</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>3</td>
+<td>0.0292</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>281</td>
+<td>0.0288</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>184</td>
+<td>0.0279</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2,219</td>
+<td>0.0274</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>1,541</td>
+<td>0.0256</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>1,591</td>
+<td>0.0244</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>1,238</td>
+<td>0.0207</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>1,138</td>
+<td>0.0201</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>683</td>
+<td>0.02</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>2,222</td>
+<td>0.0186</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>1,718</td>
+<td>0.0174</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>1,262</td>
+<td>0.0172</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>1,494</td>
+<td>0.0171</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>2,158</td>
+<td>0.016</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>1,997</td>
+<td>0.0156</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>1,396</td>
+<td>0.0145</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>42</td>
+<td>0.014</td>
+<td>NORMAL</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>1,430</td>
+<td>0.014</td>
+<td>NORMAL</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 2,499 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_035_Q35_kmeans_cluster_assignment_step.html" class="nav-btn">← Prev: K-Means Clustering Assign...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_037_Q37_hybrid_relational_vector_cohort_join.html" class="nav-btn">Next: Cohort-Constrained Vector... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_064_Q64_pure_sql_tfidf_calculation - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Search &amp; Retrieval</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_064_Q64_pure_sql_tfidf_calculation</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_063_Q63_boolean_search_negation.html" class="nav-btn">← Prev: High-Precision Boolean Se...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_065_Q65_search_position_bias_dcg.html" class="nav-btn">Next: Discounted Cumulative Gai... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Search &amp; Retrieval</span>
+                    <span class="badge badge-id">task_064_Q64_pure_sql_tfidf_calculation</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">TF-IDF (Term Frequency - Inverse Document Frequency) in Pure SQL</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">173.64 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.1x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">195.88 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">26.7 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 14.3s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>TF-IDF is the foundational algorithm of information retrieval. Calculating it directly in SQL provides deep insight into term uniqueness across a corpus without requiring Python.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Calculating document frequency across millions of documents requires careful window partitioning to avoid Cartesian explosions.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">TF-IDF is the foundational algorithm of information retrieval. Calculating it directly in SQL provides deep insight into term uniqueness across a corpus without requiring Python.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: doc_id, term, term_count, tf, idf, tfidf_score.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 26.7 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 doc_words</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">26.7 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>doc_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>term</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>term_count</code> <small>(INTEGER)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>doc_id</th>
+<th>term</th>
+<th>term_count</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>database</td>
+<td>10</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1</td>
+<td>columnar</td>
+<td>5</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>database</td>
+<td>8</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2</td>
+<td>relational</td>
+<td>7</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>3</td>
+<td>columnar</td>
+<td>4</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>3</td>
+<td>database</td>
+<td>6</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>4</td>
+<td>columnar</td>
+<td>8</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>5</td>
+<td>relational</td>
+<td>7</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>6</td>
+<td>database</td>
+<td>7</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>7</td>
+<td>columnar</td>
+<td>7</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>8</td>
+<td>relational</td>
+<td>8</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>9</td>
+<td>database</td>
+<td>5</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>10</td>
+<td>columnar</td>
+<td>9</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>11</td>
+<td>relational</td>
+<td>9</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>12</td>
+<td>database</td>
+<td>6</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 434.17 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 27.864237795198594%; background: #f85149;" title="HASH_GROUP_BY: 120.98ms (27.9%)"></div><div class="cost-bar-seg" style="width: 17.048123243444927%; background: #f85149;" title="HASH_GROUP_BY: 74.02ms (17.0%)"></div><div class="cost-bar-seg" style="width: 10.796473274589372%; background: #3fb950;" title="HASH_GROUP_BY: 46.87ms (10.8%)"></div><div class="cost-bar-seg" style="width: 7.862676922185247%; background: #d29922;" title="HASH_JOIN: 34.14ms (7.9%)"></div><div class="cost-bar-seg" style="width: 6.82990449906905%; background: #bc8cff;" title="PROJECTION: 29.65ms (6.8%)"></div><div class="cost-bar-seg" style="width: 6.322217238633683%; background: #39c5cf;" title="ORDER_BY: 27.45ms (6.3%)"></div><div class="cost-bar-seg" style="width: 6.218448020056491%; background: #f0883e;" title="PROJECTION: 27.00ms (6.2%)"></div><div class="cost-bar-seg" style="width: 4.770007015222239%; background: #79c0ff;" title="HASH_JOIN: 20.71ms (4.8%)"></div><div class="cost-bar-seg" style="width: 3.6962036333617276%; background: #58a6ff;" title="TABLE_SCAN: 16.05ms (3.7%)"></div><div class="cost-bar-seg" style="width: 3.2119872799444416%; background: #f85149;" title="TABLE_SCAN: 13.95ms (3.2%)"></div><div class="cost-bar-seg" style="width: 1.2760906172926165%; background: #3fb950;" title="PROJECTION: 5.54ms (1.3%)"></div><div class="cost-bar-seg" style="width: 0.9189305893489177%; background: #d29922;" title="HASH_GROUP_BY: 3.99ms (0.9%)"></div><div class="cost-bar-seg" style="width: 0.8082559679542507%; background: #bc8cff;" title="PROJECTION: 3.51ms (0.8%)"></div><div class="cost-bar-seg" style="width: 0.7494611190028718%; background: #39c5cf;" title="PROJECTION: 3.25ms (0.7%)"></div><div class="cost-bar-seg" style="width: 0.5255085018082178%; background: #f0883e;" title="PROJECTION: 2.28ms (0.5%)"></div><div class="cost-bar-seg" style="width: 0.5210037865450783%; background: #79c0ff;" title="PROJECTION: 2.26ms (0.5%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.26 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.26 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">6.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">27.45 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.31 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">5.54 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.31 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_compress_string_">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">6.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">29.65 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">137.33 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;doc_id&#x27;, &#x27;term&#x27;, &#x27;term_count&#x27;, &#x27;t">📁 Projections: [&#x27;doc_id&#x27;, &#x27;term&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">6.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">27.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">134.79 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;doc_id&#x27;, &#x27;term&#x27;, &#x27;term_count&#x27;, &#x27;(">📁 Projections: [&#x27;doc_id&#x27;, &#x27;term&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">7.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">34.14 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">139.87 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">4.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">20.71 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">134.79 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 27.9% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">120.98 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,997</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (27.9% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.13 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">7.63 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;doc_id&#x27;, &#x27;term_count&#x27;]">📁 Projections: [&#x27;doc_id&#x27;, &#x27;term_co...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.29 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">7.63 MB</span></div>
+                <div class="nm-tbl" title="memory.main.doc_words">📁 memory.main.doc_words</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">3.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.95 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">7.63 MB</span></div>
+                <div class="nm-tbl" title="memory.main.doc_words">📁 memory.main.doc_words</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;__internal_decompress_string(#0)&#x27;">📁 Projections: [&#x27;__internal_decomp...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">3.99 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">5.09 MB</span></div>
+                <div class="nm-tbl" title="Projections: #0">📁 Projections: #0</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">3.51 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">5.09 MB</span></div>
+                <div class="nm-tbl" title="Projections: __internal_compress_string_uhugeint">📁 Projections: __internal_compress...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.28 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">5.09 MB</span></div>
+                <div class="nm-tbl" title="Projections: __internal_decompress_string(#0)">📁 Projections: __internal_decompre...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">10.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">46.87 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">6.36 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.08 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">6.36 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;term&#x27;, &#x27;doc_id&#x27;]">📁 Projections: [&#x27;term&#x27;, &#x27;doc_id&#x27;]</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">3.25 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">6.36 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;__internal_compress_string_uhugei">📁 Projections: [&#x27;__internal_compre...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">3.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">16.05 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">333,334</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">6.36 MB</span></div>
+                <div class="nm-tbl" title="memory.main.doc_words">📁 memory.main.doc_words</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>UNGROUPED_AGGREGATE</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 17.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">74.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,997</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">3.81 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (17.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.10 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">3.81 MB</span></div>
+                <div class="nm-tbl" title="Projections: doc_id">📁 Projections: doc_id</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.81 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">3.81 MB</span></div>
+                <div class="nm-tbl" title="memory.main.doc_words">📁 memory.main.doc_words</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>27.9%</strong></td>
+            <td>120.98 ms</td>
+            <td>999,997</td>
+            <td>19.07 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>17.0%</strong></td>
+            <td>74.02 ms</td>
+            <td>999,997</td>
+            <td>3.81 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>10.8%</strong></td>
+            <td>46.87 ms</td>
+            <td>333,334</td>
+            <td>6.36 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>7.9%</strong></td>
+            <td>34.14 ms</td>
+            <td>333,334</td>
+            <td>139.87 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>6.8%</strong></td>
+            <td>29.65 ms</td>
+            <td>333,334</td>
+            <td>137.33 MB</td>
+            <td><small>Projections: [&#x27;doc_id&#x27;, &#x27;term&#x27;, &#x27;term_count&#x27;, &#x27;t</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>6.3%</strong></td>
+            <td>27.45 ms</td>
+            <td>333,334</td>
+            <td>14.31 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>6.2%</strong></td>
+            <td>27.00 ms</td>
+            <td>333,334</td>
+            <td>134.79 MB</td>
+            <td><small>Projections: [&#x27;doc_id&#x27;, &#x27;term&#x27;, &#x27;term_count&#x27;, &#x27;(</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>4.8%</strong></td>
+            <td>20.71 ms</td>
+            <td>333,334</td>
+            <td>134.79 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>3.7%</strong></td>
+            <td>16.05 ms</td>
+            <td>333,334</td>
+            <td>6.36 MB</td>
+            <td><small>memory.main.doc_words</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>3.2%</strong></td>
+            <td>13.95 ms</td>
+            <td>333,334</td>
+            <td>7.63 MB</td>
+            <td><small>memory.main.doc_words</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.3%</strong></td>
+            <td>5.54 ms</td>
+            <td>333,334</td>
+            <td>14.31 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_compress_string_</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>0.9%</strong></td>
+            <td>3.99 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.8%</strong></td>
+            <td>3.51 ms</td>
+            <td>333,334</td>
+            <td>5.09 MB</td>
+            <td><small>Projections: __internal_compress_string_uhugeint</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.7%</strong></td>
+            <td>3.25 ms</td>
+            <td>333,334</td>
+            <td>6.36 MB</td>
+            <td><small>Projections: [&#x27;__internal_compress_string_uhugei</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.5%</strong></td>
+            <td>2.28 ms</td>
+            <td>333,334</td>
+            <td>5.09 MB</td>
+            <td><small>Projections: __internal_decompress_string(#0)</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.5%</strong></td>
+            <td>2.26 ms</td>
+            <td>333,334</td>
+            <td>15.26 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.3%</strong></td>
+            <td>1.29 ms</td>
+            <td>1,000,000</td>
+            <td>7.63 MB</td>
+            <td><small>memory.main.doc_words</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.2%</strong></td>
+            <td>0.81 ms</td>
+            <td>1,000,000</td>
+            <td>3.81 MB</td>
+            <td><small>memory.main.doc_words</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.13 ms</td>
+            <td>1,000,000</td>
+            <td>7.63 MB</td>
+            <td><small>Projections: [&#x27;doc_id&#x27;, &#x27;term_count&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.10 ms</td>
+            <td>1,000,000</td>
+            <td>3.81 MB</td>
+            <td><small>Projections: doc_id</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.08 ms</td>
+            <td>333,334</td>
+            <td>6.36 MB</td>
+            <td><small>Projections: [&#x27;term&#x27;, &#x27;doc_id&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNGROUPED_AGGREGATE</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.03 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.03 ms</td>
+            <td>333,334</td>
+            <td>5.09 MB</td>
+            <td><small>Projections: #0</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;__internal_decompress_string(#0)&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 173.64 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">doc_lengths</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">term_count</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">doc_len</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">doc_words</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">doc_id</span><span class="p">),</span>
+<span class="w">     </span><span class="n">corpus_stats</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="k">count</span><span class="p">(</span><span class="k">DISTINCT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_docs</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">doc_words</span><span class="p">),</span>
+<span class="w">     </span><span class="n">term_docs</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">term</span><span class="p">,</span>
+<span class="w">          </span><span class="k">count</span><span class="p">(</span><span class="k">DISTINCT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">docs_with_term</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">doc_words</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">term</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">doc_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">term</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">term_count</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">w</span><span class="p">.</span><span class="n">term_count</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l</span><span class="p">.</span><span class="n">doc_len</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">tf</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">ln</span><span class="p">(</span><span class="k">c</span><span class="p">.</span><span class="n">total_docs</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">td</span><span class="p">.</span><span class="n">docs_with_term</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">idf</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">((</span><span class="n">w</span><span class="p">.</span><span class="n">term_count</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l</span><span class="p">.</span><span class="n">doc_len</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">ln</span><span class="p">(</span><span class="k">c</span><span class="p">.</span><span class="n">total_docs</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">td</span><span class="p">.</span><span class="n">docs_with_term</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">tfidf_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">doc_words</span><span class="w"> </span><span class="n">w</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">doc_lengths</span><span class="w"> </span><span class="n">l</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">doc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l</span><span class="p">.</span><span class="n">doc_id</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">term_docs</span><span class="w"> </span><span class="n">td</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">term</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">td</span><span class="p">.</span><span class="n">term</span>
+<span class="k">CROSS</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">corpus_stats</span><span class="w"> </span><span class="k">c</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">term</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'columnar'</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">tfidf_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 195.88 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Calculate TF-IDF for term 'columnar' across 3 documents</span>
+<span class="w"> </span><span class="c1">-- TF = term_count / total_terms_in_doc, IDF = LN(Total_Docs / Docs_With_Term)</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">doc_lengths</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">term_count</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">doc_len</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">doc_words</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">doc_id</span><span class="p">),</span>
+<span class="w">      </span><span class="n">corpus_stats</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="k">count</span><span class="p">(</span><span class="k">DISTINCT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_docs</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">doc_words</span><span class="p">),</span>
+<span class="w">      </span><span class="n">term_docs</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">term</span><span class="p">,</span>
+<span class="w">          </span><span class="k">count</span><span class="p">(</span><span class="k">DISTINCT</span><span class="w"> </span><span class="n">doc_id</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">docs_with_term</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">doc_words</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">term</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">doc_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">term</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">term_count</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">w</span><span class="p">.</span><span class="n">term_count</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l</span><span class="p">.</span><span class="n">doc_len</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">tf</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">ln</span><span class="p">(</span><span class="k">c</span><span class="p">.</span><span class="n">total_docs</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">td</span><span class="p">.</span><span class="n">docs_with_term</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">idf</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">((</span><span class="n">w</span><span class="p">.</span><span class="n">term_count</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l</span><span class="p">.</span><span class="n">doc_len</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">ln</span><span class="p">(</span><span class="k">c</span><span class="p">.</span><span class="n">total_docs</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">td</span><span class="p">.</span><span class="n">docs_with_term</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">tfidf_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">doc_words</span><span class="w"> </span><span class="n">w</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">doc_lengths</span><span class="w"> </span><span class="n">l</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">doc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l</span><span class="p">.</span><span class="n">doc_id</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">term_docs</span><span class="w"> </span><span class="n">td</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">term</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">td</span><span class="p">.</span><span class="n">term</span>
+<span class="k">CROSS</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">corpus_stats</span><span class="w"> </span><span class="k">c</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">term</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'columnar'</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">tfidf_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">doc_words</span><span class="w"> </span><span class="p">(</span><span class="n">doc_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">term</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">term_count</span><span class="w"> </span><span class="nb">INT</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">doc_words</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'database'</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'columnar'</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'database'</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'relational'</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'columnar'</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(333,334 rows × 6 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>doc_id</th>
+<th>term</th>
+<th>term_count</th>
+<th>tf</th>
+<th>idf</th>
+<th>tfidf_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>245,782</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>245,869</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>245,899</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>245,914</td>
+<td>columnar</td>
+<td>11</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>245,980</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>246,010</td>
+<td>columnar</td>
+<td>10</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>246,163</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>246,280</td>
+<td>columnar</td>
+<td>10</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>246,463</td>
+<td>columnar</td>
+<td>7</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>246,490</td>
+<td>columnar</td>
+<td>9</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>246,493</td>
+<td>columnar</td>
+<td>7</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>246,625</td>
+<td>columnar</td>
+<td>4</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>246,652</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>246,724</td>
+<td>columnar</td>
+<td>9</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>246,871</td>
+<td>columnar</td>
+<td>9</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>246,928</td>
+<td>columnar</td>
+<td>5</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>247,003</td>
+<td>columnar</td>
+<td>7</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>247,093</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>247,312</td>
+<td>columnar</td>
+<td>5</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>247,336</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>247,366</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>247,408</td>
+<td>columnar</td>
+<td>7</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>247,480</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>247,798</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>247,828</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 333,334 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(333,334 rows × 6 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>doc_id</th>
+<th>term</th>
+<th>term_count</th>
+<th>tf</th>
+<th>idf</th>
+<th>tfidf_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>123,016</td>
+<td>columnar</td>
+<td>5</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>123,031</td>
+<td>columnar</td>
+<td>3</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>123,064</td>
+<td>columnar</td>
+<td>7</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>123,127</td>
+<td>columnar</td>
+<td>2</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>123,136</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>123,196</td>
+<td>columnar</td>
+<td>7</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>123,235</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>123,379</td>
+<td>columnar</td>
+<td>5</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>123,397</td>
+<td>columnar</td>
+<td>5</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>123,475</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>123,478</td>
+<td>columnar</td>
+<td>1</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>123,628</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>123,631</td>
+<td>columnar</td>
+<td>7</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>123,907</td>
+<td>columnar</td>
+<td>3</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>123,931</td>
+<td>columnar</td>
+<td>3</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>124,021</td>
+<td>columnar</td>
+<td>11</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>124,045</td>
+<td>columnar</td>
+<td>4</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>124,069</td>
+<td>columnar</td>
+<td>5</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>124,162</td>
+<td>columnar</td>
+<td>8</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>124,174</td>
+<td>columnar</td>
+<td>10</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>124,405</td>
+<td>columnar</td>
+<td>5</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>124,489</td>
+<td>columnar</td>
+<td>9</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>124,606</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>124,663</td>
+<td>columnar</td>
+<td>5</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>124,747</td>
+<td>columnar</td>
+<td>6</td>
+<td>1</td>
+<td>1.0986</td>
+<td>1.0986</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 333,334 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_063_Q63_boolean_search_negation.html" class="nav-btn">← Prev: High-Precision Boolean Se...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_065_Q65_search_position_bias_dcg.html" class="nav-btn">Next: Discounted Cumulative Gai... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

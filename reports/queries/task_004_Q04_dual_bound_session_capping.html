@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_004_Q04_dual_bound_session_capping - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Temporal &amp; Time-Series</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_004_Q04_dual_bound_session_capping</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_003_Q03_clickstream_sessionization_gaps.html" class="nav-btn">← Prev: Clickstream Sessionizatio...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_005_Q05_iot_sensor_gap_fill_locf.html" class="nav-btn">Next: IoT Sensor Telemetry Gap-... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Temporal &amp; Time-Series</span>
+                    <span class="badge badge-id">task_004_Q04_dual_bound_session_capping</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Sliding Sessionization with Absolute Maximum Duration Cap</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">408.07 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">399.69 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">30.5 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 18.8s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Real-world web sessions often need dual constraints: a 30-minute inactivity timeout AND a strict maximum 4-hour absolute session duration to prevent bots from maintaining endless sessions.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>A simple inactivity check keeps sessions alive indefinitely if events happen every 10 minutes. Tracking session origin requires window frames with state.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Real-world web sessions often need dual constraints: a 30-minute inactivity timeout AND a strict maximum 4-hour absolute session duration to prevent bots from maintaining endless sessions.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: user_id, event_time, action, raw_session_id, minutes_since_session_start.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 30.5 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 bot_events</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">30.5 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>user_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>event_time</code> <small>(TIMESTAMP)</small></span> <span class="col-pill"><code>action</code> <small>(VARCHAR)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>user_id</th>
+<th>event_time</th>
+<th>action</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>2026-03-01 00:00:00</td>
+<td>ping</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1</td>
+<td>2026-03-01 02:00:00</td>
+<td>ping</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>1</td>
+<td>2026-03-01 04:30:00</td>
+<td>ping</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>1</td>
+<td>2026-03-01 04:45:00</td>
+<td>ping</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>1</td>
+<td>2026-03-01 09:30:00.000010</td>
+<td>click</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2</td>
+<td>2026-03-01 09:30:00.000025</td>
+<td>view</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>3</td>
+<td>2026-03-01 09:30:00.000056</td>
+<td>add_to_cart</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>4</td>
+<td>2026-03-01 09:30:00.000062</td>
+<td>checkout</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>5</td>
+<td>2026-03-01 09:30:00.000098</td>
+<td>search</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>6</td>
+<td>2026-03-01 09:30:00.000106</td>
+<td>click</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>7</td>
+<td>2026-03-01 09:30:00.000123</td>
+<td>view</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>8</td>
+<td>2026-03-01 09:30:00.000145</td>
+<td>add_to_cart</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>9</td>
+<td>2026-03-01 09:30:00.000163</td>
+<td>checkout</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>10</td>
+<td>2026-03-01 09:30:00.000182</td>
+<td>search</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>11</td>
+<td>2026-03-01 09:30:00.000217</td>
+<td>click</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 924.62 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 33.91022828124454%; background: #f85149;" title="WINDOW: 313.54ms (33.9%)"></div><div class="cost-bar-seg" style="width: 25.045760899696816%; background: #f85149;" title="WINDOW: 231.58ms (25.0%)"></div><div class="cost-bar-seg" style="width: 24.571722090029123%; background: #f85149;" title="WINDOW: 227.19ms (24.6%)"></div><div class="cost-bar-seg" style="width: 12.350887090593261%; background: #f85149;" title="ORDER_BY: 114.20ms (12.4%)"></div><div class="cost-bar-seg" style="width: 1.5105445182318682%; background: #bc8cff;" title="TABLE_SCAN: 13.97ms (1.5%)"></div><div class="cost-bar-seg" style="width: 1.029517416926333%; background: #39c5cf;" title="PROJECTION: 9.52ms (1.0%)"></div><div class="cost-bar-seg" style="width: 0.7767708679803005%; background: #f0883e;" title="PROJECTION: 7.18ms (0.8%)"></div><div class="cost-bar-seg" style="width: 0.523564345276847%; background: #79c0ff;" title="PROJECTION: 4.84ms (0.5%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">7.18 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.59 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_decompress">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__int...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 12.4% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">114.20 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.59 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (12.4% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">9.52 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.59 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_compress_s">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__int...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">4.84 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.59 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;action&#x27;,">📁 Projections: [&#x27;user_id&#x27;, &#x27;event_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.26 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.59 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="high-cost-tag">🔥 33.9% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">313.54 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.59 MB</span></div>
+                <div class="nm-tbl" title="Projections: first_value(event_time) OVER (PARTI">📁 Projections: first_value(event_t...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (33.9% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.13 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;action&#x27;,">📁 Projections: [&#x27;user_id&#x27;, &#x27;event_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.25 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45.78 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="high-cost-tag">🔥 25.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">231.58 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45.78 MB</span></div>
+                <div class="nm-tbl" title="Projections: sum_no_overflow(gap_split) OVER (PA">📁 Projections: sum_no_overflow(gap...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (25.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.80 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;action&#x27;,">📁 Projections: [&#x27;user_id&#x27;, &#x27;event_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.16 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.45 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="high-cost-tag">🔥 24.6% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">227.19 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.45 MB</span></div>
+                <div class="nm-tbl" title="Projections: lag(event_time, 1, NULL::TIMESTAMP)">📁 Projections: lag(event_time, 1, ...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (24.6% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">1.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.97 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="memory.main.bot_events">📁 memory.main.bot_events</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>33.9%</strong></td>
+            <td>313.54 ms</td>
+            <td>1,000,000</td>
+            <td>49.59 MB</td>
+            <td><small>Projections: first_value(event_time) OVER (PARTI</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>25.0%</strong></td>
+            <td>231.58 ms</td>
+            <td>1,000,000</td>
+            <td>45.78 MB</td>
+            <td><small>Projections: sum_no_overflow(gap_split) OVER (PA</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>24.6%</strong></td>
+            <td>227.19 ms</td>
+            <td>1,000,000</td>
+            <td>34.45 MB</td>
+            <td><small>Projections: lag(event_time, 1, NULL::TIMESTAMP)</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>12.4%</strong></td>
+            <td>114.20 ms</td>
+            <td>1,000,000</td>
+            <td>49.59 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>1.5%</strong></td>
+            <td>13.97 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>memory.main.bot_events</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.0%</strong></td>
+            <td>9.52 ms</td>
+            <td>1,000,000</td>
+            <td>49.59 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_compress_s</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.8%</strong></td>
+            <td>7.18 ms</td>
+            <td>1,000,000</td>
+            <td>49.59 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_decompress</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.5%</strong></td>
+            <td>4.84 ms</td>
+            <td>1,000,000</td>
+            <td>49.59 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;action&#x27;,</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.2%</strong></td>
+            <td>1.80 ms</td>
+            <td>1,000,000</td>
+            <td>30.52 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;action&#x27;,</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.26 ms</td>
+            <td>1,000,000</td>
+            <td>49.59 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.25 ms</td>
+            <td>1,000,000</td>
+            <td>45.78 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.16 ms</td>
+            <td>1,000,000</td>
+            <td>34.45 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.13 ms</td>
+            <td>1,000,000</td>
+            <td>41.96 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;action&#x27;,</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 408.07 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="c1">-- Partition sessions by inactivity (&gt;30m) OR exceeding 4 hours from session start</span>
+<span class="k">WITH</span><span class="w"> </span><span class="n">ranked_events</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">event_time</span><span class="p">,</span>
+<span class="w">          </span><span class="n">action</span><span class="p">,</span>
+<span class="w">          </span><span class="n">lag</span><span class="p">(</span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span>
+<span class="w">                                </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prev_time</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">bot_events</span><span class="p">),</span>
+<span class="w">     </span><span class="n">step_flags</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">event_time</span><span class="p">,</span>
+<span class="w">          </span><span class="n">action</span><span class="p">,</span>
+<span class="w">          </span><span class="k">CASE</span>
+<span class="w">              </span><span class="k">WHEN</span><span class="w"> </span><span class="n">prev_time</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">              </span><span class="k">WHEN</span><span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'minute'</span><span class="p">,</span><span class="w"> </span><span class="n">prev_time</span><span class="p">,</span><span class="w"> </span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">30</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">              </span><span class="k">ELSE</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">          </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">gap_split</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">ranked_events</span><span class="p">),</span>
+<span class="w">     </span><span class="n">base_sessions</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">gap_split</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span>
+<span class="w">                               </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">raw_session_id</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">step_flags</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">event_time</span><span class="p">,</span>
+<span class="w">       </span><span class="n">action</span><span class="p">,</span>
+<span class="w">       </span><span class="n">raw_session_id</span><span class="p">,</span><span class="w"> </span><span class="c1">-- Measure elapsed minutes from session genesis</span>
+<span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'minute'</span><span class="p">,</span><span class="w"> </span><span class="n">first_value</span><span class="p">(</span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span><span class="w"> </span><span class="n">raw_session_id</span>
+<span class="w">                                                   </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">event_time</span><span class="p">),</span><span class="w"> </span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">minutes_since_session_start</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">base_sessions</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">         </span><span class="n">event_time</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 399.69 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Partition sessions by inactivity (&gt;30m) OR exceeding 4 hours from session start</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">ranked_events</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">event_time</span><span class="p">,</span>
+<span class="w">          </span><span class="n">action</span><span class="p">,</span>
+<span class="w">          </span><span class="n">lag</span><span class="p">(</span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span>
+<span class="w">                                </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prev_time</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">bot_events</span><span class="p">),</span>
+<span class="w">      </span><span class="n">step_flags</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">event_time</span><span class="p">,</span>
+<span class="w">          </span><span class="n">action</span><span class="p">,</span>
+<span class="w">          </span><span class="k">CASE</span>
+<span class="w">              </span><span class="k">WHEN</span><span class="w"> </span><span class="n">prev_time</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">              </span><span class="k">WHEN</span><span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'minute'</span><span class="p">,</span><span class="w"> </span><span class="n">prev_time</span><span class="p">,</span><span class="w"> </span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">30</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">              </span><span class="k">ELSE</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">          </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">gap_split</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">ranked_events</span><span class="p">),</span>
+<span class="w">      </span><span class="n">base_sessions</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">gap_split</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span>
+<span class="w">                               </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">raw_session_id</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">step_flags</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">event_time</span><span class="p">,</span>
+<span class="w">       </span><span class="n">action</span><span class="p">,</span>
+<span class="w">       </span><span class="n">raw_session_id</span><span class="p">,</span><span class="w"> </span><span class="c1">-- Measure elapsed minutes from session genesis</span>
+<span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'minute'</span><span class="p">,</span><span class="w"> </span><span class="n">first_value</span><span class="p">(</span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span><span class="w"> </span><span class="n">raw_session_id</span>
+<span class="w">                                                   </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">event_time</span><span class="p">),</span><span class="w"> </span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">minutes_since_session_start</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">base_sessions</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">         </span><span class="n">event_time</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">bot_events</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">event_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span><span class="w"> </span><span class="n">action</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">bot_events</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 00:00:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ping'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 02:00:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ping'</span><span class="p">),</span>
+<span class="w">       </span><span class="c1">-- +2 hrs</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 04:30:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ping'</span><span class="p">),</span>
+<span class="w"> </span><span class="c1">-- +4.5 hrs (exceeds 4h cap)</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 04:45:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ping'</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000,000 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>user_id</th>
+<th>event_time</th>
+<th>action</th>
+<th>raw_session_id</th>
+<th>minutes_since_session_start</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>2026-03-01 00:00:00</td>
+<td>ping</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1</td>
+<td>2026-03-01 02:00:00</td>
+<td>ping</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>1</td>
+<td>2026-03-01 04:30:00</td>
+<td>ping</td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>1</td>
+<td>2026-03-01 04:45:00</td>
+<td>ping</td>
+<td>3</td>
+<td>15</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>1</td>
+<td>2026-03-01 09:30:00.000010</td>
+<td>click</td>
+<td>4</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2</td>
+<td>2026-03-01 09:30:00.000025</td>
+<td>view</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>3</td>
+<td>2026-03-01 09:30:00.000056</td>
+<td>add_to_cart</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>4</td>
+<td>2026-03-01 09:30:00.000062</td>
+<td>checkout</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>5</td>
+<td>2026-03-01 09:30:00.000098</td>
+<td>search</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>6</td>
+<td>2026-03-01 09:30:00.000106</td>
+<td>click</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>7</td>
+<td>2026-03-01 09:30:00.000123</td>
+<td>view</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>8</td>
+<td>2026-03-01 09:30:00.000145</td>
+<td>add_to_cart</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>9</td>
+<td>2026-03-01 09:30:00.000163</td>
+<td>checkout</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>10</td>
+<td>2026-03-01 09:30:00.000182</td>
+<td>search</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>11</td>
+<td>2026-03-01 09:30:00.000217</td>
+<td>click</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>12</td>
+<td>2026-03-01 09:30:00.000224</td>
+<td>view</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>13</td>
+<td>2026-03-01 09:30:00.000242</td>
+<td>add_to_cart</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>14</td>
+<td>2026-03-01 09:30:00.000271</td>
+<td>checkout</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>15</td>
+<td>2026-03-01 09:30:00.000290</td>
+<td>search</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>16</td>
+<td>2026-03-01 09:30:00.000303</td>
+<td>click</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>17</td>
+<td>2026-03-01 09:30:00.000329</td>
+<td>view</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>18</td>
+<td>2026-03-01 09:30:00.000340</td>
+<td>add_to_cart</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>19</td>
+<td>2026-03-01 09:30:00.000368</td>
+<td>checkout</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>20</td>
+<td>2026-03-01 09:30:00.000386</td>
+<td>search</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>21</td>
+<td>2026-03-01 09:30:00.000403</td>
+<td>click</td>
+<td>1</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1,000,000 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>user_id</th>
+<th>event_time</th>
+<th>action</th>
+<th>raw_session_id</th>
+<th>minutes_since_session_start</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>2026-03-01 00:00:00</td>
+<td>ping</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1</td>
+<td>2026-03-01 02:00:00</td>
+<td>ping</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>1</td>
+<td>2026-03-01 04:30:00</td>
+<td>ping</td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>1</td>
+<td>2026-03-01 04:45:00</td>
+<td>ping</td>
+<td>3</td>
+<td>15</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>1</td>
+<td>2026-03-01 09:30:00.000010</td>
+<td>click</td>
+<td>4</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2</td>
+<td>2026-03-01 09:30:00.000025</td>
+<td>view</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>3</td>
+<td>2026-03-01 09:30:00.000056</td>
+<td>add_to_cart</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>4</td>
+<td>2026-03-01 09:30:00.000062</td>
+<td>checkout</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>5</td>
+<td>2026-03-01 09:30:00.000098</td>
+<td>search</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>6</td>
+<td>2026-03-01 09:30:00.000106</td>
+<td>click</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>7</td>
+<td>2026-03-01 09:30:00.000123</td>
+<td>view</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>8</td>
+<td>2026-03-01 09:30:00.000145</td>
+<td>add_to_cart</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>9</td>
+<td>2026-03-01 09:30:00.000163</td>
+<td>checkout</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>10</td>
+<td>2026-03-01 09:30:00.000182</td>
+<td>search</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>11</td>
+<td>2026-03-01 09:30:00.000217</td>
+<td>click</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>12</td>
+<td>2026-03-01 09:30:00.000224</td>
+<td>view</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>13</td>
+<td>2026-03-01 09:30:00.000242</td>
+<td>add_to_cart</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>14</td>
+<td>2026-03-01 09:30:00.000271</td>
+<td>checkout</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>15</td>
+<td>2026-03-01 09:30:00.000290</td>
+<td>search</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>16</td>
+<td>2026-03-01 09:30:00.000303</td>
+<td>click</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>17</td>
+<td>2026-03-01 09:30:00.000329</td>
+<td>view</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>18</td>
+<td>2026-03-01 09:30:00.000340</td>
+<td>add_to_cart</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>19</td>
+<td>2026-03-01 09:30:00.000368</td>
+<td>checkout</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>20</td>
+<td>2026-03-01 09:30:00.000386</td>
+<td>search</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>21</td>
+<td>2026-03-01 09:30:00.000403</td>
+<td>click</td>
+<td>1</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_003_Q03_clickstream_sessionization_gaps.html" class="nav-btn">← Prev: Clickstream Sessionizatio...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_005_Q05_iot_sensor_gap_fill_locf.html" class="nav-btn">Next: IoT Sensor Telemetry Gap-... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

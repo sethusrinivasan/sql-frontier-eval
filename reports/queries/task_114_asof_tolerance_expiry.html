@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_114_asof_tolerance_expiry - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Temporal &amp; Time-Series</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_114_asof_tolerance_expiry</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_113_vector_prefilter_recall_drop.html" class="nav-btn">← Prev: Vector Nearest Neighbors:...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_115_rrf_hybrid_rank_fusion_isolation.html" class="nav-btn">Next: Reciprocal Rank Fusion (R... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Temporal &amp; Time-Series</span>
+                    <span class="badge badge-id">task_114_asof_tolerance_expiry</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">ASOF Point-in-Time Quote Matching with 500ms Expiry Tolerance</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">352.55 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">319.26 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">2,000,000 rows</div>
+                    <div class="stat-sub">76.3 MiB across 2 tables</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 9.2s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Matches executed trades with the prevailing market quote as-of the trade timestamp, but enforces a strict 500ms staleness tolerance. Stale market data must not be matched.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Standard ASOF joins without a staleness tolerance check blindly match trades to arbitrarily old quotes from hours or days ago. For Trade 1, naive SQL matches the 2-minute-old quote ($150.10) instead of returning NULL, resulting in stale execution data.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Match each executed trade with the most recent prevailing market quote.
+CRITICAL CONSTRAINT: If the most recent quote is older than 500 milliseconds prior to the trade execution time, the quote is considered stale and must be returned as NULL.
+
+Required output columns:
+- trade_id (INT)
+- trade_time (TIMESTAMP)
+- symbol (VARCHAR)
+- prevailing_ask (DOUBLE)
+
+Order by trade_id ASC.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">2 Tables (2,000,000 rows &bull; 76.3 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 market_quotes</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">42.0 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>quote_time</code> <small>(TIMESTAMP)</small></span> <span class="col-pill"><code>symbol</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>bid</code> <small>(DOUBLE)</small></span> <span class="col-pill"><code>ask</code> <small>(DOUBLE)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>quote_time</th>
+<th>symbol</th>
+<th>bid</th>
+<th>ask</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-03-01 10:00:00</td>
+<td>AAPL</td>
+<td>150</td>
+<td>150.1</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-03-01 10:05:00</td>
+<td>AAPL</td>
+<td>151</td>
+<td>151.1</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-03-01 09:30:00.000011</td>
+<td>NVDA</td>
+<td>151.48</td>
+<td>151.58</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-03-01 09:30:00.000022</td>
+<td>AAPL</td>
+<td>150.32</td>
+<td>150.42</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2026-03-01 09:30:00.000043</td>
+<td>MSFT</td>
+<td>150.21</td>
+<td>150.31</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2026-03-01 09:30:00.000062</td>
+<td>GOOGL</td>
+<td>150.32</td>
+<td>150.42</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>2026-03-01 09:30:00.000087</td>
+<td>AMZN</td>
+<td>151.1</td>
+<td>151.2</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>2026-03-01 09:30:00.000103</td>
+<td>TSLA</td>
+<td>150.79</td>
+<td>150.89</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>2026-03-01 09:30:00.000127</td>
+<td>META</td>
+<td>151.09</td>
+<td>151.19</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>2026-03-01 09:30:00.000162</td>
+<td>AMD</td>
+<td>152.43</td>
+<td>152.53</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2026-03-01 09:30:00.000161</td>
+<td>NVDA</td>
+<td>150.45</td>
+<td>150.55</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>2026-03-01 09:30:00.000192</td>
+<td>AAPL</td>
+<td>151.57</td>
+<td>151.67</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>2026-03-01 09:30:00.000203</td>
+<td>MSFT</td>
+<td>150.79</td>
+<td>150.89</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>2026-03-01 09:30:00.000223</td>
+<td>GOOGL</td>
+<td>150.24</td>
+<td>150.34</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>2026-03-01 09:30:00.000243</td>
+<td>AMZN</td>
+<td>150.73</td>
+<td>150.83</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 market_trades</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">34.3 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>trade_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>trade_time</code> <small>(TIMESTAMP)</small></span> <span class="col-pill"><code>symbol</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>shares</code> <small>(INTEGER)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>trade_id</th>
+<th>trade_time</th>
+<th>symbol</th>
+<th>shares</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>2026-03-01 10:02:00</td>
+<td>AAPL</td>
+<td>100</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>2026-03-01 10:05:00.200000</td>
+<td>AAPL</td>
+<td>200</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>2026-03-01 09:30:00.000005</td>
+<td>NVDA</td>
+<td>143</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>2026-03-01 09:30:00.000034</td>
+<td>AAPL</td>
+<td>195</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>2026-03-01 09:30:00.000052</td>
+<td>MSFT</td>
+<td>6</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>2026-03-01 09:30:00.000078</td>
+<td>GOOGL</td>
+<td>168</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>2026-03-01 09:30:00.000081</td>
+<td>AMZN</td>
+<td>186</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>2026-03-01 09:30:00.000106</td>
+<td>TSLA</td>
+<td>165</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>2026-03-01 09:30:00.000135</td>
+<td>META</td>
+<td>132</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>2026-03-01 09:30:00.000153</td>
+<td>AMD</td>
+<td>154</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>2026-03-01 09:30:00.000165</td>
+<td>NVDA</td>
+<td>89</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>2026-03-01 09:30:00.000189</td>
+<td>AAPL</td>
+<td>226</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>2026-03-01 09:30:00.000202</td>
+<td>MSFT</td>
+<td>234</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>2026-03-01 09:30:00.000224</td>
+<td>GOOGL</td>
+<td>273</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>2026-03-01 09:30:00.000241</td>
+<td>AMZN</td>
+<td>104</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 1248.73 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 87.34523872801357%; background: #f85149;" title="ASOF_JOIN: 1090.71ms (87.3%)"></div><div class="cost-bar-seg" style="width: 6.95646335013806%; background: #f85149;" title="ORDER_BY: 86.87ms (7.0%)"></div><div class="cost-bar-seg" style="width: 2.5711460030777564%; background: #3fb950;" title="PROJECTION: 32.11ms (2.6%)"></div><div class="cost-bar-seg" style="width: 1.1830856371975653%; background: #d29922;" title="TABLE_SCAN: 14.77ms (1.2%)"></div><div class="cost-bar-seg" style="width: 1.1157787740851879%; background: #bc8cff;" title="TABLE_SCAN: 13.93ms (1.1%)"></div><div class="cost-bar-seg" style="width: 0.7390788183674053%; background: #39c5cf;" title="PROJECTION: 9.23ms (0.7%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.11 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.33 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_decompress">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__int...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 7.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">86.87 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (7.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">9.23 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_compress_s">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__int...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">2.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">32.11 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.33 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;trade_id&#x27;, &#x27;trade_time&#x27;, &#x27;symbol&#x27;">📁 Projections: [&#x27;trade_id&#x27;, &#x27;trade...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>ASOF_JOIN</strong></span>
+                <span class="high-cost-tag">🔥 87.3% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1090.71 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (87.3% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">1.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">14.77 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="memory.main.market_trades">📁 memory.main.market_trades</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">1.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.93 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
+                <div class="nm-tbl" title="memory.main.market_quotes">📁 memory.main.market_quotes</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>ASOF_JOIN</strong></td>
+            <td><strong>87.3%</strong></td>
+            <td>1090.71 ms</td>
+            <td>1,000,000</td>
+            <td>41.96 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>7.0%</strong></td>
+            <td>86.87 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>2.6%</strong></td>
+            <td>32.11 ms</td>
+            <td>1,000,000</td>
+            <td>34.33 MB</td>
+            <td><small>Projections: [&#x27;trade_id&#x27;, &#x27;trade_time&#x27;, &#x27;symbol&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>1.2%</strong></td>
+            <td>14.77 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>memory.main.market_trades</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>1.1%</strong></td>
+            <td>13.93 ms</td>
+            <td>1,000,000</td>
+            <td>30.52 MB</td>
+            <td><small>memory.main.market_quotes</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.7%</strong></td>
+            <td>9.23 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_compress_s</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>1.11 ms</td>
+            <td>1,000,000</td>
+            <td>34.33 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;__internal_decompress</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 352.55 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">trade_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">t</span><span class="p">.</span><span class="n">trade_time</span><span class="p">,</span>
+<span class="w">       </span><span class="n">t</span><span class="p">.</span><span class="n">symbol</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">quote_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">trade_time</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="mi">500</span><span class="w"> </span><span class="n">millisecond</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">ask</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prevailing_ask</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">market_trades</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="n">asof</span>
+<span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">market_quotes</span><span class="w"> </span><span class="n">q</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">symbol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">symbol</span>
+<span class="k">AND</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">trade_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">quote_time</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">trade_id</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 319.26 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">trade_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">t</span><span class="p">.</span><span class="n">trade_time</span><span class="p">,</span>
+<span class="w">       </span><span class="n">t</span><span class="p">.</span><span class="n">symbol</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'millisecond'</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">quote_time</span><span class="p">,</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">trade_time</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">500</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">ask</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prevailing_ask</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">market_trades</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="n">asof</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">market_quotes</span><span class="w"> </span><span class="n">q</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">symbol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">symbol</span>
+<span class="k">AND</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">trade_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">quote_time</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">trade_id</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">market_quotes</span><span class="w"> </span><span class="p">(</span><span class="n">quote_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span><span class="w"> </span><span class="n">symbol</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">bid</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">,</span>
+<span class="w">                                                                      </span><span class="n">ask</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">);</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">market_trades</span><span class="w"> </span><span class="p">(</span><span class="n">trade_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">trade_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span><span class="w"> </span><span class="n">symbol</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">shares</span><span class="w"> </span><span class="nb">INT</span><span class="p">);</span>
+
+<span class="c1">-- Quote 1: 10:00:00 (Stale for trade at 10:02:00)</span>
+<span class="c1">-- Quote 2: 10:05:00 (Fresh for trade at 10:05:00.200)</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">market_quotes</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="s1">'2026-03-01 10:00:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'AAPL'</span><span class="p">,</span><span class="w"> </span><span class="mi">150</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="mi">150</span><span class="p">.</span><span class="mi">10</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'2026-03-01 10:05:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'AAPL'</span><span class="p">,</span><span class="w"> </span><span class="mi">151</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="mi">151</span><span class="p">.</span><span class="mi">10</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">market_trades</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 10:02:00'</span><span class="p">,</span><span class="w"> </span><span class="s1">'AAPL'</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">),</span>
+<span class="w">       </span><span class="c1">-- 2 minutes after Quote 1 -&gt; STALE (&gt;500ms) -&gt; NULL</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 10:05:00.200'</span><span class="p">,</span><span class="w"> </span><span class="s1">'AAPL'</span><span class="p">,</span><span class="w"> </span><span class="mi">200</span><span class="p">);</span><span class="w"> </span><span class="c1">-- 200ms after Quote 2 -&gt; FRESH (&lt;=500ms) -&gt; 151.10</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000,000 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>trade_id</th>
+<th>trade_time</th>
+<th>symbol</th>
+<th>prevailing_ask</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>2026-03-01 10:02:00</td>
+<td>AAPL</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>2026-03-01 09:30:00.000005</td>
+<td>NVDA</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>2026-03-01 10:05:00.200000</td>
+<td>AAPL</td>
+<td>151.1</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>2026-03-01 09:30:00.000034</td>
+<td>AAPL</td>
+<td>150.42</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>2026-03-01 09:30:00.000052</td>
+<td>MSFT</td>
+<td>150.31</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>2026-03-01 09:30:00.000078</td>
+<td>GOOGL</td>
+<td>150.42</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>2026-03-01 09:30:00.000081</td>
+<td>AMZN</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>2026-03-01 09:30:00.000106</td>
+<td>TSLA</td>
+<td>150.89</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>2026-03-01 09:30:00.000135</td>
+<td>META</td>
+<td>151.19</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>2026-03-01 09:30:00.000153</td>
+<td>AMD</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>2026-03-01 09:30:00.000165</td>
+<td>NVDA</td>
+<td>150.55</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>2026-03-01 09:30:00.000189</td>
+<td>AAPL</td>
+<td>150.42</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>2026-03-01 09:30:00.000202</td>
+<td>MSFT</td>
+<td>150.31</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>2026-03-01 09:30:00.000224</td>
+<td>GOOGL</td>
+<td>150.34</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>2026-03-01 09:30:00.000241</td>
+<td>AMZN</td>
+<td>151.2</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>15</td>
+<td>2026-03-01 09:30:00.000268</td>
+<td>TSLA</td>
+<td>151.34</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>16</td>
+<td>2026-03-01 09:30:00.000283</td>
+<td>META</td>
+<td>151.19</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>17</td>
+<td>2026-03-01 09:30:00.000302</td>
+<td>AMD</td>
+<td>152.53</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>18</td>
+<td>2026-03-01 09:30:00.000330</td>
+<td>NVDA</td>
+<td>150.55</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>19</td>
+<td>2026-03-01 09:30:00.000345</td>
+<td>AAPL</td>
+<td>151.67</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>20</td>
+<td>2026-03-01 09:30:00.000368</td>
+<td>MSFT</td>
+<td>150.89</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>21</td>
+<td>2026-03-01 09:30:00.000386</td>
+<td>GOOGL</td>
+<td>150.4</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>22</td>
+<td>2026-03-01 09:30:00.000400</td>
+<td>AMZN</td>
+<td>150.83</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>23</td>
+<td>2026-03-01 09:30:00.000420</td>
+<td>TSLA</td>
+<td>151.34</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>24</td>
+<td>2026-03-01 09:30:00.000448</td>
+<td>META</td>
+<td>150.71</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(999,997 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>trade_id</th>
+<th>trade_time</th>
+<th>symbol</th>
+<th>prevailing_ask</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>2026-03-01 10:02:00</td>
+<td>AAPL</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>2026-03-01 10:05:00.200000</td>
+<td>AAPL</td>
+<td>151.1</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>2026-03-01 09:30:00.000034</td>
+<td>AAPL</td>
+<td>150.42</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>2026-03-01 09:30:00.000052</td>
+<td>MSFT</td>
+<td>150.31</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>5</td>
+<td>2026-03-01 09:30:00.000078</td>
+<td>GOOGL</td>
+<td>150.42</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>7</td>
+<td>2026-03-01 09:30:00.000106</td>
+<td>TSLA</td>
+<td>150.89</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>8</td>
+<td>2026-03-01 09:30:00.000135</td>
+<td>META</td>
+<td>151.19</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>10</td>
+<td>2026-03-01 09:30:00.000165</td>
+<td>NVDA</td>
+<td>150.55</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>11</td>
+<td>2026-03-01 09:30:00.000189</td>
+<td>AAPL</td>
+<td>150.42</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>12</td>
+<td>2026-03-01 09:30:00.000202</td>
+<td>MSFT</td>
+<td>150.31</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>13</td>
+<td>2026-03-01 09:30:00.000224</td>
+<td>GOOGL</td>
+<td>150.34</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>14</td>
+<td>2026-03-01 09:30:00.000241</td>
+<td>AMZN</td>
+<td>151.2</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>15</td>
+<td>2026-03-01 09:30:00.000268</td>
+<td>TSLA</td>
+<td>151.34</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>16</td>
+<td>2026-03-01 09:30:00.000283</td>
+<td>META</td>
+<td>151.19</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>17</td>
+<td>2026-03-01 09:30:00.000302</td>
+<td>AMD</td>
+<td>152.53</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>18</td>
+<td>2026-03-01 09:30:00.000330</td>
+<td>NVDA</td>
+<td>150.55</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>19</td>
+<td>2026-03-01 09:30:00.000345</td>
+<td>AAPL</td>
+<td>151.67</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>20</td>
+<td>2026-03-01 09:30:00.000368</td>
+<td>MSFT</td>
+<td>150.89</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>21</td>
+<td>2026-03-01 09:30:00.000386</td>
+<td>GOOGL</td>
+<td>150.4</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>22</td>
+<td>2026-03-01 09:30:00.000400</td>
+<td>AMZN</td>
+<td>150.83</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>23</td>
+<td>2026-03-01 09:30:00.000420</td>
+<td>TSLA</td>
+<td>151.34</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>24</td>
+<td>2026-03-01 09:30:00.000448</td>
+<td>META</td>
+<td>150.71</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>25</td>
+<td>2026-03-01 09:30:00.000466</td>
+<td>AMD</td>
+<td>150.78</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>26</td>
+<td>2026-03-01 09:30:00.000485</td>
+<td>NVDA</td>
+<td>148.89</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>27</td>
+<td>2026-03-01 09:30:00.000511</td>
+<td>AAPL</td>
+<td>150.6</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 999,997 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_113_vector_prefilter_recall_drop.html" class="nav-btn">← Prev: Vector Nearest Neighbors:...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_115_rrf_hybrid_rank_fusion_isolation.html" class="nav-btn">Next: Reciprocal Rank Fusion (R... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

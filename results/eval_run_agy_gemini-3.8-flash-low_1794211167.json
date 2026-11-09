@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-11-09T07:59:27.348943+00:00",
+  "model": "agy/gemini-3.8-flash-low",
+  "is_golden_test": false,
+  "total_tasks": 1,
+  "passed": 1,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_01_fanout",
+      "name": "E-Commerce Financial Aggregation without Join Fan-Out",
+      "category": "Metric Inflation / Chasm Trap",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH merchant_orders AS (\n    SELECT\n        merchant_id,\n        COALESCE(SUM(base_amount), 0.00) AS total_gross_sales\n    FROM orders\n    GROUP BY merchant_id\n),\nmerchant_discounts AS (\n    SELECT\n        o.merchant_id,\n        COALESCE(SUM(od.amount), 0.00) AS total_discount_amount\n    FROM orders o\n    JOIN order_discounts od ON o.order_id = od.order_id\n    GROUP BY o.merchant_id\n),\nmerchant_shipments AS (\n    SELECT\n        o.merchant_id,\n        COALESCE(SUM(os.shipping_fee), 0.00) AS total_shipping_fees\n    FROM orders o\n    JOIN order_shipments os ON o.order_id = os.order_id\n    GROUP BY o.merchant_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    COALESCE(mo.total_gross_sales, 0.00) AS total_gross_sales,\n    COALESCE(md.total_discount_amount, 0.00) AS total_discount_amount,\n    COALESCE(ms.total_shipping_fees, 0.00) AS total_shipping_fees\nFROM merchants m\nLEFT JOIN merchant_orders mo ON m.merchant_id = mo.merchant_id\nLEFT JOIN merchant_discounts md ON m.merchant_id = md.merchant_id\nLEFT JOIN merchant_shipments ms ON m.merchant_id = ms.merchant_id;",
+      "golden_sql": "WITH agg_discounts AS (\n    SELECT order_id, SUM(amount) AS total_discount\n    FROM order_discounts\n    GROUP BY order_id\n),\nagg_shipments AS (\n    SELECT order_id, SUM(shipping_fee) AS total_shipping\n    FROM order_shipments\n    GROUP BY order_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    SUM(o.base_amount) AS total_gross_sales,\n    COALESCE(SUM(d.total_discount), 0.00) AS total_discount_amount,\n    COALESCE(SUM(s.total_shipping), 0.00) AS total_shipping_fees\nFROM merchants m\nJOIN orders o ON m.merchant_id = o.merchant_id\nLEFT JOIN agg_discounts d ON o.order_id = d.order_id\nLEFT JOIN agg_shipments s ON o.order_id = s.order_id\nGROUP BY m.merchant_id, m.merchant_name;",
+      "execution_time_ms": 8.173706999514252,
+      "golden_time_ms": 9.672125001088716,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 1
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4839.538036001613,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH merchant_orders AS (\n    SELECT\n        merchant_id,\n        COALESCE(SUM(base_amount), 0.00) AS total_gross_sales\n    FROM orders\n    GROUP BY merchant_id\n),\nmerchant_discounts AS (\n    SELECT\n        o.merchant_id,\n        COALESCE(SUM(od.amount), 0.00) AS total_discount_amount\n    FROM orders o\n    JOIN order_discounts od ON o.order_id = od.order_id\n    GROUP BY o.merchant_id\n),\nmerchant_shipments AS (\n    SELECT\n        o.merchant_id,\n        COALESCE(SUM(os.shipping_fee), 0.00) AS total_shipping_fees\n    FROM orders o\n    JOIN order_shipments os ON o.order_id = os.order_id\n    GROUP BY o.merchant_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    COALESCE(mo.total_gross_sales, 0.00) AS total_gross_sales,\n    COALESCE(md.total_discount_amount, 0.00) AS total_discount_amount,\n    COALESCE(ms.total_shipping_fees, 0.00) AS total_shipping_fees\nFROM merchants m\nLEFT JOIN merchant_orders mo ON m.merchant_id = mo.merchant_id\nLEFT JOIN merchant_discounts md ON m.merchant_id = md.merchant_id\nLEFT JOIN merchant_shipments ms ON m.merchant_id = ms.merchant_id;\n```"
+      }
+    }
+  ]
+}

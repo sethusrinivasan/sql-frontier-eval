@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_094_Q94_median_absolute_deviation_mad - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Warehouse &amp; Statistical</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_094_Q94_median_absolute_deviation_mad</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_093_Q93_list_lambdas_nested_json_arrays.html" class="nav-btn">← Prev: List Lambdas for High-Per...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_095_Q95_robust_z_score_iqr_normalization.html" class="nav-btn">Next: Robust Z-Score Normalizat... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Warehouse &amp; Statistical</span>
+                    <span class="badge badge-id">task_094_Q94_median_absolute_deviation_mad</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Median Absolute Deviation (MAD) Robust Statistical Outlier Detection</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">241.66 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">239.83 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">11.4 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 11.9s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Traditional standard deviation Z-scores fail in the presence of extreme outliers because the outliers themselves distort the mean and standard deviation. MAD is a robust statistical scale estimator.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Mean and standard deviation break down completely on fat-tailed or skewed data distributions.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Traditional standard deviation Z-scores fail in the presence of extreme outliers because the outliers themselves distort the mean and standard deviation. MAD is a robust statistical scale estimator.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: tx_id, amount, overall_median, robust_mad_score, anomaly_flag.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 11.4 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 payment_volumes</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">11.4 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>tx_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>amount</code> <small>(DOUBLE)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>amount</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>10</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>12</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>11</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>13</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>5</td>
+<td>12</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>6</td>
+<td>1,000</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>372.88</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>301.72</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>300.15</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>32.47</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>1,397.29</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>0.01</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>305.26</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 295.39 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 51.90847487247529%; background: #f85149;" title="ORDER_BY: 153.33ms (51.9%)"></div><div class="cost-bar-seg" style="width: 10.18285308337256%; background: #f85149;" title="PROJECTION: 30.08ms (10.2%)"></div><div class="cost-bar-seg" style="width: 9.926454070785512%; background: #3fb950;" title="CTE: 29.32ms (9.9%)"></div><div class="cost-bar-seg" style="width: 9.648556161629628%; background: #d29922;" title="UNGROUPED_AGGREGATE: 28.50ms (9.6%)"></div><div class="cost-bar-seg" style="width: 9.158563792189097%; background: #bc8cff;" title="UNGROUPED_AGGREGATE: 27.05ms (9.2%)"></div><div class="cost-bar-seg" style="width: 3.2930892925159507%; background: #39c5cf;" title="PROJECTION: 9.73ms (3.3%)"></div><div class="cost-bar-seg" style="width: 2.5927720042814446%; background: #f0883e;" title="PROJECTION: 7.66ms (2.6%)"></div><div class="cost-bar-seg" style="width: 1.1223981286694185%; background: #79c0ff;" title="PROJECTION: 3.32ms (1.1%)"></div><div class="cost-bar-seg" style="width: 0.5370394232956288%; background: #58a6ff;" title="PROJECTION: 1.59ms (0.5%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="node-cost-tag">9.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">29.32 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.59 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;, &#x27;overall_median">📁 Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.74 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.23 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                <div class="nm-tbl" title="memory.main.payment_volumes">📁 memory.main.payment_volumes</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>UNGROUPED_AGGREGATE</strong></span>
+                <span class="node-cost-tag">9.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">28.50 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">7.63 MB</span></div>
+                <div class="nm-tbl" title="Projections: amount">📁 Projections: amount</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.61 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">7.63 MB</span></div>
+                <div class="nm-tbl" title="memory.main.payment_volumes">📁 memory.main.payment_volumes</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">2.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">7.66 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;__interna">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 51.9% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">153.33 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (51.9% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">3.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">9.73 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;__interna">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">10.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">30.08 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;, &#x27;overall_median">📁 Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">3.32 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;, &#x27;overall_median">📁 Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
+                <span class="node-cost-tag">0.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.88 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.33 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.22 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>UNGROUPED_AGGREGATE</strong></span>
+                <span class="node-cost-tag">9.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">27.05 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">7.63 MB</span></div>
+                <div class="nm-tbl" title="Projections: abs_deviation">📁 Projections: abs_deviation</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>51.9%</strong></td>
+            <td>153.33 ms</td>
+            <td>1,000,000</td>
+            <td>41.96 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>10.2%</strong></td>
+            <td>30.08 ms</td>
+            <td>1,000,000</td>
+            <td>41.96 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;, &#x27;overall_median</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>9.9%</strong></td>
+            <td>29.32 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNGROUPED_AGGREGATE</strong></td>
+            <td><strong>9.6%</strong></td>
+            <td>28.50 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNGROUPED_AGGREGATE</strong></td>
+            <td><strong>9.2%</strong></td>
+            <td>27.05 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>3.3%</strong></td>
+            <td>9.73 ms</td>
+            <td>1,000,000</td>
+            <td>41.96 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;__interna</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>2.6%</strong></td>
+            <td>7.66 ms</td>
+            <td>1,000,000</td>
+            <td>41.96 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;__interna</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.1%</strong></td>
+            <td>3.32 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;, &#x27;overall_median</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.5%</strong></td>
+            <td>1.59 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;amount&#x27;, &#x27;overall_median</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.4%</strong></td>
+            <td>1.23 ms</td>
+            <td>1,000,000</td>
+            <td>11.44 MB</td>
+            <td><small>memory.main.payment_volumes</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.4%</strong></td>
+            <td>1.22 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.3%</strong></td>
+            <td>0.88 ms</td>
+            <td>1,000,000</td>
+            <td>34.33 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CROSS_PRODUCT</strong></td>
+            <td><strong>0.3%</strong></td>
+            <td>0.74 ms</td>
+            <td>1,000,000</td>
+            <td>19.07 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.2%</strong></td>
+            <td>0.61 ms</td>
+            <td>1,000,000</td>
+            <td>7.63 MB</td>
+            <td><small>memory.main.payment_volumes</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>1,000,000</td>
+            <td>7.63 MB</td>
+            <td><small>Projections: abs_deviation</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.06 ms</td>
+            <td>1,000,000</td>
+            <td>7.63 MB</td>
+            <td><small>Projections: amount</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 241.66 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">med</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">median</span><span class="p">(</span><span class="n">amount</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">overall_median</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">payment_volumes</span><span class="p">),</span>
+<span class="w">     </span><span class="n">deviations</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">p</span><span class="p">.</span><span class="n">amount</span><span class="p">,</span>
+<span class="w">          </span><span class="n">m</span><span class="p">.</span><span class="n">overall_median</span><span class="p">,</span>
+<span class="w">          </span><span class="k">abs</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">amount</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">overall_median</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">abs_deviation</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">payment_volumes</span><span class="w"> </span><span class="n">p</span>
+<span class="w">   </span><span class="k">CROSS</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">med</span><span class="w"> </span><span class="n">m</span><span class="p">),</span>
+<span class="w">     </span><span class="n">mad_val</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">median</span><span class="p">(</span><span class="n">abs_deviation</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">mad_score</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">deviations</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">amount</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">overall_median</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">d</span><span class="p">.</span><span class="n">abs_deviation</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">nullif</span><span class="p">(</span><span class="n">v</span><span class="p">.</span><span class="n">mad_score</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">robust_mad_score</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="p">(</span><span class="n">d</span><span class="p">.</span><span class="n">abs_deviation</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">nullif</span><span class="p">(</span><span class="n">v</span><span class="p">.</span><span class="n">mad_score</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">3</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'ROBUST_OUTLIER'</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="s1">'NORMAL'</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">anomaly_flag</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">deviations</span><span class="w"> </span><span class="n">d</span>
+<span class="k">CROSS</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">mad_val</span><span class="w"> </span><span class="n">v</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">robust_mad_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 239.83 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Compute Median Absolute Deviation (MAD) and flag robust outliers</span>
+<span class="w"> </span><span class="c1">-- MAD = MEDIAN( |x - MEDIAN(x)| )</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">med</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">median</span><span class="p">(</span><span class="n">amount</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">overall_median</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">payment_volumes</span><span class="p">),</span>
+<span class="w">      </span><span class="n">deviations</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">p</span><span class="p">.</span><span class="n">amount</span><span class="p">,</span>
+<span class="w">          </span><span class="n">m</span><span class="p">.</span><span class="n">overall_median</span><span class="p">,</span>
+<span class="w">          </span><span class="k">abs</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">amount</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">overall_median</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">abs_deviation</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">payment_volumes</span><span class="w"> </span><span class="n">p</span>
+<span class="w">   </span><span class="k">CROSS</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">med</span><span class="w"> </span><span class="n">m</span><span class="p">),</span>
+<span class="w">      </span><span class="n">mad_val</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">median</span><span class="p">(</span><span class="n">abs_deviation</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">mad_score</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">deviations</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">amount</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">overall_median</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">d</span><span class="p">.</span><span class="n">abs_deviation</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">nullif</span><span class="p">(</span><span class="n">v</span><span class="p">.</span><span class="n">mad_score</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">robust_mad_score</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="p">(</span><span class="n">d</span><span class="p">.</span><span class="n">abs_deviation</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">nullif</span><span class="p">(</span><span class="n">v</span><span class="p">.</span><span class="n">mad_score</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">3</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'ROBUST_OUTLIER'</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="s1">'NORMAL'</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">anomaly_flag</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">deviations</span><span class="w"> </span><span class="n">d</span>
+<span class="k">CROSS</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">mad_val</span><span class="w"> </span><span class="n">v</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">robust_mad_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">payment_volumes</span><span class="w"> </span><span class="p">(</span><span class="n">tx_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">amount</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">payment_volumes</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">12</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">11</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">13</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">12</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">.</span><span class="mi">0</span><span class="p">);</span><span class="w"> </span><span class="c1">-- Massive outlier</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000,000 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>amount</th>
+<th>overall_median</th>
+<th>robust_mad_score</th>
+<th>anomaly_flag</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>218,474</td>
+<td>2,064.58</td>
+<td>177</td>
+<td>10.66</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>581,454</td>
+<td>2,001.18</td>
+<td>177</td>
+<td>10.31</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>188,896</td>
+<td>1,991</td>
+<td>177</td>
+<td>10.25</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>700,799</td>
+<td>1,978.94</td>
+<td>177</td>
+<td>10.18</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>896,122</td>
+<td>1,973.87</td>
+<td>177</td>
+<td>10.15</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>500,881</td>
+<td>1,962.35</td>
+<td>177</td>
+<td>10.09</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>764,403</td>
+<td>1,959.39</td>
+<td>177</td>
+<td>10.07</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>401,348</td>
+<td>1,926.38</td>
+<td>177</td>
+<td>9.88</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>20,909</td>
+<td>1,918.01</td>
+<td>177</td>
+<td>9.84</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>580,521</td>
+<td>1,892.97</td>
+<td>177</td>
+<td>9.7</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>562,740</td>
+<td>1,883.84</td>
+<td>177</td>
+<td>9.64</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>516,335</td>
+<td>1,876.7</td>
+<td>177</td>
+<td>9.6</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>582,594</td>
+<td>1,856.91</td>
+<td>177</td>
+<td>9.49</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>485,796</td>
+<td>1,838.59</td>
+<td>177</td>
+<td>9.39</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>828,286</td>
+<td>1,836.94</td>
+<td>177</td>
+<td>9.38</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>227,596</td>
+<td>1,834.88</td>
+<td>177</td>
+<td>9.37</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>697,776</td>
+<td>1,828.31</td>
+<td>177</td>
+<td>9.33</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>38,803</td>
+<td>1,824.36</td>
+<td>177</td>
+<td>9.31</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>456,005</td>
+<td>1,822.75</td>
+<td>177</td>
+<td>9.3</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>934,069</td>
+<td>1,822.12</td>
+<td>177</td>
+<td>9.29</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>966,674</td>
+<td>1,820.77</td>
+<td>177</td>
+<td>9.29</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>891,318</td>
+<td>1,818.39</td>
+<td>177</td>
+<td>9.27</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>206,231</td>
+<td>1,815.03</td>
+<td>177</td>
+<td>9.25</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>331,510</td>
+<td>1,809.27</td>
+<td>177</td>
+<td>9.22</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>446,409</td>
+<td>1,808.2</td>
+<td>177</td>
+<td>9.22</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1,000,000 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>amount</th>
+<th>overall_median</th>
+<th>robust_mad_score</th>
+<th>anomaly_flag</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>218,474</td>
+<td>2,064.58</td>
+<td>177</td>
+<td>10.66</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>581,454</td>
+<td>2,001.18</td>
+<td>177</td>
+<td>10.31</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>188,896</td>
+<td>1,991</td>
+<td>177</td>
+<td>10.25</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>700,799</td>
+<td>1,978.94</td>
+<td>177</td>
+<td>10.18</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>896,122</td>
+<td>1,973.87</td>
+<td>177</td>
+<td>10.15</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>500,881</td>
+<td>1,962.35</td>
+<td>177</td>
+<td>10.09</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>764,403</td>
+<td>1,959.39</td>
+<td>177</td>
+<td>10.07</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>401,348</td>
+<td>1,926.38</td>
+<td>177</td>
+<td>9.88</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>20,909</td>
+<td>1,918.01</td>
+<td>177</td>
+<td>9.84</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>580,521</td>
+<td>1,892.97</td>
+<td>177</td>
+<td>9.7</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>562,740</td>
+<td>1,883.84</td>
+<td>177</td>
+<td>9.64</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>516,335</td>
+<td>1,876.7</td>
+<td>177</td>
+<td>9.6</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>582,594</td>
+<td>1,856.91</td>
+<td>177</td>
+<td>9.49</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>485,796</td>
+<td>1,838.59</td>
+<td>177</td>
+<td>9.39</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>828,286</td>
+<td>1,836.94</td>
+<td>177</td>
+<td>9.38</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>227,596</td>
+<td>1,834.88</td>
+<td>177</td>
+<td>9.37</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>697,776</td>
+<td>1,828.31</td>
+<td>177</td>
+<td>9.33</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>38,803</td>
+<td>1,824.36</td>
+<td>177</td>
+<td>9.31</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>456,005</td>
+<td>1,822.75</td>
+<td>177</td>
+<td>9.3</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>934,069</td>
+<td>1,822.12</td>
+<td>177</td>
+<td>9.29</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>966,674</td>
+<td>1,820.77</td>
+<td>177</td>
+<td>9.29</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>891,318</td>
+<td>1,818.39</td>
+<td>177</td>
+<td>9.27</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>206,231</td>
+<td>1,815.03</td>
+<td>177</td>
+<td>9.25</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>331,510</td>
+<td>1,809.27</td>
+<td>177</td>
+<td>9.22</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>446,409</td>
+<td>1,808.2</td>
+<td>177</td>
+<td>9.22</td>
+<td>ROBUST_OUTLIER</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_093_Q93_list_lambdas_nested_json_arrays.html" class="nav-btn">← Prev: List Lambdas for High-Per...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_095_Q95_robust_z_score_iqr_normalization.html" class="nav-btn">Next: Robust Z-Score Normalizat... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

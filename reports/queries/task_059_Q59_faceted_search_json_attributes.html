@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_059_Q59_faceted_search_json_attributes - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Search &amp; Retrieval</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_059_Q59_faceted_search_json_attributes</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_058_Q58_stopword_cleansing_normalization.html" class="nav-btn">← Prev: Stopword Filtering and Qu...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_05_window_frame_bounds.html" class="nav-btn">Next: Financial Ledger Running ... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Search &amp; Retrieval</span>
+                    <span class="badge badge-id">task_059_Q59_faceted_search_json_attributes</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Faceted Search Aggregations over Semi-Structured JSON Attributes</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">14.99 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.2x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">12.66 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">38.1 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 23.1s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>When a customer searches for &#x27;laptops&#x27;, e-commerce search engines return matching items along with dynamic facet counts (e.g. Brand: Apple (12), Dell (8); RAM: 16GB (15), 32GB (5)) extracted from JSON specs.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Running separate queries for each facet dimension multiplies query latency and database load.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">When a customer searches for &#x27;laptops&#x27;, e-commerce search engines return matching items along with dynamic facet counts (e.g. Brand: Apple (12), Dell (8); RAM: 16GB (15), 32GB (5)) extracted from JSON specs.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: facet_dimension, facet_value, match_count.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 38.1 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 electronics_catalog</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">38.1 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>item_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>title</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>specs</code> <small>(JSON)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>item_id</th>
+<th>title</th>
+<th>specs</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>MacBook Pro 16</td>
+<td>{&quot;brand&quot;: &quot;Apple&quot;, &quot;ram&quot;: &quot;32GB&quot;, &quot;screen&quot;: 16}</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>MacBook Air 13</td>
+<td>{&quot;brand&quot;: &quot;Apple&quot;, &quot;ram&quot;: &quot;16GB&quot;, &quot;screen&quot;: 13}</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>XPS 15 Laptop</td>
+<td>{&quot;brand&quot;: &quot;Dell&quot;,  &quot;ram&quot;: &quot;16GB&quot;, &quot;screen&quot;: 15}</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>ThinkPad X1</td>
+<td>{&quot;brand&quot;: &quot;Lenovo&quot;,&quot;ram&quot;: &quot;16GB&quot;, &quot;screen&quot;: 14}</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>MacBook Pro 16</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>MacBook Air 13</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>XPS 15 Laptop</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>ThinkPad X1</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>MacBook Pro 16</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>MacBook Air 13</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>XPS 15 Laptop</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>ThinkPad X1</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>MacBook Pro 16</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>MacBook Air 13</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>XPS 15 Laptop</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 69.03 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 44.06096483094179%; background: #f85149;" title="CTE: 30.42ms (44.1%)"></div><div class="cost-bar-seg" style="width: 24.87614346685996%; background: #f85149;" title="HASH_GROUP_BY: 17.17ms (24.9%)"></div><div class="cost-bar-seg" style="width: 18.339533970482112%; background: #3fb950;" title="HASH_GROUP_BY: 12.66ms (18.3%)"></div><div class="cost-bar-seg" style="width: 10.121190632427902%; background: #d29922;" title="TABLE_SCAN: 6.99ms (10.1%)"></div><div class="cost-bar-seg" style="width: 2.0614758471539445%; background: #bc8cff;" title="PROJECTION: 1.42ms (2.1%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
+                <span class="high-cost-tag">🔥 44.1% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">30.42 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (44.1% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">2.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.42 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.76 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;brand&#x27;, &#x27;ram&#x27;]">📁 Projections: [&#x27;brand&#x27;, &#x27;ram&#x27;]</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">10.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">6.99 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.38 MB</span></div>
+                <div class="nm-tbl" title="memory.main.electronics_catalog">📁 memory.main.electronics_catalog</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">7</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">536 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;__internal_decompress_string(#0)&#x27;">📁 Projections: [&#x27;__internal_decomp...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">0.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.18 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">7</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">480 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">7</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">736 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;__internal_compress_string_ubigin">📁 Projections: [&#x27;__internal_compre...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">416 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;facet_dimension&#x27;, &#x27;facet_value&#x27;, ">📁 Projections: [&#x27;facet_dimension&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 24.9% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">17.17 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">352 B</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (24.9% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.07 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.38 MB</span></div>
+                <div class="nm-tbl" title="Projections: brand">📁 Projections: brand</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.76 MB</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">376 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;facet_dimension&#x27;, &#x27;facet_value&#x27;, ">📁 Projections: [&#x27;facet_dimension&#x27;,...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">18.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">12.66 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">328 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.07 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.38 MB</span></div>
+                <div class="nm-tbl" title="Projections: ram">📁 Projections: ram</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.76 MB</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>CTE</strong></td>
+            <td><strong>44.1%</strong></td>
+            <td>30.42 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>24.9%</strong></td>
+            <td>17.17 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>18.3%</strong></td>
+            <td>12.66 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>10.1%</strong></td>
+            <td>6.99 ms</td>
+            <td>1,000,000</td>
+            <td>15.38 MB</td>
+            <td><small>memory.main.electronics_catalog</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>2.1%</strong></td>
+            <td>1.42 ms</td>
+            <td>1,000,000</td>
+            <td>30.76 MB</td>
+            <td><small>Projections: [&#x27;brand&#x27;, &#x27;ram&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>0.3%</strong></td>
+            <td>0.18 ms</td>
+            <td>7</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.07 ms</td>
+            <td>1,000,000</td>
+            <td>15.38 MB</td>
+            <td><small>Projections: ram</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.07 ms</td>
+            <td>1,000,000</td>
+            <td>15.38 MB</td>
+            <td><small>Projections: brand</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>1,000,000</td>
+            <td>30.76 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>CTE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>1,000,000</td>
+            <td>30.76 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>7</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;__internal_compress_string_ubigin</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;facet_dimension&#x27;, &#x27;facet_value&#x27;, </small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>3</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;facet_dimension&#x27;, &#x27;facet_value&#x27;, </small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>7</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;__internal_decompress_string(#0)&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>0</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 14.99 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">matching_items</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">title</span><span class="p">,</span>
+<span class="w">          </span><span class="n">specs</span><span class="o">-&gt;&gt;</span><span class="s1">'brand'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">brand</span><span class="p">,</span>
+<span class="w">          </span><span class="n">specs</span><span class="o">-&gt;&gt;</span><span class="s1">'ram'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">ram</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">electronics_catalog</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="s1">'brand'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">facet_dimension</span><span class="p">,</span>
+<span class="w">       </span><span class="n">brand</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">facet_value</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">match_count</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">matching_items</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">brand</span>
+<span class="k">UNION</span><span class="w"> </span><span class="k">ALL</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="s1">'ram'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">facet_dimension</span><span class="p">,</span>
+<span class="w">       </span><span class="n">ram</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">facet_value</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">match_count</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">matching_items</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ram</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">facet_dimension</span><span class="p">,</span>
+<span class="w">         </span><span class="n">match_count</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span>
+<span class="w">         </span><span class="n">facet_value</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 12.66 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Extract faceted breakdown of matching laptop brands and RAM capacities</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">matching_items</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">title</span><span class="p">,</span>
+<span class="w">          </span><span class="n">specs</span><span class="o">-&gt;&gt;</span><span class="s1">'brand'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">brand</span><span class="p">,</span>
+<span class="w">          </span><span class="n">specs</span><span class="o">-&gt;&gt;</span><span class="s1">'ram'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">ram</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">electronics_catalog</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="s1">'brand'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">facet_dimension</span><span class="p">,</span>
+<span class="w">       </span><span class="n">brand</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">facet_value</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">match_count</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">matching_items</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">brand</span>
+<span class="k">UNION</span><span class="w"> </span><span class="k">ALL</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="s1">'ram'</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">facet_dimension</span><span class="p">,</span>
+<span class="w">       </span><span class="n">ram</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">facet_value</span><span class="p">,</span>
+<span class="w">       </span><span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">match_count</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">matching_items</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ram</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">facet_dimension</span><span class="p">,</span>
+<span class="w">         </span><span class="n">match_count</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span>
+<span class="w">         </span><span class="n">facet_value</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">electronics_catalog</span><span class="w"> </span><span class="p">(</span><span class="n">item_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">specs</span><span class="w"> </span><span class="n">JSON</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">electronics_catalog</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'MacBook Pro 16'</span><span class="p">,</span><span class="w"> </span><span class="s1">'{"brand": "Apple", "ram": "32GB", "screen": 16}'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'MacBook Air 13'</span><span class="p">,</span><span class="w"> </span><span class="s1">'{"brand": "Apple", "ram": "16GB", "screen": 13}'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'XPS 15 Laptop'</span><span class="p">,</span><span class="w"> </span><span class="s1">'{"brand": "Dell",  "ram": "16GB", "screen": 15}'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="s1">'ThinkPad X1'</span><span class="p">,</span><span class="w"> </span><span class="s1">'{"brand": "Lenovo","ram": "16GB", "screen": 14}'</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(7 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>facet_dimension</th>
+<th>facet_value</th>
+<th>match_count</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>brand</td>
+<td><span class="cell-null">NULL</span></td>
+<td>999,996</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>brand</td>
+<td>Apple</td>
+<td>2</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>brand</td>
+<td>Dell</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>brand</td>
+<td>Lenovo</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>ram</td>
+<td><span class="cell-null">NULL</span></td>
+<td>999,996</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>ram</td>
+<td>16GB</td>
+<td>3</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>ram</td>
+<td>32GB</td>
+<td>1</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(7 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>facet_dimension</th>
+<th>facet_value</th>
+<th>match_count</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>brand</td>
+<td><span class="cell-null">NULL</span></td>
+<td>999,996</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>brand</td>
+<td>Apple</td>
+<td>2</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>brand</td>
+<td>Dell</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>brand</td>
+<td>Lenovo</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>ram</td>
+<td><span class="cell-null">NULL</span></td>
+<td>999,996</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>ram</td>
+<td>16GB</td>
+<td>3</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>ram</td>
+<td>32GB</td>
+<td>1</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_058_Q58_stopword_cleansing_normalization.html" class="nav-btn">← Prev: Stopword Filtering and Qu...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_05_window_frame_bounds.html" class="nav-btn">Next: Financial Ledger Running ... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

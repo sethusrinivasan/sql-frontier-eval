@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_092_Q92_dynamic_unpivot_wide_metrics - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Warehouse &amp; Statistical</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_092_Q92_dynamic_unpivot_wide_metrics</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_091_Q91_dynamic_pivot_monthly_revenue.html" class="nav-btn">← Prev: Dynamic PIVOT of Monthly ...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_093_Q93_list_lambdas_nested_json_arrays.html" class="nav-btn">Next: List Lambdas for High-Per... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Warehouse &amp; Statistical</span>
+                    <span class="badge badge-id">task_092_Q92_dynamic_unpivot_wide_metrics</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: No</span>
+                </div>
+                <h1 class="task-title">Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">784.96 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">739.91 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">45.8 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 4.9s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, memory, disk). Normalizing them into key-value pairs is necessary for time-series modeling.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Chaining 10 UNION ALL queries multiplies read passes over the source data.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, memory, disk). Normalizing them into key-value pairs is necessary for time-series modeling.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: host_id, captured_date, metric_name, metric_value.
+Row order does not matter.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 45.8 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 wide_telemetry</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">45.8 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>host_id</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>captured_date</code> <small>(DATE)</small></span> <span class="col-pill"><code>cpu_metric</code> <small>(DOUBLE)</small></span> <span class="col-pill"><code>mem_metric</code> <small>(DOUBLE)</small></span> <span class="col-pill"><code>disk_metric</code> <small>(DOUBLE)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>host_id</th>
+<th>captured_date</th>
+<th>cpu_metric</th>
+<th>mem_metric</th>
+<th>disk_metric</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>srv-01</td>
+<td>2026-03-01 00:00:00</td>
+<td>45.2</td>
+<td>78.5</td>
+<td>92.1</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>srv-01</td>
+<td>2026-01-01 00:00:00</td>
+<td>53.95</td>
+<td>93.7</td>
+<td>109.92</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>srv-01</td>
+<td>2026-01-02 00:00:00</td>
+<td>49.06</td>
+<td>85.21</td>
+<td>99.96</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>srv-01</td>
+<td>2026-01-03 00:00:00</td>
+<td>43.65</td>
+<td>75.8</td>
+<td>88.94</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>srv-01</td>
+<td>2026-01-04 00:00:00</td>
+<td>36.91</td>
+<td>64.09</td>
+<td>75.21</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>srv-01</td>
+<td>2026-01-05 00:00:00</td>
+<td>54.01</td>
+<td>93.81</td>
+<td>110.05</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>srv-01</td>
+<td>2026-01-06 00:00:00</td>
+<td>39.96</td>
+<td>69.39</td>
+<td>81.42</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>srv-01</td>
+<td>2026-01-07 00:00:00</td>
+<td>52.53</td>
+<td>91.24</td>
+<td>107.04</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>srv-01</td>
+<td>2026-01-08 00:00:00</td>
+<td>41.27</td>
+<td>71.67</td>
+<td>84.09</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>srv-01</td>
+<td>2026-01-09 00:00:00</td>
+<td>46.29</td>
+<td>80.4</td>
+<td>94.32</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>srv-01</td>
+<td>2026-01-10 00:00:00</td>
+<td>49.37</td>
+<td>85.74</td>
+<td>100.59</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>srv-01</td>
+<td>2026-01-11 00:00:00</td>
+<td>49.18</td>
+<td>85.42</td>
+<td>100.21</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>srv-01</td>
+<td>2026-01-12 00:00:00</td>
+<td>35.27</td>
+<td>61.24</td>
+<td>71.86</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>srv-01</td>
+<td>2026-01-13 00:00:00</td>
+<td>50.51</td>
+<td>87.72</td>
+<td>102.91</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>srv-01</td>
+<td>2026-01-14 00:00:00</td>
+<td>42.98</td>
+<td>74.64</td>
+<td>87.58</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 48.19 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 47.037578237979396%; background: #f85149;" title="UNNEST: 22.67ms (47.0%)"></div><div class="cost-bar-seg" style="width: 27.091743044832235%; background: #f85149;" title="TABLE_SCAN: 13.06ms (27.1%)"></div><div class="cost-bar-seg" style="width: 22.97423707445884%; background: #f85149;" title="PROJECTION: 11.07ms (23.0%)"></div><div class="cost-bar-seg" style="width: 1.5758494773061076%; background: #d29922;" title="FILTER: 0.76ms (1.6%)"></div><div class="cost-bar-seg" style="width: 1.3205921654234218%; background: #bc8cff;" title="PROJECTION: 0.64ms (1.3%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.64 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">125.89 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#4&#x27;, &#x27;#5&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#4&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">1.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.76 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">286.14 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="high-cost-tag">🔥 47.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">22.67 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">286.14 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (47.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="high-cost-tag">🔥 23.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">11.07 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">72.50 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;host_id&#x27;, &#x27;captured_date&#x27;, &#x27;unpiv">📁 Projections: [&#x27;host_id&#x27;, &#x27;captur...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (23.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="high-cost-tag">🔥 27.1% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.06 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
+                <div class="nm-tbl" title="memory.main.wide_telemetry">📁 memory.main.wide_telemetry</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (27.1% of query runtime)</div>
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>47.0%</strong></td>
+            <td>22.67 ms</td>
+            <td>3,000,000</td>
+            <td>286.14 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>27.1%</strong></td>
+            <td>13.06 ms</td>
+            <td>1,000,000</td>
+            <td>41.96 MB</td>
+            <td><small>memory.main.wide_telemetry</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>23.0%</strong></td>
+            <td>11.07 ms</td>
+            <td>1,000,000</td>
+            <td>72.50 MB</td>
+            <td><small>Projections: [&#x27;host_id&#x27;, &#x27;captured_date&#x27;, &#x27;unpiv</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>1.6%</strong></td>
+            <td>0.76 ms</td>
+            <td>3,000,000</td>
+            <td>286.14 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.3%</strong></td>
+            <td>0.64 ms</td>
+            <td>3,000,000</td>
+            <td>125.89 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#4&#x27;, &#x27;#5&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 784.96 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="n">UNPIVOT</span><span class="w"> </span><span class="n">wide_telemetry</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">cpu_metric</span><span class="p">,</span>
+<span class="w">                          </span><span class="n">mem_metric</span><span class="p">,</span>
+<span class="w">                          </span><span class="n">disk_metric</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="n">metric_name</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="n">metric_value</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 739.91 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Transform wide metric columns into normalized key-value rows</span>
+<span class="w"> </span><span class="n">UNPIVOT</span><span class="w"> </span><span class="n">wide_telemetry</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">cpu_metric</span><span class="p">,</span>
+<span class="w">                           </span><span class="n">mem_metric</span><span class="p">,</span>
+<span class="w">                           </span><span class="n">disk_metric</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="n">metric_name</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="n">metric_value</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">wide_telemetry</span><span class="w"> </span><span class="p">(</span><span class="n">host_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">captured_date</span><span class="w"> </span><span class="nb">DATE</span><span class="p">,</span><span class="w"> </span><span class="n">cpu_metric</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">,</span>
+<span class="w">                                                                             </span><span class="n">mem_metric</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">,</span>
+<span class="w">                                                                                        </span><span class="n">disk_metric</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">wide_telemetry</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="s1">'srv-01'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01'</span><span class="p">,</span><span class="w"> </span><span class="mi">45</span><span class="p">.</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">78</span><span class="p">.</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">92</span><span class="p">.</span><span class="mi">1</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(3,000,000 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>host_id</th>
+<th>captured_date</th>
+<th>metric_name</th>
+<th>metric_value</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>srv-01</td>
+<td>2026-03-01 00:00:00</td>
+<td>cpu_metric</td>
+<td>45.2</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>srv-01</td>
+<td>2026-03-01 00:00:00</td>
+<td>mem_metric</td>
+<td>78.5</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>srv-01</td>
+<td>2026-03-01 00:00:00</td>
+<td>disk_metric</td>
+<td>92.1</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>srv-01</td>
+<td>2026-01-01 00:00:00</td>
+<td>cpu_metric</td>
+<td>53.95</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>srv-01</td>
+<td>2026-01-01 00:00:00</td>
+<td>mem_metric</td>
+<td>93.7</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>srv-01</td>
+<td>2026-01-01 00:00:00</td>
+<td>disk_metric</td>
+<td>109.92</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>srv-01</td>
+<td>2026-01-02 00:00:00</td>
+<td>cpu_metric</td>
+<td>49.06</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>srv-01</td>
+<td>2026-01-02 00:00:00</td>
+<td>mem_metric</td>
+<td>85.21</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>srv-01</td>
+<td>2026-01-02 00:00:00</td>
+<td>disk_metric</td>
+<td>99.96</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>srv-01</td>
+<td>2026-01-03 00:00:00</td>
+<td>cpu_metric</td>
+<td>43.65</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>srv-01</td>
+<td>2026-01-03 00:00:00</td>
+<td>mem_metric</td>
+<td>75.8</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>srv-01</td>
+<td>2026-01-03 00:00:00</td>
+<td>disk_metric</td>
+<td>88.94</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>srv-01</td>
+<td>2026-01-04 00:00:00</td>
+<td>cpu_metric</td>
+<td>36.91</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>srv-01</td>
+<td>2026-01-04 00:00:00</td>
+<td>mem_metric</td>
+<td>64.09</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>srv-01</td>
+<td>2026-01-04 00:00:00</td>
+<td>disk_metric</td>
+<td>75.21</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>srv-01</td>
+<td>2026-01-05 00:00:00</td>
+<td>cpu_metric</td>
+<td>54.01</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>srv-01</td>
+<td>2026-01-05 00:00:00</td>
+<td>mem_metric</td>
+<td>93.81</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>srv-01</td>
+<td>2026-01-05 00:00:00</td>
+<td>disk_metric</td>
+<td>110.05</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>srv-01</td>
+<td>2026-01-06 00:00:00</td>
+<td>cpu_metric</td>
+<td>39.96</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>srv-01</td>
+<td>2026-01-06 00:00:00</td>
+<td>mem_metric</td>
+<td>69.39</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>srv-01</td>
+<td>2026-01-06 00:00:00</td>
+<td>disk_metric</td>
+<td>81.42</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>srv-01</td>
+<td>2026-01-07 00:00:00</td>
+<td>cpu_metric</td>
+<td>52.53</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>srv-01</td>
+<td>2026-01-07 00:00:00</td>
+<td>mem_metric</td>
+<td>91.24</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>srv-01</td>
+<td>2026-01-07 00:00:00</td>
+<td>disk_metric</td>
+<td>107.04</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>srv-01</td>
+<td>2026-01-08 00:00:00</td>
+<td>cpu_metric</td>
+<td>41.27</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 3,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(3,000,000 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>host_id</th>
+<th>captured_date</th>
+<th>metric_name</th>
+<th>metric_value</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>srv-01</td>
+<td>2026-03-01 00:00:00</td>
+<td>cpu_metric</td>
+<td>45.2</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>srv-01</td>
+<td>2026-03-01 00:00:00</td>
+<td>mem_metric</td>
+<td>78.5</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>srv-01</td>
+<td>2026-03-01 00:00:00</td>
+<td>disk_metric</td>
+<td>92.1</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>srv-01</td>
+<td>2026-01-01 00:00:00</td>
+<td>cpu_metric</td>
+<td>53.95</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>srv-01</td>
+<td>2026-01-01 00:00:00</td>
+<td>mem_metric</td>
+<td>93.7</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>srv-01</td>
+<td>2026-01-01 00:00:00</td>
+<td>disk_metric</td>
+<td>109.92</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>srv-01</td>
+<td>2026-01-02 00:00:00</td>
+<td>cpu_metric</td>
+<td>49.06</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>srv-01</td>
+<td>2026-01-02 00:00:00</td>
+<td>mem_metric</td>
+<td>85.21</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>srv-01</td>
+<td>2026-01-02 00:00:00</td>
+<td>disk_metric</td>
+<td>99.96</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>srv-01</td>
+<td>2026-01-03 00:00:00</td>
+<td>cpu_metric</td>
+<td>43.65</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>srv-01</td>
+<td>2026-01-03 00:00:00</td>
+<td>mem_metric</td>
+<td>75.8</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>srv-01</td>
+<td>2026-01-03 00:00:00</td>
+<td>disk_metric</td>
+<td>88.94</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>srv-01</td>
+<td>2026-01-04 00:00:00</td>
+<td>cpu_metric</td>
+<td>36.91</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>srv-01</td>
+<td>2026-01-04 00:00:00</td>
+<td>mem_metric</td>
+<td>64.09</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>srv-01</td>
+<td>2026-01-04 00:00:00</td>
+<td>disk_metric</td>
+<td>75.21</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>srv-01</td>
+<td>2026-01-05 00:00:00</td>
+<td>cpu_metric</td>
+<td>54.01</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>srv-01</td>
+<td>2026-01-05 00:00:00</td>
+<td>mem_metric</td>
+<td>93.81</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>srv-01</td>
+<td>2026-01-05 00:00:00</td>
+<td>disk_metric</td>
+<td>110.05</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>srv-01</td>
+<td>2026-01-06 00:00:00</td>
+<td>cpu_metric</td>
+<td>39.96</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>srv-01</td>
+<td>2026-01-06 00:00:00</td>
+<td>mem_metric</td>
+<td>69.39</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>srv-01</td>
+<td>2026-01-06 00:00:00</td>
+<td>disk_metric</td>
+<td>81.42</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>srv-01</td>
+<td>2026-01-07 00:00:00</td>
+<td>cpu_metric</td>
+<td>52.53</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>srv-01</td>
+<td>2026-01-07 00:00:00</td>
+<td>mem_metric</td>
+<td>91.24</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>srv-01</td>
+<td>2026-01-07 00:00:00</td>
+<td>disk_metric</td>
+<td>107.04</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>srv-01</td>
+<td>2026-01-08 00:00:00</td>
+<td>cpu_metric</td>
+<td>41.27</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 3,000,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_091_Q91_dynamic_pivot_monthly_revenue.html" class="nav-btn">← Prev: Dynamic PIVOT of Monthly ...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_093_Q93_list_lambdas_nested_json_arrays.html" class="nav-btn">Next: List Lambdas for High-Per... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

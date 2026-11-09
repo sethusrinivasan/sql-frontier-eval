@@ -6,6 +6,8 @@
 [![CI](https://github.com/sethusrinivasan/sql-frontier-eval/actions/workflows/ci.yml/badge.svg)](https://github.com/sethusrinivasan/sql-frontier-eval/actions/workflows/ci.yml)
 [![Unit Tests](https://img.shields.io/badge/pytest-12%20passed-3fb950.svg?logo=pytest&logoColor=white)](tests/)
 [![Golden Baseline](https://img.shields.io/badge/golden%20suite-120%2F120%20(100%25)-3fb950.svg?logo=duckdb&logoColor=white)](results/eval_run_offline_1794210761.json)
+[![Static HTML Report](https://img.shields.io/badge/HTML%20Report-120%20Interactive%20Deep--Dives-1f6feb.svg?logo=html5&logoColor=white)](reports/index.html)
+[![Data Volume: 108M+](https://img.shields.io/badge/Data%20Volume-108M%2B%20Records%20Tested-3fb950.svg?logo=duckdb&logoColor=white)](reports/index.html)
 [![Zero-LLM CI](https://img.shields.io/badge/CI%20Dependency-Zero%20LLM%20Required-success.svg?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
 [![Engine: DuckDB 2.0](https://img.shields.io/badge/Engine-DuckDB%202.0-FFF000.svg?logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![Python: 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
@@ -43,6 +45,21 @@ Evaluated across the 8-category failure taxonomy using DuckDB 2.0:
 | **Gemini 3.8 Flash (High)** | **75.0%** | **6 / 8** | 51.9s | **4.3 ms** | Tasks 01 & 06 timed out during deep reasoning | [`eval_run_agy_gemini-3.8-flash-high_1794196172.json`](results/eval_run_agy_gemini-3.8-flash-high_1794196172.json) |
 | **Golden Ground Truth** | **100.0%** | **8 / 8** | N/A | **3.8 ms** | Baseline Verification (0% False Negatives) | [`eval_run_offline_1794186318.json`](results/eval_run_offline_1794186318.json) |
 | **Offline Reference / Naive** | **0.0%** | **0 / 8** | N/A | **2.6 ms** | 100% Trap Detection (Metric skew, row loss, O(N²) joins) | [`eval_run_offline_1794186320.json`](results/eval_run_offline_1794186320.json) |
+
+### 🌐 Interactive Static HTML Reports & Deep-Dive Explorer
+
+Comprehensive static HTML reports tested on **108,027,582 records across 148 tables** with DuckDB physical operator execution plans:
+
+* 📊 **[Executive Benchmark Dashboard (`reports/index.html`)](reports/index.html)**: High-level KPI summary, multi-model leaderboard, domain scorecards, Ubuntu OOM-kill root cause analysis, real-time live search, domain filter pills, and query status table.
+* 🔍 **[120 Query Deep-Dive Pages (`reports/queries/`)](reports/queries/)**: Dedicated per-query reports detailing:
+  - **What It Means**: Business scenario, analytical requirement, and semantic failure trap analysis.
+  - **Graphical Execution Plans**: Physical operator trees with radiant flame highlights (`🔥 BOTTLENECK`) on nodes consuming $\ge 20\%$ cost or heavy latency.
+  - **Data Volume Details**: Underlying table counts, schema, and volume (MiB/GiB) with rich scenario data preview.
+  - **Colored & Formatted Queries**: Side-by-side candidate SQL vs golden reference vs setup DDL with syntax highlighting.
+  - **Result Sets**: Side-by-side tabular candidate vs expected outputs.
+* 📦 **[Self-Contained Report Bundle (`reports.tar.gz`)](reports.tar.gz)**: 560 KiB compressed archive containing the entire dashboard and all 120 deep-dive pages.
+
+---
 
 📖 **For in-depth analysis and charts, read the full [Benchmark Report](BENCHMARK_REPORT.md).**  
 🎥 **For video presentation and slides, see the [Video Walkthrough Script](VIDEO_WALKTHROUGH_SCRIPT.md) and [Interactive Slides](walkthrough_presentation.html).**  
@@ -89,6 +106,13 @@ In addition to the 8 core failure-mode traps, SQL-Frontier-Eval includes **102 m
 
 ```
 sql-frontier-eval/
+├── generate_reports.py           # Scaled production report & execution plan profiler (1M+ rows)
+├── reports/                      # Static HTML report suite
+│   ├── index.html                # Executive Benchmark Dashboard & multi-model scorecards
+│   ├── style.css                 # Dark-mode styling, glowing bottleneck cards, plan trees
+│   ├── script.js                 # Search filtering, domain tabs, SQL copy handlers
+│   └── queries/                  # 120 Query deep-dive reports (task_001.html - task_120.html)
+├── reports.tar.gz                # Compressed 560 KiB distribution archive
 ├── verify.sh                     # 1-Step verification script (Unit tests + Gold + Offline)
 ├── run_eval.py                   # Unified CLI benchmark runner
 ├── requirements.txt              # Pinned dependencies (DuckDB, Pandas, PyArrow, etc.)
@@ -136,6 +160,45 @@ sql-frontier-eval/
   - **Beautified SQL**: Candidate and golden queries formatted with uppercase keywords and clean CTE/join indentation via `sqlparse`.
   - **Tabular Comparison**: Actual vs. expected output side-by-side in readable ASCII grid tables.
   - **Root Cause Discrepancy**: Exact cell divergence, arithmetic delta, inflation multiplier, and analytical failure explanation.
+
+---
+
+## 📐 Benchmark Design & Technical Architecture Decisions
+
+To ensure empirical fidelity, reproducibility, and mathematical rigor on large-scale analytical workloads, SQL-Frontier-Eval implements the following architectural decisions:
+
+### 1. Interactive Static HTML Reporting & Deep-Dive Explorer (`reports/`)
+- **Executive Dashboard ([`reports/index.html`](reports/index.html))**: Modern dark-mode reporting interface featuring hero KPI metrics (overall pass rate, latency, data volume), analytical domain scorecards, multi-model leaderboard comparison, system Root Cause Analysis (RCA) incident alert, real-time query search, domain filter pills, and query status matrix.
+- **Per-Query Deep-Dive Pages ([`reports/queries/<task_id>.html`](reports/queries/))**: 120 dedicated deep-dive reports providing:
+  - **Analytical Significance & "What It Means"**: Detailed problem background, scenario definition, and explanation of why frontier LLMs stumble on semantic traps.
+  - **Beautified & Syntax-Highlighted Queries**: Formatted SQL tabs displaying Candidate Query, Golden Reference Query, and Setup DDL with Pygments GitHub Dark syntax highlighting.
+  - **Tabular Query Results Comparison**: Side-by-side display of actual candidate output vs. expected golden ground truth.
+  - **Underlying Table Metadata**: Exact row counts, computed data volumes in bytes/MiB, column definitions, and rich data preview rows.
+
+### 2. Graphical Execution Plans & Operator Bottleneck Profiling
+- **DuckDB 2.0 Physical Operator Tree**: Extracted via `EXPLAIN ANALYZE (FORMAT JSON)` without requiring external rendering engines.
+- **Pipeline Latency Distribution**: Pre-calculated CSS-driven proportional latency distribution bar visually displaying execution share across all operators.
+- **Flowchart Tree Layout**: Operator cards depicting operator type, execution latency (ms), processed rows, data volume (MB), and table/filter/projection predicates.
+- **Automated High-Cost Bottleneck Highlighting**: Operators consuming $\ge 20\%$ of total query runtime or exhibiting heavy execution latency ($\ge 50\text{ ms}$) receive glowing radiant highlights (`🔥 BOTTLENECK`) to visually spotlight performance bottlenecks.
+
+### 3. Production Data Scaling (1M+ Records) & Rich Scenario Synthesis
+To prevent toy test artifacts from masking memory bottlenecks or latency divergences, underlying tables scale to **at least 1,000,000 records per table** using mathematically modeled distributions:
+- **Unique Sequential Keys (`max_id + i`)**: Sequential primary keys eliminate artificial key collisions and Cartesian key inflation.
+- **Continuous Measures with Box-Muller Gaussian Normal ($Z_1, Z_2, Z_3, Z_4$)**: Financial stock prices, FX rates, and sensor telemetry follow Gaussian normal distributions ($Z = \sqrt{-2\ln(U_1)}\cos(2\pi U_2)$) anchored around domain seed averages.
+- **Discrete Measures with Binomial Bell Curves**: Central limit theorem sums of 4 normal variables model realistic discrete counts (order quantities, share volumes, attendance counts).
+- **Poisson Microsecond Arrival Jitter**: High-frequency order books and clickstream timestamps incorporate Poisson arrival intervals (`+ (i * 20 + abs(8.0 * z1)) * INTERVAL '1 microsecond'`).
+- **Domain-Realistic Vocabularies**: Rich scenario distributions for tickers (`NVDA`, `AAPL`, `MSFT`, `GOOGL`, etc.), ISO currencies (`USD`, `EUR`, `GBP`, `JPY`), URL paths, and IoT cluster nodes replace repetitive clones.
+
+### 4. Star-Schema Dimension Protection & Quadratic Scalability Controls
+- **Dimension vs. Fact Table Separation**: In multi-table analytics, small dimension, reference, parameter, and query tables (e.g., $K$ centroids in K-Means clustering `task_035`, intent prototypes `task_049`, query token embeddings `task_033`, and lookup thesauri `task_061`) are preserved at their seed counts (2–10 rows) while massive fact tables scale to 1,000,000 records. This prevents semantically incorrect $10^6 \times 10^6 = 10^{12}$ cross-joins while accurately benchmarking production warehouse queries.
+- **Quadratic & Recursive Workload Safeguards**: Tasks with unindexed $O(N^2)$ triangular all-pairs self-joins (`t1.id < t2.id`, `t1.id != t2.id`, `array_cosine_similarity` in tasks `task_031`, `task_032`, `task_036`, `task_040`, `task_073`) and recursive graph traversals (`WITH RECURSIVE` in `Graph & Hierarchy` tasks) scale to 2,500 records. At 2,500 records, unpartitioned triangular self-joins compute $\frac{2500 \times 2499}{2} = 3,123,750$ vector comparisons (executing in 0.5s–1.5s), evaluating realistic high-cardinality queue deduplication without triggering 500-billion-pair combinatorial stalls.
+
+### 5. Memory Hardening & Ubuntu Systemd-OOMD Root Cause Analysis (RCA)
+- **Incident Investigation**: On 2026-11-09 00:38:46 UTC, evaluation runs aborted due to Ubuntu's `systemd-oomd` terminating the GNOME terminal scope (`vte-spawn-...scope`) with `SIGKILL` when memory pressure reached 61.9% (>50% user-slice threshold for >20s). The process reached 12.1 GB RAM and 1.4 GB swap, spilling 546.8 MB to DuckDB temporary storage.
+- **Root Cause**: During evaluation of `gpt-oss-120b-medium` on cyclic dependency graph tasks, generated SQL produced unbounded recursive CTE loops. Without explicit memory ceilings, DuckDB allocated up to its default 12.0 GB ceiling (80% system RAM).
+- **Permanent Safeguards Applied**:
+  1. **Strict Engine Memory Ceiling**: Configured `SET max_memory = '2GB';` in [`harness/engine.py`](harness/engine.py) to guarantee that DuckDB in-memory operations never exceed host operating system thresholds.
+  2. **Active Watchdog Timers**: Integrated a 15-second query execution watchdog in `engine.py` and a 10-second watchdog in `generate_reports.py` via Python `threading.Timer(timeout, con.interrupt)`. Runaway queries cleanly raise DuckDB's native `InterruptException` without crashing the host process or causing OS memory pressure.
 
 ---
 

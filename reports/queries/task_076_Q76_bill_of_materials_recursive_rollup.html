@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_076_Q76_bill_of_materials_recursive_rollup - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Graph &amp; Hierarchy</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_076_Q76_bill_of_materials_recursive_rollup</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_075_Q75_hybrid_search_metadata_soft_boost.html" class="nav-btn">← Prev: Hybrid Search with Hard C...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_077_Q77_org_hierarchy_span_of_control.html" class="nav-btn">Next: Organizational Reporting ... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Graph &amp; Hierarchy</span>
+                    <span class="badge badge-id">task_076_Q76_bill_of_materials_recursive_rollup</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Hierarchical Bill of Materials (BOM) Cost Rollup via Recursive CTE</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">0.76 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.1x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">0.83 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">4 rows</div>
+                    <div class="stat-sub">240 B across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 11.3s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Manufacturing an electric vehicle requires thousands of nested parts (Car -&gt; Battery Pack -&gt; Cell Module -&gt; Lithium Cathode). Calculating unit cost requires rolling up quantities across arbitrary depth levels.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Fixed joins only support fixed depth hierarchies (e.g. 3 levels max). If an assembly has 6 levels, fixed joins miss the lowest-tier parts entirely.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Manufacturing an electric vehicle requires thousands of nested parts (Car -&gt; Battery Pack -&gt; Cell Module -&gt; Lithium Cathode). Calculating unit cost requires rolling up quantities across arbitrary depth levels.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: child_part, total_qty, depth.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (4 rows &bull; 240 B)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 bom_parts</span>
+                    <span class="badge badge-pass">4 rows</span>
+                    <span class="badge badge-golden">240 B Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>parent_part</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>child_part</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>quantity_needed</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>unit_cost</code> <small>(DECIMAL(10,2))</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 4 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>parent_part</th>
+<th>child_part</th>
+<th>quantity_needed</th>
+<th>unit_cost</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>EV_CAR</td>
+<td>CHASSIS</td>
+<td>1</td>
+<td>5,000</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>EV_CAR</td>
+<td>BATTERY_PACK</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>BATTERY_PACK</td>
+<td>BATTERY_MODULE</td>
+<td>4</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>BATTERY_MODULE</td>
+<td>LITHIUM_CELL</td>
+<td>100</td>
+<td>15</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 0.76 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 65.21883838716043%; background: #58a6ff;" title="RECURSIVE_CTE: 0.50ms (65.2%)"></div><div class="cost-bar-seg" style="width: 15.760047359073864%; background: #f85149;" title="ORDER_BY: 0.12ms (15.8%)"></div><div class="cost-bar-seg" style="width: 14.039860553838054%; background: #3fb950;" title="HASH_JOIN: 0.11ms (14.0%)"></div><div class="cost-bar-seg" style="width: 2.360718279286983%; background: #d29922;" title="TABLE_SCAN: 0.02ms (2.4%)"></div><div class="cost-bar-seg" style="width: 1.152404130763665%; background: #bc8cff;" title="PROJECTION: 0.01ms (1.2%)"></div><div class="cost-bar-seg" style="width: 0.8099717161086626%; background: #39c5cf;" title="TABLE_SCAN: 0.01ms (0.8%)"></div><div class="cost-bar-seg" style="width: 0.5102940209169242%; background: #f0883e;" title="RECURSIVE_CTE_SCAN: 0.00ms (0.5%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">15.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.12 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,192 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔄 <strong>RECURSIVE_CTE</strong></span>
+                <span class="node-cost-tag">65.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.50 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">96 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;child_part&#x27;, &#x27;total_qty&#x27;, &#x27;depth&#x27;">📁 Projections: [&#x27;child_part&#x27;, &#x27;tot...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">2.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">40 B</span></div>
+                <div class="nm-tbl" title="memory.main.bom_parts">📁 memory.main.bom_parts</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,144 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;child_part&#x27;, &#x27;total_qty&#x27;, &#x27;depth&#x27;">📁 Projections: [&#x27;child_part&#x27;, &#x27;tot...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">14.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.11 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,152 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>RECURSIVE_CTE_SCAN</strong></span>
+                <span class="node-cost-tag">0.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">96 B</span></div>
+                
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">4</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">144 B</span></div>
+                <div class="nm-tbl" title="memory.main.bom_parts">📁 memory.main.bom_parts</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>RECURSIVE_CTE</strong></td>
+            <td><strong>65.2%</strong></td>
+            <td>0.50 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>15.8%</strong></td>
+            <td>0.12 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>14.0%</strong></td>
+            <td>0.11 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>2.4%</strong></td>
+            <td>0.02 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.bom_parts</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.2%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;child_part&#x27;, &#x27;total_qty&#x27;, &#x27;depth&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.8%</strong></td>
+            <td>0.01 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.bom_parts</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>RECURSIVE_CTE_SCAN</strong></td>
+            <td><strong>0.5%</strong></td>
+            <td>0.00 ms</td>
+            <td>4</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;child_part&#x27;, &#x27;total_qty&#x27;, &#x27;depth&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 0.76 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="k">RECURSIVE</span><span class="w"> </span><span class="n">bom_tree</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="c1">-- Anchor: Top-level components of EV_CAR</span>
+<span class="w"> </span><span class="k">SELECT</span><span class="w"> </span><span class="n">parent_part</span><span class="p">,</span>
+<span class="w">        </span><span class="n">child_part</span><span class="p">,</span>
+<span class="w">        </span><span class="n">quantity_needed</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_qty</span><span class="p">,</span>
+<span class="w">        </span><span class="mi">1</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">depth</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">bom_parts</span>
+<span class="w">   </span><span class="k">WHERE</span><span class="w"> </span><span class="n">parent_part</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'EV_CAR'</span>
+<span class="w">   </span><span class="k">UNION</span><span class="w"> </span><span class="k">ALL</span><span class="w"> </span><span class="c1">-- Recursive: Multiply quantity down the hierarchy tree</span>
+<span class="w"> </span><span class="k">SELECT</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">child_part</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">parent_part</span><span class="p">,</span>
+<span class="w">        </span><span class="n">b</span><span class="p">.</span><span class="n">child_part</span><span class="p">,</span>
+<span class="w">        </span><span class="n">t</span><span class="p">.</span><span class="n">total_qty</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">quantity_needed</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_qty</span><span class="p">,</span>
+<span class="w">        </span><span class="n">t</span><span class="p">.</span><span class="n">depth</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">depth</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">bom_tree</span><span class="w"> </span><span class="n">t</span>
+<span class="w">   </span><span class="k">JOIN</span><span class="w"> </span><span class="n">bom_parts</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">child_part</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">parent_part</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">child_part</span><span class="p">,</span>
+<span class="w">       </span><span class="n">total_qty</span><span class="p">,</span>
+<span class="w">       </span><span class="n">depth</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">bom_tree</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">depth</span><span class="p">,</span>
+<span class="w">         </span><span class="n">child_part</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 0.83 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Recursively expand BOM tree to compute total quantity of base components</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">RECURSIVE</span><span class="w"> </span><span class="n">bom_tree</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="c1">-- Anchor: Top-level components of EV_CAR</span>
+<span class="w"> </span><span class="k">SELECT</span><span class="w"> </span><span class="n">parent_part</span><span class="p">,</span>
+<span class="w">        </span><span class="n">child_part</span><span class="p">,</span>
+<span class="w">        </span><span class="n">quantity_needed</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_qty</span><span class="p">,</span>
+<span class="w">        </span><span class="mi">1</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">depth</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">bom_parts</span>
+<span class="w">   </span><span class="k">WHERE</span><span class="w"> </span><span class="n">parent_part</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'EV_CAR'</span>
+<span class="w">   </span><span class="k">UNION</span><span class="w"> </span><span class="k">ALL</span><span class="w"> </span><span class="c1">-- Recursive: Multiply quantity down the hierarchy tree</span>
+<span class="w"> </span><span class="k">SELECT</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">child_part</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">parent_part</span><span class="p">,</span>
+<span class="w">        </span><span class="n">b</span><span class="p">.</span><span class="n">child_part</span><span class="p">,</span>
+<span class="w">        </span><span class="n">t</span><span class="p">.</span><span class="n">total_qty</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">quantity_needed</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_qty</span><span class="p">,</span>
+<span class="w">        </span><span class="n">t</span><span class="p">.</span><span class="n">depth</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">depth</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">bom_tree</span><span class="w"> </span><span class="n">t</span>
+<span class="w">   </span><span class="k">JOIN</span><span class="w"> </span><span class="n">bom_parts</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">child_part</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">parent_part</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">child_part</span><span class="p">,</span>
+<span class="w">       </span><span class="n">total_qty</span><span class="p">,</span>
+<span class="w">       </span><span class="n">depth</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">bom_tree</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">depth</span><span class="p">,</span>
+<span class="w">         </span><span class="n">child_part</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">bom_parts</span><span class="w"> </span><span class="p">(</span><span class="n">parent_part</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">child_part</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">quantity_needed</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">unit_cost</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">));</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">bom_parts</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="s1">'EV_CAR'</span><span class="p">,</span><span class="w"> </span><span class="s1">'CHASSIS'</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">5000</span><span class="p">.</span><span class="mi">00</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'EV_CAR'</span><span class="p">,</span><span class="w"> </span><span class="s1">'BATTERY_PACK'</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'BATTERY_PACK'</span><span class="p">,</span><span class="w"> </span><span class="s1">'BATTERY_MODULE'</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'BATTERY_MODULE'</span><span class="p">,</span><span class="w"> </span><span class="s1">'LITHIUM_CELL'</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="mi">15</span><span class="p">.</span><span class="mi">00</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(4 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>child_part</th>
+<th>total_qty</th>
+<th>depth</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>BATTERY_PACK</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>CHASSIS</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>BATTERY_MODULE</td>
+<td>4</td>
+<td>2</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>LITHIUM_CELL</td>
+<td>400</td>
+<td>3</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(4 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>child_part</th>
+<th>total_qty</th>
+<th>depth</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>BATTERY_PACK</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>CHASSIS</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>BATTERY_MODULE</td>
+<td>4</td>
+<td>2</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>LITHIUM_CELL</td>
+<td>400</td>
+<td>3</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_075_Q75_hybrid_search_metadata_soft_boost.html" class="nav-btn">← Prev: Hybrid Search with Hard C...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_077_Q77_org_hierarchy_span_of_control.html" class="nav-btn">Next: Organizational Reporting ... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

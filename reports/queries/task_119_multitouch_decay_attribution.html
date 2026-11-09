@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_119_multitouch_decay_attribution - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Temporal &amp; Time-Series</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_119_multitouch_decay_attribution</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_118_reversal_interleaved_ledger.html" class="nav-btn">← Prev: Financial Ledger Running ...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_120_market_basket_lift_smoothing.html" class="nav-btn">Next: Association Rule Lift Mat... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Temporal &amp; Time-Series</span>
+                    <span class="badge badge-id">task_119_multitouch_decay_attribution</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">229.28 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">223.86 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">2,000,000 rows</div>
+                    <div class="stat-sub">64.8 MiB across 2 tables</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 7.2s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Calculates exponential time-decay attribution across previous marketing touches (7-day half-life: w = 2^(-delta_t / 7)), strictly normalizing touchpoint weights so attributed revenue sums to exactly 100% of conversion value.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Naive queries multiply raw exponential decay directly by order revenue without dividing by the sum of weights. In our scenario (raw weights sum to 1.75), naive attribution distributes 175% ($612.50) of the actual $350.00 revenue, severely corrupting marketing ROI calculations.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Attribute conversion revenue ($300.00) across touchpoints occurring within 30 days prior to purchase.
+Use exponential time-decay weighting with a 7-day half-life:
+raw_weight = POW(0.5, date_diff(&#x27;second&#x27;, click_time, conversion_time) / (7.0 * 86400.0))
+CRITICAL: Attributed revenue MUST be normalized across touches so the sum of attributed revenue exactly equals the $300.00 conversion revenue.
+
+Required output columns:
+- touch_id (INT)
+- channel (VARCHAR)
+- attributed_revenue (DECIMAL)
+
+Order by touch_id ASC.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">2 Tables (2,000,000 rows &bull; 64.8 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 purchase_conversions</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">30.5 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>order_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>user_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>order_revenue</code> <small>(DECIMAL(10,2))</small></span> <span class="col-pill"><code>conversion_time</code> <small>(TIMESTAMP)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>order_id</th>
+<th>user_id</th>
+<th>order_revenue</th>
+<th>conversion_time</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>101</td>
+<td>42</td>
+<td>350</td>
+<td>2026-03-15 12:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>101</td>
+<td>42</td>
+<td>377.27</td>
+<td>2026-03-01 09:30:00.000004</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>102</td>
+<td>43</td>
+<td>266.6</td>
+<td>2026-03-01 09:30:00.000033</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>103</td>
+<td>44</td>
+<td>391.22</td>
+<td>2026-03-01 09:30:00.000046</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>104</td>
+<td>45</td>
+<td>372.02</td>
+<td>2026-03-01 09:30:00.000063</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>105</td>
+<td>46</td>
+<td>317.61</td>
+<td>2026-03-01 09:30:00.000085</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>106</td>
+<td>47</td>
+<td>420.67</td>
+<td>2026-03-01 09:30:00.000111</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>107</td>
+<td>48</td>
+<td>392.91</td>
+<td>2026-03-01 09:30:00.000127</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>108</td>
+<td>49</td>
+<td>443.28</td>
+<td>2026-03-01 09:30:00.000154</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>109</td>
+<td>50</td>
+<td>435.5</td>
+<td>2026-03-01 09:30:00.000173</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>110</td>
+<td>51</td>
+<td>333.04</td>
+<td>2026-03-01 09:30:00.000183</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>111</td>
+<td>52</td>
+<td>339.94</td>
+<td>2026-03-01 09:30:00.000202</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>112</td>
+<td>53</td>
+<td>339.53</td>
+<td>2026-03-01 09:30:00.000222</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>113</td>
+<td>54</td>
+<td>377.5</td>
+<td>2026-03-01 09:30:00.000244</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>114</td>
+<td>55</td>
+<td>307.88</td>
+<td>2026-03-01 09:30:00.000266</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 touchpoints</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">34.3 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>touch_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>user_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>channel</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>click_time</code> <small>(TIMESTAMP)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>touch_id</th>
+<th>user_id</th>
+<th>channel</th>
+<th>click_time</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>42</td>
+<td>Google Search</td>
+<td>2026-03-01 12:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>42</td>
+<td>Facebook Ad</td>
+<td>2026-03-08 12:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>42</td>
+<td>Email Promo</td>
+<td>2026-03-15 12:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>42</td>
+<td>Google Search</td>
+<td>2026-03-01 09:30:00.000001</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>43</td>
+<td>Facebook Ad</td>
+<td>2026-03-01 09:30:00.000027</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>44</td>
+<td>Email Promo</td>
+<td>2026-03-01 09:30:00.000045</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>45</td>
+<td>Google Search</td>
+<td>2026-03-01 09:30:00.000064</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>46</td>
+<td>Facebook Ad</td>
+<td>2026-03-01 09:30:00.000085</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>47</td>
+<td>Email Promo</td>
+<td>2026-03-01 09:30:00.000111</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>48</td>
+<td>Google Search</td>
+<td>2026-03-01 09:30:00.000136</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>49</td>
+<td>Facebook Ad</td>
+<td>2026-03-01 09:30:00.000144</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>50</td>
+<td>Email Promo</td>
+<td>2026-03-01 09:30:00.000162</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>51</td>
+<td>Google Search</td>
+<td>2026-03-01 09:30:00.000195</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>52</td>
+<td>Facebook Ad</td>
+<td>2026-03-01 09:30:00.000219</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>53</td>
+<td>Email Promo</td>
+<td>2026-03-01 09:30:00.000232</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 197.63 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 54.1086277070673%; background: #f85149;" title="HASH_JOIN: 106.94ms (54.1%)"></div><div class="cost-bar-seg" style="width: 11.630864257712537%; background: #f85149;" title="ORDER_BY: 22.99ms (11.6%)"></div><div class="cost-bar-seg" style="width: 11.581650579076632%; background: #3fb950;" title="WINDOW: 22.89ms (11.6%)"></div><div class="cost-bar-seg" style="width: 6.991153651265643%; background: #d29922;" title="TABLE_SCAN: 13.82ms (7.0%)"></div><div class="cost-bar-seg" style="width: 5.07606342343893%; background: #bc8cff;" title="PROJECTION: 10.03ms (5.1%)"></div><div class="cost-bar-seg" style="width: 3.6755299289873253%; background: #39c5cf;" title="PROJECTION: 7.26ms (3.7%)"></div><div class="cost-bar-seg" style="width: 3.151823363706916%; background: #f0883e;" title="PROJECTION: 6.23ms (3.2%)"></div><div class="cost-bar-seg" style="width: 2.8213288850938674%; background: #79c0ff;" title="PROJECTION: 5.58ms (2.8%)"></div><div class="cost-bar-seg" style="width: 0.918013063529181%; background: #58a6ff;" title="TABLE_SCAN: 1.81ms (0.9%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">2.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">5.58 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.25 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">11.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">22.99 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.25 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">3.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">6.23 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.25 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_compress_string_">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">5.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">10.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.25 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;touch_id&#x27;, &#x27;channel&#x27;, &#x27;attributed">📁 Projections: [&#x27;touch_id&#x27;, &#x27;chann...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.09 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.39 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="node-cost-tag">11.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">22.89 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.39 MB</span></div>
+                <div class="nm-tbl" title="Projections: sum(raw_weight) OVER ()">📁 Projections: sum(raw_weight) OVE...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">3.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">7.26 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">18.32 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;touch_id&#x27;, &#x27;channel&#x27;, &#x27;order_reve">📁 Projections: [&#x27;touch_id&#x27;, &#x27;chann...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="high-cost-tag">🔥 54.1% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">106.94 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.39 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (54.1% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">7.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.82 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
+                <div class="nm-tbl" title="memory.main.touchpoints">📁 memory.main.touchpoints</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.81 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
+                <div class="nm-tbl" title="memory.main.purchase_conversions">📁 memory.main.purchase_conversions</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>54.1%</strong></td>
+            <td>106.94 ms</td>
+            <td>533,542</td>
+            <td>22.39 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>11.6%</strong></td>
+            <td>22.99 ms</td>
+            <td>533,542</td>
+            <td>14.25 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>11.6%</strong></td>
+            <td>22.89 ms</td>
+            <td>533,542</td>
+            <td>22.39 MB</td>
+            <td><small>Projections: sum(raw_weight) OVER ()</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>7.0%</strong></td>
+            <td>13.82 ms</td>
+            <td>1,000,000</td>
+            <td>30.52 MB</td>
+            <td><small>memory.main.touchpoints</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>5.1%</strong></td>
+            <td>10.03 ms</td>
+            <td>533,542</td>
+            <td>14.25 MB</td>
+            <td><small>Projections: [&#x27;touch_id&#x27;, &#x27;channel&#x27;, &#x27;attributed</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>3.7%</strong></td>
+            <td>7.26 ms</td>
+            <td>533,542</td>
+            <td>18.32 MB</td>
+            <td><small>Projections: [&#x27;touch_id&#x27;, &#x27;channel&#x27;, &#x27;order_reve</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>3.2%</strong></td>
+            <td>6.23 ms</td>
+            <td>533,542</td>
+            <td>14.25 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_compress_string_</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>2.8%</strong></td>
+            <td>5.58 ms</td>
+            <td>533,542</td>
+            <td>14.25 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.9%</strong></td>
+            <td>1.81 ms</td>
+            <td>999,998</td>
+            <td>19.07 MB</td>
+            <td><small>memory.main.purchase_conversions</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.09 ms</td>
+            <td>533,542</td>
+            <td>22.39 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 229.28 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">touchpoint_weights</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">touch_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">t</span><span class="p">.</span><span class="n">channel</span><span class="p">,</span>
+<span class="w">          </span><span class="k">c</span><span class="p">.</span><span class="n">order_revenue</span><span class="p">,</span>
+<span class="w">          </span><span class="n">pow</span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'second'</span><span class="p">,</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">click_time</span><span class="p">,</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">conversion_time</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">7</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">86400</span><span class="p">.</span><span class="mi">0</span><span class="p">))</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">raw_weight</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">touchpoints</span><span class="w"> </span><span class="n">t</span>
+<span class="w">   </span><span class="k">JOIN</span><span class="w"> </span><span class="n">purchase_conversions</span><span class="w"> </span><span class="k">c</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">user_id</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">click_time</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">conversion_time</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">click_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">conversion_time</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="mi">30</span><span class="w"> </span><span class="k">DAY</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">touch_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">channel</span><span class="p">,</span>
+<span class="w">       </span><span class="k">cast</span><span class="p">(</span><span class="n">order_revenue</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="n">raw_weight</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">sum</span><span class="p">(</span><span class="n">raw_weight</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">())</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">))</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">attributed_revenue</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">touchpoint_weights</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">touch_id</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 223.86 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">weighted_touches</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">touch_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">t</span><span class="p">.</span><span class="n">channel</span><span class="p">,</span>
+<span class="w">          </span><span class="k">c</span><span class="p">.</span><span class="n">order_revenue</span><span class="p">,</span>
+<span class="w">          </span><span class="n">pow</span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'second'</span><span class="p">,</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">click_time</span><span class="p">,</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">conversion_time</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">7</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">86400</span><span class="p">.</span><span class="mi">0</span><span class="p">))</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">raw_weight</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">purchase_conversions</span><span class="w"> </span><span class="k">c</span>
+<span class="w">   </span><span class="k">JOIN</span><span class="w"> </span><span class="n">touchpoints</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">user_id</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">click_time</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">conversion_time</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">t</span><span class="p">.</span><span class="n">click_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">conversion_time</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="mi">30</span><span class="w"> </span><span class="n">days</span><span class="p">),</span>
+<span class="w">     </span><span class="n">total_weight</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">raw_weight</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">sum_weights</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">weighted_touches</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">touch_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">channel</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">order_revenue</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="n">raw_weight</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">sum_weights</span><span class="p">),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">attributed_revenue</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">total_weight</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">touch_id</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">touchpoints</span><span class="w"> </span><span class="p">(</span><span class="n">touch_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">channel</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">click_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">);</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">purchase_conversions</span><span class="w"> </span><span class="p">(</span><span class="n">order_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">order_revenue</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">),</span>
+<span class="w">                                                                            </span><span class="n">conversion_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">touchpoints</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="s1">'Google Search'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-01 12:00:00'</span><span class="p">),</span>
+<span class="w">       </span><span class="c1">-- 14 days before (weight = 0.25)</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="s1">'Facebook Ad'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-08 12:00:00'</span><span class="p">),</span>
+<span class="w"> </span><span class="c1">-- 7 days before  (weight = 0.50)</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="s1">'Email Promo'</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-15 12:00:00'</span><span class="p">);</span><span class="w"> </span><span class="c1">-- 0 days before  (weight = 1.00)</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">purchase_conversions</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="mi">350</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span><span class="w"> </span><span class="s1">'2026-03-15 12:00:00'</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(533,542 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>touch_id</th>
+<th>channel</th>
+<th>attributed_revenue</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>3</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>4</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>5</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>10</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>11</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>16</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>17</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>18</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>20</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>21</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>23</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>24</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>28</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>29</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>31</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>32</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>35</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>36</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>37</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 533,542 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(533,542 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>touch_id</th>
+<th>channel</th>
+<th>attributed_revenue</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>3</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>4</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>5</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>10</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>11</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>16</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>17</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>18</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>20</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>21</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>23</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>24</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>28</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>29</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>31</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>32</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>35</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>36</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>37</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 533,542 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_118_reversal_interleaved_ledger.html" class="nav-btn">← Prev: Financial Ledger Running ...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_120_market_basket_lift_smoothing.html" class="nav-btn">Next: Association Rule Lift Mat... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_022_Q22_linear_interpolation_missing_points - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Temporal &amp; Time-Series</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_022_Q22_linear_interpolation_missing_points</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_021_Q21_temporal_gap_detection.html" class="nav-btn">← Prev: Continuous Asset Lease Un...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_023_Q23_trimmed_mean_rolling_window.html" class="nav-btn">Next: Outlier-Resistant Rolling... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Temporal &amp; Time-Series</span>
+                    <span class="badge badge-id">task_022_Q22_linear_interpolation_missing_points</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Bi-directional Linear Value Interpolation between Observations</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">161.66 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.3x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">124.17 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">15.3 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 14.5s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>When a sensor drops offline for 30 minutes, data scientists prefer linear interpolation between the last known reading and the next recovered reading rather than flat zero-filling.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Requires simultaneous look-behind (LAG) and look-ahead (LEAD) across varying time distances.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">When a sensor drops offline for 30 minutes, data scientists prefer linear interpolation between the last known reading and the next recovered reading rather than flat zero-filling.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: ts, raw_psi, interpolated_psi.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 15.3 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 pressure_readings</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">15.3 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>ts</code> <small>(TIMESTAMP)</small></span> <span class="col-pill"><code>psi</code> <small>(DOUBLE)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>ts</th>
+<th>psi</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-03-01 10:00:00</td>
+<td>100</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-03-01 10:01:00</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-03-01 10:02:00</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-03-01 10:03:00</td>
+<td>130</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2026-03-01 09:30:00.000009</td>
+<td>90.39</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2026-03-01 09:30:00.000026</td>
+<td>98.86</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>2026-03-01 09:30:00.000046</td>
+<td>131.74</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>2026-03-01 09:30:00.000061</td>
+<td>117.3</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>2026-03-01 09:30:00.000080</td>
+<td>114.86</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>2026-03-01 09:30:00.000104</td>
+<td>125.6</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2026-03-01 09:30:00.000130</td>
+<td>88.5</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>2026-03-01 09:30:00.000145</td>
+<td>100.74</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>2026-03-01 09:30:00.000168</td>
+<td>93.37</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>2026-03-01 09:30:00.000185</td>
+<td>128.37</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>2026-03-01 09:30:00.000206</td>
+<td>97.81</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 310.93 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 77.17201134854066%; background: #f85149;" title="WINDOW: 239.95ms (77.2%)"></div><div class="cost-bar-seg" style="width: 21.98310538352252%; background: #f85149;" title="ORDER_BY: 68.35ms (22.0%)"></div><div class="cost-bar-seg" style="width: 0.6338299303739403%; background: #3fb950;" title="TABLE_SCAN: 1.97ms (0.6%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 22.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">68.35 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (22.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.46 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;ts&#x27;, &#x27;raw_psi&#x27;, &#x27;interpolated_psi">📁 Projections: [&#x27;ts&#x27;, &#x27;raw_psi&#x27;, &#x27;...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.19 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45.78 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;, &#x27;#5&#x27;">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="high-cost-tag">🔥 77.2% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">239.95 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45.78 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;last_value(psi IGNORE NULLS) OVER">📁 Projections: [&#x27;last_value(psi IG...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (77.2% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.97 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.26 MB</span></div>
+                <div class="nm-tbl" title="memory.main.pressure_readings">📁 memory.main.pressure_readings</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>77.2%</strong></td>
+            <td>239.95 ms</td>
+            <td>1,000,000</td>
+            <td>45.78 MB</td>
+            <td><small>Projections: [&#x27;last_value(psi IGNORE NULLS) OVER</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>22.0%</strong></td>
+            <td>68.35 ms</td>
+            <td>1,000,000</td>
+            <td>22.89 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.6%</strong></td>
+            <td>1.97 ms</td>
+            <td>1,000,000</td>
+            <td>15.26 MB</td>
+            <td><small>memory.main.pressure_readings</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.46 ms</td>
+            <td>1,000,000</td>
+            <td>22.89 MB</td>
+            <td><small>Projections: [&#x27;ts&#x27;, &#x27;raw_psi&#x27;, &#x27;interpolated_psi</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.19 ms</td>
+            <td>1,000,000</td>
+            <td>45.78 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;, &#x27;#5&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 161.66 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">bounds</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">ts</span><span class="p">,</span>
+<span class="w">          </span><span class="n">psi</span><span class="p">,</span>
+<span class="w">          </span><span class="n">last_value</span><span class="p">(</span><span class="n">psi</span>
+<span class="w">                     </span><span class="k">IGNORE</span><span class="w"> </span><span class="n">nulls</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                         </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="w"> </span><span class="k">ROWS</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">PRECEDING</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prev_psi</span><span class="p">,</span>
+<span class="w">          </span><span class="n">last_value</span><span class="p">(</span><span class="n">ts</span>
+<span class="w">                     </span><span class="k">IGNORE</span><span class="w"> </span><span class="n">nulls</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                         </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="w"> </span><span class="k">ROWS</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">PRECEDING</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prev_ts</span><span class="p">,</span>
+<span class="w">          </span><span class="n">first_value</span><span class="p">(</span><span class="n">psi</span>
+<span class="w">                      </span><span class="k">IGNORE</span><span class="w"> </span><span class="n">nulls</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                          </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="w"> </span><span class="k">ROWS</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">FOLLOWING</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">next_psi</span><span class="p">,</span>
+<span class="w">          </span><span class="n">first_value</span><span class="p">(</span><span class="n">ts</span>
+<span class="w">                      </span><span class="k">IGNORE</span><span class="w"> </span><span class="n">nulls</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                          </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="w"> </span><span class="k">ROWS</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">FOLLOWING</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">next_ts</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">pressure_readings</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">ts</span><span class="p">,</span>
+<span class="w">       </span><span class="n">psi</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">raw_psi</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">psi</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">psi</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="n">round</span><span class="p">(</span><span class="n">prev_psi</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">next_psi</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">prev_psi</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'second'</span><span class="p">,</span><span class="w"> </span><span class="n">prev_ts</span><span class="p">,</span><span class="w"> </span><span class="n">ts</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'second'</span><span class="p">,</span><span class="w"> </span><span class="n">prev_ts</span><span class="p">,</span><span class="w"> </span><span class="n">next_ts</span><span class="p">)),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">interpolated_psi</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">bounds</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 124.17 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Linearly interpolate missing PSI values based on preceding and following known points</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">bounds</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">ts</span><span class="p">,</span>
+<span class="w">          </span><span class="n">psi</span><span class="p">,</span>
+<span class="w">          </span><span class="n">last_value</span><span class="p">(</span><span class="n">psi</span>
+<span class="w">                     </span><span class="k">IGNORE</span><span class="w"> </span><span class="n">nulls</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                         </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="w"> </span><span class="k">ROWS</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">PRECEDING</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prev_psi</span><span class="p">,</span>
+<span class="w">          </span><span class="n">last_value</span><span class="p">(</span><span class="n">ts</span>
+<span class="w">                     </span><span class="k">IGNORE</span><span class="w"> </span><span class="n">nulls</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                         </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="w"> </span><span class="k">ROWS</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">PRECEDING</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">prev_ts</span><span class="p">,</span>
+<span class="w">          </span><span class="n">first_value</span><span class="p">(</span><span class="n">psi</span>
+<span class="w">                      </span><span class="k">IGNORE</span><span class="w"> </span><span class="n">nulls</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                          </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="w"> </span><span class="k">ROWS</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">FOLLOWING</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">next_psi</span><span class="p">,</span>
+<span class="w">          </span><span class="n">first_value</span><span class="p">(</span><span class="n">ts</span>
+<span class="w">                      </span><span class="k">IGNORE</span><span class="w"> </span><span class="n">nulls</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                          </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="w"> </span><span class="k">ROWS</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">FOLLOWING</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">next_ts</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">pressure_readings</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">ts</span><span class="p">,</span>
+<span class="w">       </span><span class="n">psi</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">raw_psi</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">psi</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">psi</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="n">round</span><span class="p">(</span><span class="n">prev_psi</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">next_psi</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">prev_psi</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'second'</span><span class="p">,</span><span class="w"> </span><span class="n">prev_ts</span><span class="p">,</span><span class="w"> </span><span class="n">ts</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">date_diff</span><span class="p">(</span><span class="s1">'second'</span><span class="p">,</span><span class="w"> </span><span class="n">prev_ts</span><span class="p">,</span><span class="w"> </span><span class="n">next_ts</span><span class="p">)),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">interpolated_psi</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">bounds</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ts</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">pressure_readings</span><span class="w"> </span><span class="p">(</span><span class="n">ts</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span><span class="w"> </span><span class="n">psi</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">pressure_readings</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="s1">'2026-03-01 10:00:00'</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">.</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'2026-03-01 10:01:00'</span><span class="p">,</span><span class="w"> </span><span class="k">NULL</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'2026-03-01 10:02:00'</span><span class="p">,</span><span class="w"> </span><span class="k">NULL</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'2026-03-01 10:03:00'</span><span class="p">,</span><span class="w"> </span><span class="mi">130</span><span class="p">.</span><span class="mi">0</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000,000 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>ts</th>
+<th>raw_psi</th>
+<th>interpolated_psi</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-03-01 09:30:00.000009</td>
+<td>90.39</td>
+<td>90.39</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-03-01 09:30:00.000026</td>
+<td>98.86</td>
+<td>98.86</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-03-01 09:30:00.000046</td>
+<td>131.74</td>
+<td>131.74</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-03-01 09:30:00.000061</td>
+<td>117.3</td>
+<td>117.3</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2026-03-01 09:30:00.000080</td>
+<td>114.86</td>
+<td>114.86</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2026-03-01 09:30:00.000104</td>
+<td>125.6</td>
+<td>125.6</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>2026-03-01 09:30:00.000130</td>
+<td>88.5</td>
+<td>88.5</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>2026-03-01 09:30:00.000145</td>
+<td>100.74</td>
+<td>100.74</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>2026-03-01 09:30:00.000168</td>
+<td>93.37</td>
+<td>93.37</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>2026-03-01 09:30:00.000185</td>
+<td>128.37</td>
+<td>128.37</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2026-03-01 09:30:00.000206</td>
+<td>97.81</td>
+<td>97.81</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>2026-03-01 09:30:00.000224</td>
+<td>104.94</td>
+<td>104.94</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>2026-03-01 09:30:00.000241</td>
+<td>117.94</td>
+<td>117.94</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>2026-03-01 09:30:00.000261</td>
+<td>111.3</td>
+<td>111.3</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>2026-03-01 09:30:00.000282</td>
+<td>110.76</td>
+<td>110.76</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>2026-03-01 09:30:00.000305</td>
+<td>100.47</td>
+<td>100.47</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>2026-03-01 09:30:00.000322</td>
+<td>120.44</td>
+<td>120.44</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>2026-03-01 09:30:00.000342</td>
+<td>108.85</td>
+<td>108.85</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>2026-03-01 09:30:00.000376</td>
+<td>157.71</td>
+<td>157.71</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>2026-03-01 09:30:00.000383</td>
+<td>123.59</td>
+<td>123.59</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>2026-03-01 09:30:00.000412</td>
+<td>82.01</td>
+<td>82.01</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>2026-03-01 09:30:00.000421</td>
+<td>118.43</td>
+<td>118.43</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>2026-03-01 09:30:00.000447</td>
+<td>134.35</td>
+<td>134.35</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>2026-03-01 09:30:00.000465</td>
+<td>128.61</td>
+<td>128.61</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>2026-03-01 09:30:00.000489</td>
+<td>91.86</td>
+<td>91.86</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1,000,000 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>ts</th>
+<th>raw_psi</th>
+<th>interpolated_psi</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2026-03-01 09:30:00.000009</td>
+<td>90.39</td>
+<td>90.39</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2026-03-01 09:30:00.000026</td>
+<td>98.86</td>
+<td>98.86</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2026-03-01 09:30:00.000046</td>
+<td>131.74</td>
+<td>131.74</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2026-03-01 09:30:00.000061</td>
+<td>117.3</td>
+<td>117.3</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2026-03-01 09:30:00.000080</td>
+<td>114.86</td>
+<td>114.86</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>2026-03-01 09:30:00.000104</td>
+<td>125.6</td>
+<td>125.6</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>2026-03-01 09:30:00.000130</td>
+<td>88.5</td>
+<td>88.5</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>2026-03-01 09:30:00.000145</td>
+<td>100.74</td>
+<td>100.74</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>2026-03-01 09:30:00.000168</td>
+<td>93.37</td>
+<td>93.37</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>2026-03-01 09:30:00.000185</td>
+<td>128.37</td>
+<td>128.37</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>2026-03-01 09:30:00.000206</td>
+<td>97.81</td>
+<td>97.81</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>2026-03-01 09:30:00.000224</td>
+<td>104.94</td>
+<td>104.94</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>2026-03-01 09:30:00.000241</td>
+<td>117.94</td>
+<td>117.94</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>2026-03-01 09:30:00.000261</td>
+<td>111.3</td>
+<td>111.3</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>2026-03-01 09:30:00.000282</td>
+<td>110.76</td>
+<td>110.76</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>2026-03-01 09:30:00.000305</td>
+<td>100.47</td>
+<td>100.47</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>2026-03-01 09:30:00.000322</td>
+<td>120.44</td>
+<td>120.44</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>2026-03-01 09:30:00.000342</td>
+<td>108.85</td>
+<td>108.85</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>2026-03-01 09:30:00.000376</td>
+<td>157.71</td>
+<td>157.71</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>2026-03-01 09:30:00.000383</td>
+<td>123.59</td>
+<td>123.59</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>2026-03-01 09:30:00.000412</td>
+<td>82.01</td>
+<td>82.01</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>2026-03-01 09:30:00.000421</td>
+<td>118.43</td>
+<td>118.43</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>2026-03-01 09:30:00.000447</td>
+<td>134.35</td>
+<td>134.35</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>2026-03-01 09:30:00.000465</td>
+<td>128.61</td>
+<td>128.61</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>2026-03-01 09:30:00.000489</td>
+<td>91.86</td>
+<td>91.86</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_021_Q21_temporal_gap_detection.html" class="nav-btn">← Prev: Continuous Asset Lease Un...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_023_Q23_trimmed_mean_rolling_window.html" class="nav-btn">Next: Outlier-Resistant Rolling... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

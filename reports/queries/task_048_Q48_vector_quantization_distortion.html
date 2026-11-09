@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_048_Q48_vector_quantization_distortion - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Vector &amp; Embeddings</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_048_Q48_vector_quantization_distortion</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_047_Q47_hierarchical_vector_coarse_fine.html" class="nav-btn">← Prev: Hierarchical Coarse-to-Fi...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_049_Q49_prototype_intent_classification.html" class="nav-btn">Next: Zero-Shot Query Intent Cl... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Vector &amp; Embeddings</span>
+                    <span class="badge badge-id">task_048_Q48_vector_quantization_distortion</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Vector Quantization Precision Distortion &amp; Reconstruction Error</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">60.20 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.2x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">51.89 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">26.7 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 23.3s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>To compress embeddings from 32-bit floats to 8-bit integers, engineers evaluate the reconstruction error (distance between uncompressed and quantized vector) to measure fidelity loss.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Deploying quantized embeddings without evaluating distortion leads to silent degradation in search accuracy.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">To compress embeddings from 32-bit floats to 8-bit integers, engineers evaluate the reconstruction error (distance between uncompressed and quantized vector) to measure fidelity loss.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: vector_id, l2_quantization_error, cosine_distortion.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 26.7 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 vector_compression_test</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">26.7 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>vector_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>fp32_vec</code> <small>(FLOAT[3])</small></span> <span class="col-pill"><code>quantized_vec</code> <small>(FLOAT[3])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>vector_id</th>
+<th>fp32_vec</th>
+<th>quantized_vec</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>[0.12345 0.67891 0.44332]</td>
+<td>[0.12 0.68 0.44]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>[0.99123 0.02111 0.11005]</td>
+<td>[0.99 0.02 0.11]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>[0.7553 0.0597 0.0299]</td>
+<td>[0.7553 0.0597 0.0299]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>[0.9254 0.0531 0.0495]</td>
+<td>[0.9254 0.0531 0.0495]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>[ 0.8503  0.0391 -0.0012]</td>
+<td>[ 0.8503  0.0391 -0.0012]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>[0.8341 0.065  0.1105]</td>
+<td>[0.8341 0.065  0.1105]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>[ 0.8646 -0.0248 -0.0306]</td>
+<td>[ 0.8646 -0.0248 -0.0306]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>[0.8941 0.0856 0.0119]</td>
+<td>[0.8941 0.0856 0.0119]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>[0.8255 0.0444 0.0235]</td>
+<td>[0.8255 0.0444 0.0235]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>[ 0.8169 -0.0374  0.1182]</td>
+<td>[ 0.8169 -0.0374  0.1182]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>[0.8098 0.0563 0.0613]</td>
+<td>[0.8098 0.0563 0.0613]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>[0.8978 0.0433 0.0307]</td>
+<td>[0.8978 0.0433 0.0307]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>[0.8621 0.0939 0.086 ]</td>
+<td>[0.8621 0.0939 0.086 ]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>[0.8453 0.0448 0.0774]</td>
+<td>[0.8453 0.0448 0.0774]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>[0.8726 0.0797 0.0881]</td>
+<td>[0.8726 0.0797 0.0881]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 147.08 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 67.25848957530555%; background: #f85149;" title="PROJECTION: 98.92ms (67.3%)"></div><div class="cost-bar-seg" style="width: 29.389724333184724%; background: #f85149;" title="ORDER_BY: 43.23ms (29.4%)"></div><div class="cost-bar-seg" style="width: 3.3517860915097355%; background: #3fb950;" title="TABLE_SCAN: 4.93ms (3.4%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 29.4% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">43.23 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (29.4% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="high-cost-tag">🔥 67.3% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">98.92 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;vector_id&#x27;, &#x27;l2_quantization_erro">📁 Projections: [&#x27;vector_id&#x27;, &#x27;l2_q...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (67.3% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">3.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">4.93 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="memory.main.vector_compression_test">📁 memory.main.vector_compression_t...</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>67.3%</strong></td>
+            <td>98.92 ms</td>
+            <td>1,000,000</td>
+            <td>11.44 MB</td>
+            <td><small>Projections: [&#x27;vector_id&#x27;, &#x27;l2_quantization_erro</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>29.4%</strong></td>
+            <td>43.23 ms</td>
+            <td>1,000,000</td>
+            <td>11.44 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>3.4%</strong></td>
+            <td>4.93 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>memory.main.vector_compression_test</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 60.20 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">vector_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_distance</span><span class="p">(</span><span class="n">fp32_vec</span><span class="p">,</span><span class="w"> </span><span class="n">quantized_vec</span><span class="p">),</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">l2_quantization_error</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">fp32_vec</span><span class="p">,</span><span class="w"> </span><span class="n">quantized_vec</span><span class="p">),</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">cosine_distortion</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">vector_compression_test</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">l2_quantization_error</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 51.89 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Evaluate Euclidean distortion and cosine fidelity loss per vector</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">vector_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_distance</span><span class="p">(</span><span class="n">fp32_vec</span><span class="p">,</span><span class="w"> </span><span class="n">quantized_vec</span><span class="p">),</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">l2_quantization_error</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">fp32_vec</span><span class="p">,</span><span class="w"> </span><span class="n">quantized_vec</span><span class="p">),</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">cosine_distortion</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">vector_compression_test</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">l2_quantization_error</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">vector_compression_test</span><span class="w"> </span><span class="p">(</span><span class="n">vector_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">fp32_vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span><span class="w"> </span><span class="n">quantized_vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">vector_compression_test</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">12345</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">67891</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">44332</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">68</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">44</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">99123</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">02111</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">11005</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">99</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">02</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">11</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000,000 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>vector_id</th>
+<th>l2_quantization_error</th>
+<th>cosine_distortion</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>0.0049</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>0.0017</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>15</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>16</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>17</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>18</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>19</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>20</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>21</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>22</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>23</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>24</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1,000,000 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>vector_id</th>
+<th>l2_quantization_error</th>
+<th>cosine_distortion</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>0.0049</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>0.0017</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>122,882</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>122,883</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>122,884</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>122,885</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>122,886</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>122,887</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>122,888</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>122,889</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>122,890</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>122,891</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>122,892</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>122,893</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>122,894</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>122,895</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>122,896</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>122,897</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>122,898</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>122,899</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>122,900</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>122,901</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>122,902</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>122,903</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>122,904</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_047_Q47_hierarchical_vector_coarse_fine.html" class="nav-btn">← Prev: Hierarchical Coarse-to-Fi...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_049_Q49_prototype_intent_classification.html" class="nav-btn">Next: Zero-Shot Query Intent Cl... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

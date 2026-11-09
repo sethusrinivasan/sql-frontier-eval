@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_042_Q42_negative_prompting_vector_repulsion - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Vector &amp; Embeddings</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_042_Q42_negative_prompting_vector_repulsion</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_041_Q41_collaborative_filtering_latent_dot.html" class="nav-btn">← Prev: Latent Factor Matrix Fact...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_043_Q43_best_chunk_pooling_retrieval.html" class="nav-btn">Next: Document-Level Aggregatio... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Vector &amp; Embeddings</span>
+                    <span class="badge badge-id">task_042_Q42_negative_prompting_vector_repulsion</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Vector Repulsion Scoring (Positive vs Negative Query Guidance)</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">262.37 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">256.42 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">30.5 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 12.2s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>In image generation and semantic search, users supply positive and negative prompts (e.g. &#x27;cyberpunk city&#x27; NOT &#x27;blurry / low quality&#x27;). The score boosts positive similarity and penalizes negative similarity.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Filtering out negatives with boolean NOT drops items that have even slight overlap with negative words.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">In image generation and semantic search, users supply positive and negative prompts (e.g. &#x27;cyberpunk city&#x27; NOT &#x27;blurry / low quality&#x27;). The score boosts positive similarity and penalizes negative similarity.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: asset_id, name, pos_sim, neg_sim, net_guided_score.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 30.5 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 generative_assets</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">30.5 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>asset_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>name</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>vec</code> <small>(FLOAT[2])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>asset_id</th>
+<th>name</th>
+<th>vec</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Sharp Neon Skyline</td>
+<td>[0.9 0.1]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>Blurry Neon Streetscape</td>
+<td>[0.8 0.7]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>Rustic Wooden Cabin</td>
+<td>[0.  0.9]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>Sharp Neon Skyline</td>
+<td>[0.9156 0.0837]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>Blurry Neon Streetscape</td>
+<td>[0.8852 0.1337]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>Rustic Wooden Cabin</td>
+<td>[0.8744 0.1242]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>Sharp Neon Skyline</td>
+<td>[0.9135 0.0987]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>Blurry Neon Streetscape</td>
+<td>[0.8887 0.1472]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>Rustic Wooden Cabin</td>
+<td>[0.8848 0.0686]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>Sharp Neon Skyline</td>
+<td>[0.8603 0.0646]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>Blurry Neon Streetscape</td>
+<td>[0.7757 0.0407]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>Rustic Wooden Cabin</td>
+<td>[0.8216 0.1476]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>Sharp Neon Skyline</td>
+<td>[0.8509 0.0848]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>Blurry Neon Streetscape</td>
+<td>[0.762  0.1005]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>Rustic Wooden Cabin</td>
+<td>[0.8194 0.0965]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 297.62 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 56.23528024282714%; background: #f85149;" title="ORDER_BY: 167.37ms (56.2%)"></div><div class="cost-bar-seg" style="width: 28.539789907654633%; background: #f85149;" title="PROJECTION: 84.94ms (28.5%)"></div><div class="cost-bar-seg" style="width: 11.746780385837093%; background: #3fb950;" title="PROJECTION: 34.96ms (11.7%)"></div><div class="cost-bar-seg" style="width: 3.478149463681139%; background: #d29922;" title="TABLE_SCAN: 10.35ms (3.5%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 56.2% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">167.37 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (56.2% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="high-cost-tag">🔥 28.5% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">84.94 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;, &#x27;pos_sim&#x27;, &#x27;ne">📁 Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (28.5% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">11.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">34.96 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;, &#x27;array_cosine_">📁 Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">3.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">10.35 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
+                <div class="nm-tbl" title="memory.main.generative_assets">📁 memory.main.generative_assets</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>56.2%</strong></td>
+            <td>167.37 ms</td>
+            <td>1,000,000</td>
+            <td>30.52 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>28.5%</strong></td>
+            <td>84.94 ms</td>
+            <td>1,000,000</td>
+            <td>30.52 MB</td>
+            <td><small>Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;, &#x27;pos_sim&#x27;, &#x27;ne</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>11.7%</strong></td>
+            <td>34.96 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;, &#x27;array_cosine_</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>3.5%</strong></td>
+            <td>10.35 ms</td>
+            <td>1,000,000</td>
+            <td>26.70 MB</td>
+            <td><small>memory.main.generative_assets</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 262.37 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="c1">-- Positive query: [1.0, 0.0] (cyberpunk neon), Negative query: [0.0, 1.0] (blurry/rustic)</span>
+<span class="c1">-- Net Score = Cosine(vec, pos) - (0.5 * Cosine(vec, neg))</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">asset_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">name</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">pos_sim</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">neg_sim</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">50</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">])),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">net_guided_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">generative_assets</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">net_guided_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 256.42 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Positive query: [1.0, 0.0] (cyberpunk neon), Negative query: [0.0, 1.0] (blurry/rustic)</span>
+<span class="w"> </span><span class="c1">-- Net Score = Cosine(vec, pos) - (0.5 * Cosine(vec, neg))</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">asset_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">name</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">pos_sim</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">neg_sim</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">50</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vec</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">.</span><span class="mi">0</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">])),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">net_guided_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">generative_assets</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">net_guided_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">generative_assets</span><span class="w"> </span><span class="p">(</span><span class="n">asset_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">generative_assets</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'Sharp Neon Skyline'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'Blurry Neon Streetscape'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">7</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'Rustic Wooden Cabin'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">9</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000,000 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>asset_id</th>
+<th>name</th>
+<th>pos_sim</th>
+<th>neg_sim</th>
+<th>net_guided_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>720,289</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.993</td>
+<td>-0.1185</td>
+<td>1.0522</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>724,362</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9937</td>
+<td>-0.1121</td>
+<td>1.0497</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>962,196</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9947</td>
+<td>-0.1028</td>
+<td>1.0461</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>630,022</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9949</td>
+<td>-0.1009</td>
+<td>1.0454</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>666,507</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9951</td>
+<td>-0.0992</td>
+<td>1.0447</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>879,949</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9951</td>
+<td>-0.099</td>
+<td>1.0446</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>411,414</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9955</td>
+<td>-0.0945</td>
+<td>1.0428</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>106,762</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9961</td>
+<td>-0.0885</td>
+<td>1.0403</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>986,598</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9962</td>
+<td>-0.0873</td>
+<td>1.0398</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>594,405</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9962</td>
+<td>-0.0867</td>
+<td>1.0396</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>936,960</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9963</td>
+<td>-0.0854</td>
+<td>1.0391</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>387,353</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9964</td>
+<td>-0.0845</td>
+<td>1.0387</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>415,980</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9964</td>
+<td>-0.0844</td>
+<td>1.0386</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>161,587</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9965</td>
+<td>-0.084</td>
+<td>1.0385</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>673,990</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9966</td>
+<td>-0.0829</td>
+<td>1.038</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>877,559</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9966</td>
+<td>-0.0819</td>
+<td>1.0376</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>476,090</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9967</td>
+<td>-0.0815</td>
+<td>1.0374</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>827,401</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9967</td>
+<td>-0.0815</td>
+<td>1.0374</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>961,973</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9968</td>
+<td>-0.0802</td>
+<td>1.0369</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>832,104</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9968</td>
+<td>-0.0796</td>
+<td>1.0366</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>765,940</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9969</td>
+<td>-0.0784</td>
+<td>1.0361</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>520,098</td>
+<td>Sharp Neon Skyline</td>
+<td>0.997</td>
+<td>-0.0775</td>
+<td>1.0358</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>804,547</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.997</td>
+<td>-0.0768</td>
+<td>1.0355</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>830,632</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9971</td>
+<td>-0.0767</td>
+<td>1.0354</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>226,508</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9971</td>
+<td>-0.0763</td>
+<td>1.0352</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1,000,000 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>asset_id</th>
+<th>name</th>
+<th>pos_sim</th>
+<th>neg_sim</th>
+<th>net_guided_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>720,289</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.993</td>
+<td>-0.1185</td>
+<td>1.0522</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>724,362</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9937</td>
+<td>-0.1121</td>
+<td>1.0497</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>962,196</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9947</td>
+<td>-0.1028</td>
+<td>1.0461</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>630,022</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9949</td>
+<td>-0.1009</td>
+<td>1.0454</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>666,507</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9951</td>
+<td>-0.0992</td>
+<td>1.0447</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>879,949</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9951</td>
+<td>-0.099</td>
+<td>1.0446</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>411,414</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9955</td>
+<td>-0.0945</td>
+<td>1.0428</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>106,762</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9961</td>
+<td>-0.0885</td>
+<td>1.0403</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>986,598</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9962</td>
+<td>-0.0873</td>
+<td>1.0398</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>594,405</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9962</td>
+<td>-0.0867</td>
+<td>1.0396</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>936,960</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9963</td>
+<td>-0.0854</td>
+<td>1.0391</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>387,353</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9964</td>
+<td>-0.0845</td>
+<td>1.0387</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>415,980</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9964</td>
+<td>-0.0844</td>
+<td>1.0386</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>161,587</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9965</td>
+<td>-0.084</td>
+<td>1.0385</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>673,990</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9966</td>
+<td>-0.0829</td>
+<td>1.038</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>877,559</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9966</td>
+<td>-0.0819</td>
+<td>1.0376</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>827,401</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9967</td>
+<td>-0.0815</td>
+<td>1.0374</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>476,090</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9967</td>
+<td>-0.0815</td>
+<td>1.0374</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>961,973</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9968</td>
+<td>-0.0802</td>
+<td>1.0369</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>832,104</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9968</td>
+<td>-0.0796</td>
+<td>1.0366</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>765,940</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9969</td>
+<td>-0.0784</td>
+<td>1.0361</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>520,098</td>
+<td>Sharp Neon Skyline</td>
+<td>0.997</td>
+<td>-0.0775</td>
+<td>1.0358</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>804,547</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.997</td>
+<td>-0.0768</td>
+<td>1.0355</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>830,632</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9971</td>
+<td>-0.0767</td>
+<td>1.0354</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>226,508</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9971</td>
+<td>-0.0763</td>
+<td>1.0352</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_041_Q41_collaborative_filtering_latent_dot.html" class="nav-btn">← Prev: Latent Factor Matrix Fact...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_043_Q43_best_chunk_pooling_retrieval.html" class="nav-btn">Next: Document-Level Aggregatio... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

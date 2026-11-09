@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_086_Q86_multiparent_allocation_cost_rollup - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Graph &amp; Hierarchy</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_086_Q86_multiparent_allocation_cost_rollup</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_085_Q85_multilevel_referral_commissions.html" class="nav-btn">← Prev: Multi-Level Affiliate Ref...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_087_Q87_circular_fx_arbitrage_triangle.html" class="nav-btn">Next: Triangular FX Currency Ar... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-fail">✖ VALUE_MISMATCH</span>
+                    <span class="badge badge-domain">Graph &amp; Hierarchy</span>
+                    <span class="badge badge-id">task_086_Q86_multiparent_allocation_cost_rollup</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Multi-Parent Shared Infrastructure Cost Allocation Rollup</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">0.21 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">0.20 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">3 rows</div>
+                    <div class="stat-sub">132 B across 2 tables</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 4.1s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-error">
+            <div class="callout-title">⚠️ Failure Analysis (VALUE_MISMATCH)</div>
+            <div class="callout-body">
+                <p><strong>Reason:</strong> Data discrepancy: DataFrame.iloc[:, 1] (column name=&quot;child_node&quot;) are different</p>
+                <ul><li><strong>Diverged Column:</strong> <code>child_node</code> at row index <code>0</code></li><li><strong>Expected:</strong> <code>PRODUCT_SEARCH</code> | <strong>Actual:</strong> <code>PRODUCT_CHECKOUT</code></li></ul>
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Cloud infrastructure (e.g. shared Kubernetes cluster) is co-owned by multiple products with fractional split percentages. Costs must cascade down to consumer business units.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Failing to multiply split percentages down the DAG results in allocated costs exceeding 100% of actual spend.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Cloud infrastructure (e.g. shared Kubernetes cluster) is co-owned by multiple products with fractional split percentages. Costs must cascade down to consumer business units.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: parent_node, child_node, allocation_pct, raw_parent_cost, allocated_cost.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">2 Tables (3 rows &bull; 132 B)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 cost_allocations</span>
+                    <span class="badge badge-pass">2 rows</span>
+                    <span class="badge badge-golden">96 B Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>parent_node</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>child_node</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>allocation_pct</code> <small>(DOUBLE)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 2 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>parent_node</th>
+<th>child_node</th>
+<th>allocation_pct</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>K8S_SHARED</td>
+<td>PRODUCT_SEARCH</td>
+<td>0.6</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>K8S_SHARED</td>
+<td>PRODUCT_CHECKOUT</td>
+<td>0.4</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 cost_nodes</span>
+                    <span class="badge badge-pass">1 rows</span>
+                    <span class="badge badge-golden">36 B Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>node_id</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>monthly_cost</code> <small>(DECIMAL(10,2))</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>node_id</th>
+<th>monthly_cost</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>K8S_SHARED</td>
+<td>10,000</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 0.21 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 44.530952123177734%; background: #58a6ff;" title="ORDER_BY: 0.09ms (44.5%)"></div><div class="cost-bar-seg" style="width: 38.941164841061756%; background: #f85149;" title="HASH_JOIN: 0.08ms (38.9%)"></div><div class="cost-bar-seg" style="width: 4.684594781609953%; background: #3fb950;" title="TABLE_SCAN: 0.01ms (4.7%)"></div><div class="cost-bar-seg" style="width: 4.258123431917568%; background: #d29922;" title="PROJECTION: 0.01ms (4.3%)"></div><div class="cost-bar-seg" style="width: 4.153153110746042%; background: #bc8cff;" title="TABLE_SCAN: 0.01ms (4.2%)"></div><div class="cost-bar-seg" style="width: 2.7880682165871935%; background: #39c5cf;" title="PROJECTION: 0.01ms (2.8%)"></div><div class="cost-bar-seg" style="width: 0.6439434948997604%; background: #f0883e;" title="PROJECTION: 0.00ms (0.6%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,208 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;__internal_decompress_string(#0)&#x27;">📁 Projections: [&#x27;__internal_decomp...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">44.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.09 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,208 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">2.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,208 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;__internal_compress_string_uhugei">📁 Projections: [&#x27;__internal_compre...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">4.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,208 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;parent_node&#x27;, &#x27;child_node&#x27;, &#x27;allo">📁 Projections: [&#x27;parent_node&#x27;, &#x27;ch...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">38.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.08 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">4,192 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">4.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">80 B</span></div>
+                <div class="nm-tbl" title="memory.main.cost_allocations">📁 memory.main.cost_allocations</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">4.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
+                <div class="nm-tbl" title="memory.main.cost_nodes">📁 memory.main.cost_nodes</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>44.5%</strong></td>
+            <td>0.09 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>38.9%</strong></td>
+            <td>0.08 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>4.7%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.cost_allocations</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>4.3%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;parent_node&#x27;, &#x27;child_node&#x27;, &#x27;allo</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>4.2%</strong></td>
+            <td>0.01 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.cost_nodes</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>2.8%</strong></td>
+            <td>0.01 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;__internal_compress_string_uhugei</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.6%</strong></td>
+            <td>0.00 ms</td>
+            <td>2</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;__internal_decompress_string(#0)&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 0.21 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">ca</span><span class="p">.</span><span class="n">parent_node</span><span class="p">,</span>
+<span class="w">       </span><span class="n">ca</span><span class="p">.</span><span class="n">child_node</span><span class="p">,</span>
+<span class="w">       </span><span class="n">ca</span><span class="p">.</span><span class="n">allocation_pct</span><span class="p">,</span>
+<span class="w">       </span><span class="n">cn</span><span class="p">.</span><span class="n">monthly_cost</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">raw_parent_cost</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">cn</span><span class="p">.</span><span class="n">monthly_cost</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">cast</span><span class="p">(</span><span class="n">ca</span><span class="p">.</span><span class="n">allocation_pct</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)),</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">allocated_cost</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">cost_allocations</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">ca</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">cost_nodes</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">cn</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">ca</span><span class="p">.</span><span class="n">parent_node</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cn</span><span class="p">.</span><span class="n">node_id</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ca</span><span class="p">.</span><span class="n">parent_node</span><span class="p">,</span>
+<span class="w">         </span><span class="n">ca</span><span class="p">.</span><span class="n">child_node</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 0.20 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Allocate parent cost to child business units</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">parent_node</span><span class="p">,</span>
+<span class="w">       </span><span class="n">a</span><span class="p">.</span><span class="n">child_node</span><span class="p">,</span>
+<span class="w">       </span><span class="n">a</span><span class="p">.</span><span class="n">allocation_pct</span><span class="p">,</span>
+<span class="w">       </span><span class="n">n</span><span class="p">.</span><span class="n">monthly_cost</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">raw_parent_cost</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">n</span><span class="p">.</span><span class="n">monthly_cost</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">allocation_pct</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">allocated_cost</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">cost_allocations</span><span class="w"> </span><span class="n">a</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">cost_nodes</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">parent_node</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n</span><span class="p">.</span><span class="n">node_id</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">allocated_cost</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">cost_nodes</span><span class="w"> </span><span class="p">(</span><span class="n">node_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">monthly_cost</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">));</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">cost_allocations</span><span class="w"> </span><span class="p">(</span><span class="n">parent_node</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">child_node</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">allocation_pct</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">cost_nodes</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="s1">'K8S_SHARED'</span><span class="p">,</span><span class="w"> </span><span class="mi">10000</span><span class="p">.</span><span class="mi">00</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">cost_allocations</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="s1">'K8S_SHARED'</span><span class="p">,</span><span class="w"> </span><span class="s1">'PRODUCT_SEARCH'</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">60</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="s1">'K8S_SHARED'</span><span class="p">,</span><span class="w"> </span><span class="s1">'PRODUCT_CHECKOUT'</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">40</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-fail">(2 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>parent_node</th>
+<th>child_node</th>
+<th>allocation_pct</th>
+<th>raw_parent_cost</th>
+<th>allocated_cost</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>K8S_SHARED</td>
+<td>PRODUCT_CHECKOUT</td>
+<td>0.4</td>
+<td>10,000</td>
+<td>4,000</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>K8S_SHARED</td>
+<td>PRODUCT_SEARCH</td>
+<td>0.6</td>
+<td>10,000</td>
+<td>6,000</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(2 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>parent_node</th>
+<th>child_node</th>
+<th>allocation_pct</th>
+<th>raw_parent_cost</th>
+<th>allocated_cost</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>K8S_SHARED</td>
+<td>PRODUCT_SEARCH</td>
+<td>0.6</td>
+<td>10,000</td>
+<td>6,000</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>K8S_SHARED</td>
+<td>PRODUCT_CHECKOUT</td>
+<td>0.4</td>
+<td>10,000</td>
+<td>4,000</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_085_Q85_multilevel_referral_commissions.html" class="nav-btn">← Prev: Multi-Level Affiliate Ref...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_087_Q87_circular_fx_arbitrage_triangle.html" class="nav-btn">Next: Triangular FX Currency Ar... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

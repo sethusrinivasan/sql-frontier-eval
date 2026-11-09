@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_011_Q11_exclude_ties_ranking - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Temporal &amp; Time-Series</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_011_Q11_exclude_ties_ranking</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_010_Q10_peer_exclusion_moving_average.html" class="nav-btn">← Prev: Window Frame Exclusion: P...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_012_Q12_microsecond_latency_jitter.html" class="nav-btn">Next: Inter-Packet Network Arri... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Temporal &amp; Time-Series</span>
+                    <span class="badge badge-id">task_011_Q11_exclude_ties_ranking</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Excluding Ties in Percentile Ranks via EXCLUDE TIES</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">124.91 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">124.23 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">19.1 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 13.7s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>When evaluating employee sales performance, ties should not inflate the percentile score against colleagues who achieved the exact same result.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Using standard RANK() causes tied individuals to push each other&#x27;s percentiles higher or lower inconsistently.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">When evaluating employee sales performance, ties should not inflate the percentile score against colleagues who achieved the exact same result.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: rep_id, sales_quota_achieved, cumulative_sales_exclusive_of_ties.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 19.1 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 rep_sales</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">19.1 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>rep_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>sales_quota_achieved</code> <small>(DECIMAL(5,2))</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>rep_id</th>
+<th>sales_quota_achieved</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>120</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>115</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>115</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>4</td>
+<td>95</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>131.03</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>117.46</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>112.5</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>100.03</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>107.69</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>111.91</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>131.52</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>116.64</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>104.59</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>125.12</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>101.89</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 267.14 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 70.30525695875411%; background: #f85149;" title="WINDOW: 187.81ms (70.3%)"></div><div class="cost-bar-seg" style="width: 29.256592737605413%; background: #f85149;" title="ORDER_BY: 78.15ms (29.3%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 29.3% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">78.15 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (29.3% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.14 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="high-cost-tag">🔥 70.3% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">187.81 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
+                <div class="nm-tbl" title="Projections: sum_no_overflow(sales_quota_achieve">📁 Projections: sum_no_overflow(sal...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (70.3% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">7.63 MB</span></div>
+                <div class="nm-tbl" title="memory.main.rep_sales">📁 memory.main.rep_sales</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>70.3%</strong></td>
+            <td>187.81 ms</td>
+            <td>1,000,000</td>
+            <td>22.89 MB</td>
+            <td><small>Projections: sum_no_overflow(sales_quota_achieve</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>29.3%</strong></td>
+            <td>78.15 ms</td>
+            <td>1,000,000</td>
+            <td>22.89 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.4%</strong></td>
+            <td>1.03 ms</td>
+            <td>1,000,000</td>
+            <td>7.63 MB</td>
+            <td><small>memory.main.rep_sales</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.14 ms</td>
+            <td>1,000,000</td>
+            <td>22.89 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 124.91 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">rep_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">sales_quota_achieved</span><span class="p">,</span>
+<span class="w">       </span><span class="k">sum</span><span class="p">(</span><span class="n">sales_quota_achieved</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                       </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">sales_quota_achieved</span><span class="w"> </span><span class="k">DESC</span><span class="w"> </span><span class="n">RANGE</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">PRECEDING</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="n">exclude</span><span class="w"> </span><span class="n">ties</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">cumulative_sales_exclusive_of_ties</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">rep_sales</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">sales_quota_achieved</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span>
+<span class="w">         </span><span class="n">rep_id</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 124.23 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Compute cumulative sales sum excluding tied peers in current row calculation</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">rep_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">sales_quota_achieved</span><span class="p">,</span>
+<span class="w">       </span><span class="k">sum</span><span class="p">(</span><span class="n">sales_quota_achieved</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                                       </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">sales_quota_achieved</span><span class="w"> </span><span class="k">DESC</span><span class="w"> </span><span class="n">RANGE</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="n">UNBOUNDED</span><span class="w"> </span><span class="n">PRECEDING</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">CURRENT</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="n">exclude</span><span class="w"> </span><span class="n">ties</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">cumulative_sales_exclusive_of_ties</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">rep_sales</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">sales_quota_achieved</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span>
+<span class="w">         </span><span class="n">rep_id</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">rep_sales</span><span class="w"> </span><span class="p">(</span><span class="n">rep_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">sales_quota_achieved</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">));</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">rep_sales</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">120</span><span class="p">.</span><span class="mi">00</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">115</span><span class="p">.</span><span class="mi">00</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">115</span><span class="p">.</span><span class="mi">00</span><span class="p">),</span>
+<span class="w">       </span><span class="c1">-- Tie</span>
+<span class="w"> </span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">95</span><span class="p">.</span><span class="mi">00</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000,000 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>rep_id</th>
+<th>sales_quota_achieved</th>
+<th>cumulative_sales_exclusive_of_ties</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>814,234</td>
+<td>162.05</td>
+<td>162.05</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>593,667</td>
+<td>161.21</td>
+<td>323.26</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>775,185</td>
+<td>159.87</td>
+<td>483.13</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>419,683</td>
+<td>159.82</td>
+<td>642.95</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>880,050</td>
+<td>158.35</td>
+<td>801.3</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>213,542</td>
+<td>158.34</td>
+<td>959.64</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>44,600</td>
+<td>158.17</td>
+<td>1,117.81</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>654,559</td>
+<td>157.88</td>
+<td>1,275.69</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>754,964</td>
+<td>157.66</td>
+<td>1,433.35</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>89,090</td>
+<td>157.62</td>
+<td>1,590.97</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>219,193</td>
+<td>157.6</td>
+<td>1,748.57</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>396,664</td>
+<td>157.48</td>
+<td>1,906.05</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>88,824</td>
+<td>157.4</td>
+<td>2,063.45</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>396,388</td>
+<td>157.33</td>
+<td>2,220.78</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>226,014</td>
+<td>157.16</td>
+<td>2,377.94</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>587,083</td>
+<td>157</td>
+<td>2,534.94</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>704,525</td>
+<td>156.85</td>
+<td>2,691.79</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>427,376</td>
+<td>156.82</td>
+<td>2,848.61</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>384,977</td>
+<td>156.76</td>
+<td>3,005.37</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>920,396</td>
+<td>156.63</td>
+<td>3,162</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>750,480</td>
+<td>156.49</td>
+<td>3,318.49</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>505,177</td>
+<td>156.26</td>
+<td>3,474.75</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>418,422</td>
+<td>156.11</td>
+<td>3,630.86</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>841,268</td>
+<td>156.03</td>
+<td>3,786.89</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>233,920</td>
+<td>156.01</td>
+<td>3,942.9</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1,000,000 rows × 3 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>rep_id</th>
+<th>sales_quota_achieved</th>
+<th>cumulative_sales_exclusive_of_ties</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>814,234</td>
+<td>162.05</td>
+<td>162.05</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>593,667</td>
+<td>161.21</td>
+<td>323.26</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>775,185</td>
+<td>159.87</td>
+<td>483.13</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>419,683</td>
+<td>159.82</td>
+<td>642.95</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>880,050</td>
+<td>158.35</td>
+<td>801.3</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>213,542</td>
+<td>158.34</td>
+<td>959.64</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>44,600</td>
+<td>158.17</td>
+<td>1,117.81</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>654,559</td>
+<td>157.88</td>
+<td>1,275.69</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>754,964</td>
+<td>157.66</td>
+<td>1,433.35</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>89,090</td>
+<td>157.62</td>
+<td>1,590.97</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>219,193</td>
+<td>157.6</td>
+<td>1,748.57</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>396,664</td>
+<td>157.48</td>
+<td>1,906.05</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>88,824</td>
+<td>157.4</td>
+<td>2,063.45</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>396,388</td>
+<td>157.33</td>
+<td>2,220.78</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>226,014</td>
+<td>157.16</td>
+<td>2,377.94</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>587,083</td>
+<td>157</td>
+<td>2,534.94</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>704,525</td>
+<td>156.85</td>
+<td>2,691.79</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>427,376</td>
+<td>156.82</td>
+<td>2,848.61</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>384,977</td>
+<td>156.76</td>
+<td>3,005.37</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>920,396</td>
+<td>156.63</td>
+<td>3,162</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>750,480</td>
+<td>156.49</td>
+<td>3,318.49</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>505,177</td>
+<td>156.26</td>
+<td>3,474.75</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>418,422</td>
+<td>156.11</td>
+<td>3,630.86</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>841,268</td>
+<td>156.03</td>
+<td>3,786.89</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>233,920</td>
+<td>156.01</td>
+<td>3,942.9</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_010_Q10_peer_exclusion_moving_average.html" class="nav-btn">← Prev: Window Frame Exclusion: P...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_012_Q12_microsecond_latency_jitter.html" class="nav-btn">Next: Inter-Packet Network Arri... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

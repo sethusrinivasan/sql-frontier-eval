@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_037_Q37_hybrid_relational_vector_cohort_join - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Vector &amp; Embeddings</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_037_Q37_hybrid_relational_vector_cohort_join</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_036_Q36_knn_vector_anomaly_detection.html" class="nav-btn">← Prev: Vector Anomaly Detection ...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_038_Q38_multimodal_image_text_fusion.html" class="nav-btn">Next: Multi-Modal Joint Retriev... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Vector &amp; Embeddings</span>
+                    <span class="badge badge-id">task_037_Q37_hybrid_relational_vector_cohort_join</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Cohort-Constrained Vector Match with Geographical Regionality</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">98.80 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">91.67 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,001 rows</div>
+                    <div class="stat-sub">34.3 MiB across 2 tables</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 11.2s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personality/skill compatibility joined with strict relational geographic and category boundaries.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Matching vectors globally without partitioning by region produces candidates located 3,000 miles away.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personality/skill compatibility joined with strict relational geographic and category boundaries.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: job_id, region, candidate_id, skill_fit_score.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">2 Tables (1,000,001 rows &bull; 34.3 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 candidates</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">34.3 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>candidate_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>region</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>skills_vec</code> <small>(FLOAT[3])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>candidate_id</th>
+<th>region</th>
+<th>skills_vec</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>US-WEST</td>
+<td>[0.8 0.5 0.2]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>EU-CENTRAL</td>
+<td>[0.85 0.5  0.2 ]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>US-WEST</td>
+<td>[0.8564 0.0135 0.0448]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>EU-CENTRAL</td>
+<td>[ 0.8426 -0.0158  0.0398]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>US-WEST</td>
+<td>[ 0.8315  0.0152 -0.0075]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>EU-CENTRAL</td>
+<td>[ 0.8648 -0.0325  0.0799]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>US-WEST</td>
+<td>[0.8107 0.0577 0.0823]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>EU-CENTRAL</td>
+<td>[0.8185 0.0194 0.0531]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>US-WEST</td>
+<td>[0.898  0.0153 0.0716]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>EU-CENTRAL</td>
+<td>[0.8869 0.045  0.0292]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>US-WEST</td>
+<td>[ 0.788  -0.0488 -0.001 ]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>EU-CENTRAL</td>
+<td>[0.8641 0.0211 0.0239]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>US-WEST</td>
+<td>[0.8598 0.0742 0.0206]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>EU-CENTRAL</td>
+<td>[8.295e-01 3.670e-02 1.000e-04]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>US-WEST</td>
+<td>[0.8183 0.0659 0.1206]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 job_openings</span>
+                    <span class="badge badge-pass">1 rows</span>
+                    <span class="badge badge-golden">36 B Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>job_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>region</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>required_vec</code> <small>(FLOAT[3])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>job_id</th>
+<th>region</th>
+<th>required_vec</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>[0.82 0.48 0.18]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 113.87 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 40.23695540474837%; background: #f85149;" title="ORDER_BY: 45.82ms (40.2%)"></div><div class="cost-bar-seg" style="width: 20.610701650586115%; background: #f85149;" title="PROJECTION: 23.47ms (20.6%)"></div><div class="cost-bar-seg" style="width: 19.735822055844007%; background: #3fb950;" title="HASH_JOIN: 22.47ms (19.7%)"></div><div class="cost-bar-seg" style="width: 16.96736966136321%; background: #d29922;" title="TABLE_SCAN: 19.32ms (17.0%)"></div><div class="cost-bar-seg" style="width: 1.7938569949636785%; background: #bc8cff;" title="PROJECTION: 2.04ms (1.8%)"></div><div class="cost-bar-seg" style="width: 0.64377316048113%; background: #39c5cf;" title="PROJECTION: 0.73ms (0.6%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.73 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">13.35 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;__internal">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 40.2% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">45.82 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8.11 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (40.2% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.04 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8.11 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS TINYINT)&#x27;, &#x27;__internal">📁 Projections: [&#x27;CAST(#0 AS TINYIN...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="high-cost-tag">🔥 20.6% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">23.47 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">13.35 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;job_id&#x27;, &#x27;region&#x27;, &#x27;candidate_id&#x27;">📁 Projections: [&#x27;job_id&#x27;, &#x27;region&#x27;...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (20.6% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">19.7%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">22.47 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">17.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">19.32 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.26 MB</span></div>
+                <div class="nm-tbl" title="memory.main.candidates">📁 memory.main.candidates</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
+                <div class="nm-tbl" title="memory.main.job_openings">📁 memory.main.job_openings</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>40.2%</strong></td>
+            <td>45.82 ms</td>
+            <td>500,000</td>
+            <td>8.11 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>20.6%</strong></td>
+            <td>23.47 ms</td>
+            <td>500,000</td>
+            <td>13.35 MB</td>
+            <td><small>Projections: [&#x27;job_id&#x27;, &#x27;region&#x27;, &#x27;candidate_id&#x27;</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>19.7%</strong></td>
+            <td>22.47 ms</td>
+            <td>500,000</td>
+            <td>22.89 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>17.0%</strong></td>
+            <td>19.32 ms</td>
+            <td>500,000</td>
+            <td>15.26 MB</td>
+            <td><small>memory.main.candidates</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.8%</strong></td>
+            <td>2.04 ms</td>
+            <td>500,000</td>
+            <td>8.11 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS TINYINT)&#x27;, &#x27;__internal</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.6%</strong></td>
+            <td>0.73 ms</td>
+            <td>500,000</td>
+            <td>13.35 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;__internal</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.job_openings</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 98.80 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">j</span><span class="p">.</span><span class="n">job_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">j</span><span class="p">.</span><span class="n">region</span><span class="p">,</span>
+<span class="w">       </span><span class="k">c</span><span class="p">.</span><span class="n">candidate_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="k">c</span><span class="p">.</span><span class="n">skills_vec</span><span class="p">,</span><span class="w"> </span><span class="n">j</span><span class="p">.</span><span class="n">required_vec</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">skill_fit_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">job_openings</span><span class="w"> </span><span class="n">j</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">candidates</span><span class="w"> </span><span class="k">c</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">j</span><span class="p">.</span><span class="n">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">region</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">skill_fit_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 91.67 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Match jobs to candidates strictly within matching geographical region ordered by skill compatibility</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">j</span><span class="p">.</span><span class="n">job_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">j</span><span class="p">.</span><span class="n">region</span><span class="p">,</span>
+<span class="w">       </span><span class="k">c</span><span class="p">.</span><span class="n">candidate_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="k">c</span><span class="p">.</span><span class="n">skills_vec</span><span class="p">,</span><span class="w"> </span><span class="n">j</span><span class="p">.</span><span class="n">required_vec</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">skill_fit_score</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">job_openings</span><span class="w"> </span><span class="n">j</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">candidates</span><span class="w"> </span><span class="k">c</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">j</span><span class="p">.</span><span class="n">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">region</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">skill_fit_score</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">candidates</span><span class="w"> </span><span class="p">(</span><span class="n">candidate_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">region</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">skills_vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">job_openings</span><span class="w"> </span><span class="p">(</span><span class="n">job_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">region</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">required_vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">candidates</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'US-WEST'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'EU-CENTRAL'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">85</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">job_openings</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="s1">'US-WEST'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">82</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">48</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">18</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(500,000 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>job_id</th>
+<th>region</th>
+<th>candidate_id</th>
+<th>skill_fit_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>1</td>
+<td>0.9994</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>368,840</td>
+<td>0.9637</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>751,078</td>
+<td>0.9613</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>205,910</td>
+<td>0.961</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>498,798</td>
+<td>0.9591</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>938,400</td>
+<td>0.9586</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>212,330</td>
+<td>0.9585</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>594,744</td>
+<td>0.9582</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>464,044</td>
+<td>0.9578</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>453,520</td>
+<td>0.9576</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>78,506</td>
+<td>0.9575</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>29,152</td>
+<td>0.9573</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>844,956</td>
+<td>0.9562</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>909,572</td>
+<td>0.9558</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>855,096</td>
+<td>0.9553</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>492,032</td>
+<td>0.9551</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>457,548</td>
+<td>0.955</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>878,170</td>
+<td>0.9548</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>586,582</td>
+<td>0.9546</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>486,514</td>
+<td>0.9545</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>836,916</td>
+<td>0.9543</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>535,410</td>
+<td>0.9538</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>647,984</td>
+<td>0.9538</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>203,650</td>
+<td>0.9538</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>544,574</td>
+<td>0.9535</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 500,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(500,000 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>job_id</th>
+<th>region</th>
+<th>candidate_id</th>
+<th>skill_fit_score</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>1</td>
+<td>0.9994</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>368,840</td>
+<td>0.9637</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>751,078</td>
+<td>0.9613</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>205,910</td>
+<td>0.961</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>498,798</td>
+<td>0.9591</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>938,400</td>
+<td>0.9586</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>212,330</td>
+<td>0.9585</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>594,744</td>
+<td>0.9582</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>464,044</td>
+<td>0.9578</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>453,520</td>
+<td>0.9576</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>78,506</td>
+<td>0.9575</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>29,152</td>
+<td>0.9573</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>844,956</td>
+<td>0.9562</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>909,572</td>
+<td>0.9558</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>855,096</td>
+<td>0.9553</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>492,032</td>
+<td>0.9551</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>457,548</td>
+<td>0.955</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>878,170</td>
+<td>0.9548</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>586,582</td>
+<td>0.9546</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>486,514</td>
+<td>0.9545</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>836,916</td>
+<td>0.9543</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>647,984</td>
+<td>0.9538</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>535,410</td>
+<td>0.9538</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>203,650</td>
+<td>0.9538</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>101</td>
+<td>US-WEST</td>
+<td>544,574</td>
+<td>0.9535</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 500,000 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_036_Q36_knn_vector_anomaly_detection.html" class="nav-btn">← Prev: Vector Anomaly Detection ...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_038_Q38_multimodal_image_text_fusion.html" class="nav-btn">Next: Multi-Modal Joint Retriev... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

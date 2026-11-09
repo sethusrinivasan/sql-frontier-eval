@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_030_Q30_adaptive_similarity_threshold - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Vector &amp; Embeddings</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_030_Q30_adaptive_similarity_threshold</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_02_sessionization.html" class="nav-btn">← Prev: Clickstream Sessionizatio...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_031_Q31_semantic_deduplication_support_tickets.html" class="nav-btn">Next: Semantic Deduplication of... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Vector &amp; Embeddings</span>
+                    <span class="badge badge-id">task_030_Q30_adaptive_similarity_threshold</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Adaptive Similarity Thresholding with Fallback Top-K Guarantee</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">504.18 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.2x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">435.48 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">34.3 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 11.3s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>RAG systems want high-confidence matches (similarity &gt; 0.85) to avoid hallucinations, but if no document exceeds 0.85, they need a guaranteed top-1 fallback to provide at least some context.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>A hard WHERE similarity &gt; 0.85 yields empty sets, while a raw LIMIT 5 includes irrelevant noise.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">RAG systems want high-confidence matches (similarity &gt; 0.85) to avoid hallucinations, but if no document exceeds 0.85, they need a guaranteed top-1 fallback to provide at least some context.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: kb_id, content, sim_score, rank_pos, match_type.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 34.3 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 knowledge_base</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">34.3 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>kb_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>content</code> <small>(VARCHAR)</small></span> <span class="col-pill"><code>vector</code> <small>(FLOAT[3])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>kb_id</th>
+<th>content</th>
+<th>vector</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>DuckDB uses columnar storage</td>
+<td>[0.4 0.4 0.1]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>DuckDB vector execution engine</td>
+<td>[0.5 0.3 0.2]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>French cuisine recipes</td>
+<td>[0.  0.1 0.9]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>DuckDB uses columnar storage</td>
+<td>[0.8435 0.0527 0.0321]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>DuckDB vector execution engine</td>
+<td>[0.8887 0.0992 0.0642]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>French cuisine recipes</td>
+<td>[0.8195 0.0301 0.043 ]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>DuckDB uses columnar storage</td>
+<td>[0.8694 0.0932 0.0051]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>DuckDB vector execution engine</td>
+<td>[0.8209 0.0335 0.0929]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>French cuisine recipes</td>
+<td>[0.7989 0.0078 0.0216]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>DuckDB uses columnar storage</td>
+<td>[ 0.8599 -0.0056 -0.0088]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>DuckDB vector execution engine</td>
+<td>[0.8651 0.0429 0.0382]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>French cuisine recipes</td>
+<td>[0.8852 0.0943 0.0185]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>DuckDB uses columnar storage</td>
+<td>[ 0.7847 -0.0333  0.023 ]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>DuckDB vector execution engine</td>
+<td>[0.7936 0.0714 0.0096]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>French cuisine recipes</td>
+<td>[0.8915 0.0236 0.1403]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 609.80 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 66.94207919381287%; background: #f85149;" title="WINDOW: 408.21ms (66.9%)"></div><div class="cost-bar-seg" style="width: 17.602217369587517%; background: #f85149;" title="ORDER_BY: 107.34ms (17.6%)"></div><div class="cost-bar-seg" style="width: 5.021387051110276%; background: #3fb950;" title="FILTER: 30.62ms (5.0%)"></div><div class="cost-bar-seg" style="width: 4.8333549541724405%; background: #d29922;" title="PROJECTION: 29.47ms (4.8%)"></div><div class="cost-bar-seg" style="width: 3.3893552325993017%; background: #bc8cff;" title="PROJECTION: 20.67ms (3.4%)"></div><div class="cost-bar-seg" style="width: 2.178511605080641%; background: #39c5cf;" title="TABLE_SCAN: 13.28ms (2.2%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 17.6% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">107.34 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45.78 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (17.6% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">4.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">29.47 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">47.69 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;kb_id&#x27;, &#x27;content&#x27;, &#x27;sim_score&#x27;, &#x27;">📁 Projections: [&#x27;kb_id&#x27;, &#x27;content&#x27;...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">3.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">20.67 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;kb_id&#x27;, &#x27;content&#x27;, &#x27;sim_score&#x27;, &#x27;">📁 Projections: [&#x27;kb_id&#x27;, &#x27;content&#x27;...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
+                <span class="node-cost-tag">5.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">30.62 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">38.15 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.20 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">38.15 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="high-cost-tag">🔥 66.9% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">408.21 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">38.15 MB</span></div>
+                <div class="nm-tbl" title="Projections: row_number() OVER (ORDER BY array_c">📁 Projections: row_number() OVER (...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (66.9% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">2.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.28 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
+                <div class="nm-tbl" title="memory.main.knowledge_base">📁 memory.main.knowledge_base</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>66.9%</strong></td>
+            <td>408.21 ms</td>
+            <td>1,000,000</td>
+            <td>38.15 MB</td>
+            <td><small>Projections: row_number() OVER (ORDER BY array_c</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>17.6%</strong></td>
+            <td>107.34 ms</td>
+            <td>999,998</td>
+            <td>45.78 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>FILTER</strong></td>
+            <td><strong>5.0%</strong></td>
+            <td>30.62 ms</td>
+            <td>999,998</td>
+            <td>38.15 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>4.8%</strong></td>
+            <td>29.47 ms</td>
+            <td>999,998</td>
+            <td>47.69 MB</td>
+            <td><small>Projections: [&#x27;kb_id&#x27;, &#x27;content&#x27;, &#x27;sim_score&#x27;, &#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>3.4%</strong></td>
+            <td>20.67 ms</td>
+            <td>999,998</td>
+            <td>30.52 MB</td>
+            <td><small>Projections: [&#x27;kb_id&#x27;, &#x27;content&#x27;, &#x27;sim_score&#x27;, &#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>2.2%</strong></td>
+            <td>13.28 ms</td>
+            <td>1,000,000</td>
+            <td>30.52 MB</td>
+            <td><small>memory.main.knowledge_base</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.20 ms</td>
+            <td>1,000,000</td>
+            <td>38.15 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 504.18 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="c1">-- Score items, guarantee top 1 fallback even if below 0.85 threshold</span>
+<span class="k">WITH</span><span class="w"> </span><span class="n">scored</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">kb_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">content</span><span class="p">,</span>
+<span class="w">          </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vector</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">sim_score</span><span class="p">,</span>
+<span class="w">          </span><span class="n">row_number</span><span class="p">()</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                             </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vector</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span><span class="w"> </span><span class="k">DESC</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">rank_pos</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">knowledge_base</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">kb_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">content</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">sim_score</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">sim_score</span><span class="p">,</span>
+<span class="w">       </span><span class="n">rank_pos</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">sim_score</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">85</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'CONFIDENT_MATCH'</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="s1">'FALLBACK_TOP_MATCH'</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">match_type</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">scored</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">sim_score</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">85</span>
+<span class="w">  </span><span class="k">OR</span><span class="w"> </span><span class="n">rank_pos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">rank_pos</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 435.48 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Score items, guarantee top 1 fallback even if below 0.85 threshold</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">scored</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">kb_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">content</span><span class="p">,</span>
+<span class="w">          </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vector</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">sim_score</span><span class="p">,</span>
+<span class="w">          </span><span class="n">row_number</span><span class="p">()</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">                             </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">array_cosine_similarity</span><span class="p">(</span><span class="n">vector</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span><span class="w"> </span><span class="k">DESC</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">rank_pos</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">knowledge_base</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">kb_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">content</span><span class="p">,</span>
+<span class="w">       </span><span class="n">round</span><span class="p">(</span><span class="n">sim_score</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">sim_score</span><span class="p">,</span>
+<span class="w">       </span><span class="n">rank_pos</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">sim_score</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">85</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'CONFIDENT_MATCH'</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="s1">'FALLBACK_TOP_MATCH'</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">match_type</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">scored</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">sim_score</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">85</span>
+<span class="w">  </span><span class="k">OR</span><span class="w"> </span><span class="n">rank_pos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">rank_pos</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">knowledge_base</span><span class="w"> </span><span class="p">(</span><span class="n">kb_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">content</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">knowledge_base</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'DuckDB uses columnar storage'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'DuckDB vector execution engine'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'French cuisine recipes'</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">9</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(999,998 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>kb_id</th>
+<th>content</th>
+<th>sim_score</th>
+<th>rank_pos</th>
+<th>match_type</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>139,069</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>1</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>225,018</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>2</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>545,553</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>3</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>306,978</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>4</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>180,269</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>5</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>438,322</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>6</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>81,756</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>7</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>711,399</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>8</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>586,884</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>9</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>526,262</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>10</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>940,273</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>11</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>134,824</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>12</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>621,954</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>13</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>514,106</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>14</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>886,833</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>15</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>788,019</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>16</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>738,440</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>17</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>846,651</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>18</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>658,996</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>19</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>56,055</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>20</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>478,506</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>21</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>623,633</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>22</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>684,080</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>23</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>968,490</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>24</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>813,524</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>25</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 999,998 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(999,998 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>kb_id</th>
+<th>content</th>
+<th>sim_score</th>
+<th>rank_pos</th>
+<th>match_type</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>139,069</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>1</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>225,018</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>2</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>545,553</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>3</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>306,978</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>4</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>180,269</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>5</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>438,322</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>6</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>81,756</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>7</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>711,399</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>8</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>586,884</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>9</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>526,262</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>10</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>940,273</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>11</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>134,824</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>12</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>621,954</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>13</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>514,106</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>14</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>886,833</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>15</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>788,019</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>16</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>738,440</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>17</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>846,651</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>18</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>658,996</td>
+<td>DuckDB vector execution engine</td>
+<td>1</td>
+<td>19</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>56,055</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>20</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>478,506</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>21</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>623,633</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>22</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>684,080</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>23</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>968,490</td>
+<td>DuckDB uses columnar storage</td>
+<td>1</td>
+<td>24</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>813,524</td>
+<td>French cuisine recipes</td>
+<td>1</td>
+<td>25</td>
+<td>CONFIDENT_MATCH</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 999,998 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_02_sessionization.html" class="nav-btn">← Prev: Clickstream Sessionizatio...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_031_Q31_semantic_deduplication_support_tickets.html" class="nav-btn">Next: Semantic Deduplication of... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

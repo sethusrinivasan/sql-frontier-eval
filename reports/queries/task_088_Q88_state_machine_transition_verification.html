@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_088_Q88_state_machine_transition_verification - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Graph &amp; Hierarchy</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_088_Q88_state_machine_transition_verification</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_087_Q87_circular_fx_arbitrage_triangle.html" class="nav-btn">← Prev: Triangular FX Currency Ar...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_089_Q89_chasm_trap_fanout_resolution.html" class="nav-btn">Next: Chasm Trap Resolution: Mu... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Graph &amp; Hierarchy</span>
+                    <span class="badge badge-id">task_088_Q88_state_machine_transition_verification</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">Transactional State Machine Transition Sequence Verification</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">0.66 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.2x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">0.55 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">5 rows</div>
+                    <div class="stat-sub">140 B across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 14.5s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Financial compliance requires payment transactions to strictly follow the state sequence: INITIATED -&gt; AUTHORIZED -&gt; CAPTURED -&gt; SETTLED. Any transaction skipping steps is flagged as fraudulent.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Verifying status counts without checking transition sequence allows out-of-order state transitions.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Financial compliance requires payment transactions to strictly follow the state sequence: INITIATED -&gt; AUTHORIZED -&gt; CAPTURED -&gt; SETTLED. Any transaction skipping steps is flagged as fraudulent.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: tx_id, current_state, next_state, audit_validation_result.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (5 rows &bull; 140 B)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 payment_status_audit</span>
+                    <span class="badge badge-pass">5 rows</span>
+                    <span class="badge badge-golden">140 B Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>tx_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>step_order</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>status</code> <small>(VARCHAR)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 5 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>step_order</th>
+<th>status</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>1</td>
+<td>INITIATED</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1</td>
+<td>2</td>
+<td>AUTHORIZED</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>1</td>
+<td>3</td>
+<td>CAPTURED</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2</td>
+<td>1</td>
+<td>INITIATED</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2</td>
+<td>2</td>
+<td>CAPTURED</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 0.66 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 69.1592985080704%; background: #58a6ff;" title="WINDOW: 0.46ms (69.2%)"></div><div class="cost-bar-seg" style="width: 19.52628634250288%; background: #f85149;" title="ORDER_BY: 0.13ms (19.5%)"></div><div class="cost-bar-seg" style="width: 5.204033774643682%; background: #3fb950;" title="PROJECTION: 0.03ms (5.2%)"></div><div class="cost-bar-seg" style="width: 3.95354553831166%; background: #d29922;" title="TABLE_SCAN: 0.03ms (4.0%)"></div><div class="cost-bar-seg" style="width: 1.5913111275657854%; background: #bc8cff;" title="PROJECTION: 0.01ms (1.6%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">516 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;__internal">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="node-cost-tag">19.5%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.13 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">501 B</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.6%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">757 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS TINYINT)&#x27;, &#x27;__internal">📁 Projections: [&#x27;CAST(#0 AS TINYIN...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">5.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">772 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;current_state&#x27;, &#x27;next_st">📁 Projections: [&#x27;tx_id&#x27;, &#x27;current_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">692 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;tx_id&#x27;, &#x27;current_state&#x27;, &#x27;next_st">📁 Projections: [&#x27;tx_id&#x27;, &#x27;current_...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">712 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
+                <span class="node-cost-tag">69.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.46 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">712 B</span></div>
+                <div class="nm-tbl" title="Projections: lead(status, 1, NULL::VARCHAR) OVER">📁 Projections: lead(status, 1, NUL...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">4.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.03 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">120 B</span></div>
+                <div class="nm-tbl" title="memory.main.payment_status_audit">📁 memory.main.payment_status_audit</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>WINDOW</strong></td>
+            <td><strong>69.2%</strong></td>
+            <td>0.46 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: lead(status, 1, NULL::VARCHAR) OVER</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>19.5%</strong></td>
+            <td>0.13 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>5.2%</strong></td>
+            <td>0.03 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;current_state&#x27;, &#x27;next_st</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>4.0%</strong></td>
+            <td>0.03 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>memory.main.payment_status_audit</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.6%</strong></td>
+            <td>0.01 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS TINYINT)&#x27;, &#x27;__internal</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.3%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;__internal</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.00 ms</td>
+            <td>5</td>
+            <td>0.00 MB</td>
+            <td><small>Projections: [&#x27;tx_id&#x27;, &#x27;current_state&#x27;, &#x27;next_st</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 0.66 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="c1">-- Validate that every state transition matches the legal state machine rules</span>
+<span class="k">WITH</span><span class="w"> </span><span class="n">transitions</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">status</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">current_state</span><span class="p">,</span>
+<span class="w">          </span><span class="n">lead</span><span class="p">(</span><span class="n">status</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">tx_id</span>
+<span class="w">                             </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">step_order</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">next_state</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">payment_status_audit</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">current_state</span><span class="p">,</span>
+<span class="w">       </span><span class="n">next_state</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">next_state</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'TERMINAL_STATE'</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'INITIATED'</span>
+<span class="w">                </span><span class="k">AND</span><span class="w"> </span><span class="n">next_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'AUTHORIZED'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'VALID'</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'AUTHORIZED'</span>
+<span class="w">                </span><span class="k">AND</span><span class="w"> </span><span class="n">next_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'CAPTURED'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'VALID'</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'CAPTURED'</span>
+<span class="w">                </span><span class="k">AND</span><span class="w"> </span><span class="n">next_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'SETTLED'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'VALID'</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="s1">'INVALID_ILLEGAL_STATE_JUMP'</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">audit_validation_result</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">transitions</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">         </span><span class="n">current_state</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 0.55 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Validate that every state transition matches the legal state machine rules</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">transitions</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">status</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">current_state</span><span class="p">,</span>
+<span class="w">          </span><span class="n">lead</span><span class="p">(</span><span class="n">status</span><span class="p">)</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">tx_id</span>
+<span class="w">                             </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">step_order</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">next_state</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">payment_status_audit</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">current_state</span><span class="p">,</span>
+<span class="w">       </span><span class="n">next_state</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CASE</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">next_state</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'TERMINAL_STATE'</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'INITIATED'</span>
+<span class="w">                </span><span class="k">AND</span><span class="w"> </span><span class="n">next_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'AUTHORIZED'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'VALID'</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'AUTHORIZED'</span>
+<span class="w">                </span><span class="k">AND</span><span class="w"> </span><span class="n">next_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'CAPTURED'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'VALID'</span>
+<span class="w">           </span><span class="k">WHEN</span><span class="w"> </span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'CAPTURED'</span>
+<span class="w">                </span><span class="k">AND</span><span class="w"> </span><span class="n">next_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'SETTLED'</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">'VALID'</span>
+<span class="w">           </span><span class="k">ELSE</span><span class="w"> </span><span class="s1">'INVALID_ILLEGAL_STATE_JUMP'</span>
+<span class="w">       </span><span class="k">END</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">audit_validation_result</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">transitions</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">tx_id</span><span class="p">,</span>
+<span class="w">         </span><span class="n">current_state</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">payment_status_audit</span><span class="w"> </span><span class="p">(</span><span class="n">tx_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">step_order</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">);</span>
+
+<span class="c1">-- Valid tx 1</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">payment_status_audit</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'INITIATED'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'AUTHORIZED'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'CAPTURED'</span><span class="p">);</span>
+
+<span class="c1">-- Invalid tx 2: Jumped directly from INITIATED to CAPTURED!</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">payment_status_audit</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'INITIATED'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'CAPTURED'</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(5 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>current_state</th>
+<th>next_state</th>
+<th>audit_validation_result</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>AUTHORIZED</td>
+<td>CAPTURED</td>
+<td>VALID</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1</td>
+<td>CAPTURED</td>
+<td><span class="cell-null">NULL</span></td>
+<td>TERMINAL_STATE</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>1</td>
+<td>INITIATED</td>
+<td>AUTHORIZED</td>
+<td>VALID</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2</td>
+<td>CAPTURED</td>
+<td><span class="cell-null">NULL</span></td>
+<td>TERMINAL_STATE</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2</td>
+<td>INITIATED</td>
+<td>CAPTURED</td>
+<td>INVALID_ILLEGAL_STATE_JUMP</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(5 rows × 4 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>tx_id</th>
+<th>current_state</th>
+<th>next_state</th>
+<th>audit_validation_result</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>AUTHORIZED</td>
+<td>CAPTURED</td>
+<td>VALID</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1</td>
+<td>CAPTURED</td>
+<td><span class="cell-null">NULL</span></td>
+<td>TERMINAL_STATE</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>1</td>
+<td>INITIATED</td>
+<td>AUTHORIZED</td>
+<td>VALID</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>2</td>
+<td>CAPTURED</td>
+<td><span class="cell-null">NULL</span></td>
+<td>TERMINAL_STATE</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>2</td>
+<td>INITIATED</td>
+<td>CAPTURED</td>
+<td>INVALID_ILLEGAL_STATE_JUMP</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_087_Q87_circular_fx_arbitrage_triangle.html" class="nav-btn">← Prev: Triangular FX Currency Ar...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_089_Q89_chasm_trap_fanout_resolution.html" class="nav-btn">Next: Chasm Trap Resolution: Mu... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

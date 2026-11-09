@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_034_Q34_user_profile_embedding_centroid - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Vector &amp; Embeddings</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_034_Q34_user_profile_embedding_centroid</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_033_Q33_colbert_late_interaction_maxsim.html" class="nav-btn">← Prev: ColBERT Multi-Vector Late...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_035_Q35_kmeans_cluster_assignment_step.html" class="nav-btn">Next: K-Means Clustering Assign... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Vector &amp; Embeddings</span>
+                    <span class="badge badge-id">task_034_Q34_user_profile_embedding_centroid</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: Yes</span>
+                </div>
+                <h1 class="task-title">User Profile Preference Vector Centroid Aggregation</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">936.97 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">955.89 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,000,000 rows</div>
+                    <div class="stat-sub">19.1 MiB across 1 table</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 30.4s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>To personalize feeds, recommendation engines compute a dynamic user preference vector by calculating the average centroid of the embeddings of products the user clicked in the last 7 days.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>SQL standard lacks native array averaging; unnesting arrays without proper positional indexes scrambles vector dimensions.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">To personalize feeds, recommendation engines compute a dynamic user preference vector by calculating the average centroid of the embeddings of products the user clicked in the last 7 days.
+
+Execute the required analytical SQL calculation in DuckDB.
+Expected output columns: user_id, user_preference_centroid.
+Results should be ordered as specified.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">1 Tables (1,000,000 rows &bull; 19.1 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 user_clicks_vectors</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">19.1 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>user_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>item_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>item_vector</code> <small>(FLOAT[3])</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>user_id</th>
+<th>item_id</th>
+<th>item_vector</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>42</td>
+<td>1</td>
+<td>[0.8 0.2 0.1]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>42</td>
+<td>2</td>
+<td>[0.6 0.4 0.2]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>42</td>
+<td>3</td>
+<td>[0.7 0.3 0.3]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>42</td>
+<td>3</td>
+<td>[0.8619 0.061  0.1141]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>43</td>
+<td>4</td>
+<td>[0.9237 0.0698 0.0604]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>44</td>
+<td>5</td>
+<td>[0.864  0.0736 0.0779]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>45</td>
+<td>6</td>
+<td>[0.7997 0.0715 0.0555]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>46</td>
+<td>7</td>
+<td>[ 0.8986  0.0281 -0.0062]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>47</td>
+<td>8</td>
+<td>[0.881  0.0378 0.0101]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>48</td>
+<td>9</td>
+<td>[0.9201 0.0299 0.1033]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>49</td>
+<td>10</td>
+<td>[ 0.9281  0.1134 -0.026 ]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>50</td>
+<td>11</td>
+<td>[0.8155 0.0768 0.127 ]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>51</td>
+<td>12</td>
+<td>[0.8685 0.1808 0.0363]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>52</td>
+<td>13</td>
+<td>[0.812  0.048  0.0435]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>53</td>
+<td>14</td>
+<td>[ 0.8737 -0.0019  0.0637]</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 1433.24 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 33.8896294854839%; background: #f85149;" title="HASH_GROUP_BY: 485.72ms (33.9%)"></div><div class="cost-bar-seg" style="width: 31.021366733195038%; background: #f85149;" title="HASH_GROUP_BY: 444.61ms (31.0%)"></div><div class="cost-bar-seg" style="width: 19.389126156282234%; background: #f85149;" title="ORDER_BY: 277.89ms (19.4%)"></div><div class="cost-bar-seg" style="width: 7.877389605955595%; background: #f85149;" title="UNNEST: 112.90ms (7.9%)"></div><div class="cost-bar-seg" style="width: 6.088999396852271%; background: #f85149;" title="PROJECTION: 87.27ms (6.1%)"></div><div class="cost-bar-seg" style="width: 1.1760911897613548%; background: #39c5cf;" title="PROJECTION: 16.86ms (1.2%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">1.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">16.86 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,997</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.26 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;user_preference_centro">📁 Projections: [&#x27;user_id&#x27;, &#x27;user_p...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 31.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">444.61 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,997</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (31.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.37 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,999,991</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.33 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;avg_dim_val&#x27;]">📁 Projections: [&#x27;user_id&#x27;, &#x27;avg_di...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
+                <span class="high-cost-tag">🔥 19.4% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">277.89 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,999,991</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.33 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (19.4% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="high-cost-tag">🔥 6.1% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">87.27 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,999,991</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">57.22 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;dim_idx&#x27;, &#x27;avg_dim_val">📁 Projections: [&#x27;user_id&#x27;, &#x27;dim_id...</div>
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (6.1% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 33.9% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">485.72 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2,999,991</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">57.22 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (33.9% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.2%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.89 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">57.22 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;dim_idx&#x27;, &#x27;CAST(val AS">📁 Projections: [&#x27;user_id&#x27;, &#x27;dim_id...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.48 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45.78 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;val&#x27;, &#x27;dim_idx&#x27;]">📁 Projections: [&#x27;user_id&#x27;, &#x27;val&#x27;, ...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
+                <span class="high-cost-tag">🔥 7.9% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">112.90 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">80.11 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (7.9% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">4.26 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.26 MB</span></div>
+                <div class="nm-tbl" title="memory.main.user_clicks_vectors">📁 memory.main.user_clicks_vectors</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>33.9%</strong></td>
+            <td>485.72 ms</td>
+            <td>2,999,991</td>
+            <td>57.22 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>31.0%</strong></td>
+            <td>444.61 ms</td>
+            <td>999,997</td>
+            <td>41.96 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>ORDER_BY</strong></td>
+            <td><strong>19.4%</strong></td>
+            <td>277.89 ms</td>
+            <td>2,999,991</td>
+            <td>34.33 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>UNNEST</strong></td>
+            <td><strong>7.9%</strong></td>
+            <td>112.90 ms</td>
+            <td>3,000,000</td>
+            <td>80.11 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>6.1%</strong></td>
+            <td>87.27 ms</td>
+            <td>2,999,991</td>
+            <td>57.22 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;dim_idx&#x27;, &#x27;avg_dim_val</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>1.2%</strong></td>
+            <td>16.86 ms</td>
+            <td>999,997</td>
+            <td>15.26 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;user_preference_centro</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.3%</strong></td>
+            <td>4.26 ms</td>
+            <td>1,000,000</td>
+            <td>15.26 MB</td>
+            <td><small>memory.main.user_clicks_vectors</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.2%</strong></td>
+            <td>2.89 ms</td>
+            <td>3,000,000</td>
+            <td>57.22 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;dim_idx&#x27;, &#x27;CAST(val AS</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.48 ms</td>
+            <td>3,000,000</td>
+            <td>45.78 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;val&#x27;, &#x27;dim_idx&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.37 ms</td>
+            <td>2,999,991</td>
+            <td>34.33 MB</td>
+            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;avg_dim_val&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 936.97 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">unnested_dims</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">unnest</span><span class="p">(</span><span class="n">item_vector</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">val</span><span class="p">,</span>
+<span class="w">          </span><span class="n">generate_subscripts</span><span class="p">(</span><span class="n">item_vector</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">dim_idx</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">user_clicks_vectors</span><span class="p">),</span>
+<span class="w">     </span><span class="n">avg_dims</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">dim_idx</span><span class="p">,</span>
+<span class="w">          </span><span class="n">round</span><span class="p">(</span><span class="k">avg</span><span class="p">(</span><span class="n">val</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">avg_dim_val</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">unnested_dims</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">            </span><span class="n">dim_idx</span>
+<span class="w">   </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">            </span><span class="n">dim_idx</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">list</span><span class="p">(</span><span class="n">avg_dim_val</span><span class="p">)::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">user_preference_centroid</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">avg_dims</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 955.89 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="c1">-- Calculate element-wise centroid vector for user 42</span>
+<span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">unnested_dims</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">unnest</span><span class="p">(</span><span class="n">item_vector</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">val</span><span class="p">,</span>
+<span class="w">          </span><span class="n">generate_subscripts</span><span class="p">(</span><span class="n">item_vector</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">dim_idx</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">user_clicks_vectors</span><span class="p">),</span>
+<span class="w">      </span><span class="n">avg_dims</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">dim_idx</span><span class="p">,</span>
+<span class="w">          </span><span class="n">round</span><span class="p">(</span><span class="k">avg</span><span class="p">(</span><span class="n">val</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">avg_dim_val</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">unnested_dims</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">            </span><span class="n">dim_idx</span>
+<span class="w">   </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">            </span><span class="n">dim_idx</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">user_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">list</span><span class="p">(</span><span class="n">avg_dim_val</span><span class="p">)::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">user_preference_centroid</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">avg_dims</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">user_id</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">user_clicks_vectors</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">item_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">item_vector</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">user_clicks_vectors</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">2</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">.</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">3</span><span class="p">]::</span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(999,997 rows × 2 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>user_id</th>
+<th>user_preference_centroid</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>122,931</td>
+<td>[0.8655 0.0875 0.0423]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>122,953</td>
+<td>[0.816  0.1015 0.0534]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>122,994</td>
+<td>[0.9023 0.0663 0.106 ]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>123,011</td>
+<td>[0.8523 0.0908 0.0349]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>123,063</td>
+<td>[0.8406 0.0121 0.067 ]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>123,128</td>
+<td>[0.84   0.0523 0.048 ]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>123,133</td>
+<td>[0.8357 0.0686 0.0371]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>123,145</td>
+<td>[0.8705 0.0387 0.108 ]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>123,171</td>
+<td>[0.8836 0.0691 0.043 ]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>123,193</td>
+<td>[ 8.858e-01 -6.000e-04  8.780e-02]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>123,202</td>
+<td>[0.8755 0.1499 0.0262]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>123,226</td>
+<td>[0.848  0.0713 0.0347]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>123,273</td>
+<td>[ 0.8268 -0.017   0.032 ]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>123,296</td>
+<td>[0.7384 0.095  0.0598]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>123,300</td>
+<td>[ 0.8679 -0.0261  0.0951]</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>123,335</td>
+<td>[0.7767 0.0255 0.0081]</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>123,362</td>
+<td>[0.833  0.129  0.0868]</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>123,364</td>
+<td>[0.9065 0.045  0.0366]</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>123,417</td>
+<td>[0.8785 0.0356 0.0632]</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>123,435</td>
+<td>[0.8399 0.0932 0.098 ]</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>123,448</td>
+<td>[0.8838 0.0351 0.003 ]</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>123,561</td>
+<td>[0.881  0.0617 0.0554]</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>123,588</td>
+<td>[0.8224 0.0061 0.0279]</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>123,603</td>
+<td>[ 0.8578  0.051  -0.0084]</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>123,624</td>
+<td>[0.8661 0.0458 0.0311]</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 999,997 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(999,997 rows × 2 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>user_id</th>
+<th>user_preference_centroid</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>41,112</td>
+<td>[0.8723 0.0454 0.1048]</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>41,184</td>
+<td>[0.9091 0.0832 0.0179]</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>41,264</td>
+<td>[0.8683 0.0859 0.1011]</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>41,267</td>
+<td>[ 0.8071 -0.0497  0.0563]</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>41,270</td>
+<td>[0.9379 0.0648 0.0504]</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>41,273</td>
+<td>[0.8786 0.0557 0.0634]</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>41,294</td>
+<td>[0.8597 0.0757 0.0177]</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>41,327</td>
+<td>[ 0.9344 -0.0357  0.1159]</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>41,345</td>
+<td>[0.9081 0.0705 0.0488]</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>41,390</td>
+<td>[0.9292 0.0237 0.0424]</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>41,397</td>
+<td>[ 0.8642 -0.0125  0.0641]</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>41,429</td>
+<td>[ 0.804  -0.01    0.0559]</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>41,441</td>
+<td>[0.913  0.0972 0.0399]</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>41,483</td>
+<td>[0.7996 0.0916 0.0619]</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>41,514</td>
+<td>[0.8481 0.0892 0.1075]</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>41,571</td>
+<td>[0.8035 0.1089 0.0782]</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>41,700</td>
+<td>[0.8303 0.01   0.0816]</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>41,834</td>
+<td>[0.8153 0.033  0.0189]</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>41,852</td>
+<td>[0.8677 0.0977 0.0595]</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>41,856</td>
+<td>[0.9301 0.0755 0.0918]</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>41,919</td>
+<td>[0.8274 0.0323 0.0128]</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>41,935</td>
+<td>[0.8808 0.0563 0.0759]</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>41,989</td>
+<td>[0.7926 0.0013 0.0686]</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>42,029</td>
+<td>[0.823  0.0679 0.0149]</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>42,069</td>
+<td>[0.8013 0.0467 0.0897]</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 999,997 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_033_Q33_colbert_late_interaction_maxsim.html" class="nav-btn">← Prev: ColBERT Multi-Vector Late...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_035_Q35_kmeans_cluster_assignment_step.html" class="nav-btn">Next: K-Means Clustering Assign... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

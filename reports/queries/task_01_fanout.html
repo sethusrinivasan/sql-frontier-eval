@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_01_fanout - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Metric Inflation / Chasm Trap</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_01_fanout</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_019_Q19_intermittent_inactivity_anomaly.html" class="nav-btn">← Prev: Customer Churn Anomaly De...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_020_Q20_interval_overlap_concurrency.html" class="nav-btn">Next: Peak Concurrent Workforce... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Metric Inflation / Chasm Trap</span>
+                    <span class="badge badge-id">task_01_fanout</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: No</span>
+                </div>
+                <h1 class="task-title">E-Commerce Financial Aggregation without Join Fan-Out</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">88.52 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(14.6x slower than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">6.05 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">1,003,000 rows</div>
+                    <div class="stat-sub">23.0 MiB across 4 tables</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 8.6s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Demonstrates the Chasm Trap where joining multiple 1-to-many child tables (discounts and shipments) to an orders table causes row multiplication before aggregation, inflating financial sums.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>Joining multiple 1:N child tables (order_discounts has 2 rows, order_shipments has 2 rows) directly to orders before GROUP BY creates an intermediate Cartesian fan-out of 2 * 2 = 4 rows per order. Aggregating over these inflated rows multiplies base_amount by 4x ($100.00 -&gt; $400.00), total discounts by 2x ($15.00 -&gt; $30.00), and shipping by 2x ($10.00 -&gt; $20.00). Proper solution requires pre-aggregating child tables to 1 row per order in CTEs or correlated subqueries before joining.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Calculate total gross sales (sum of base_amount), total discount amount, and total shipping fees for each merchant. Ensure multiple discount line items and multiple shipment records for the same order do NOT multiply or artificially inflate the totals.
+
+Required output columns:
+- merchant_id (INT)
+- merchant_name (VARCHAR)
+- total_gross_sales (DECIMAL)
+- total_discount_amount (DECIMAL)
+- total_shipping_fees (DECIMAL)
+
+Row order does not matter.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">4 Tables (1,003,000 rows &bull; 23.0 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 merchants</span>
+                    <span class="badge badge-pass">1,000 rows</span>
+                    <span class="badge badge-golden">23.4 KiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>merchant_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>merchant_name</code> <small>(VARCHAR)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>merchant_id</th>
+<th>merchant_name</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>Acme Electronics</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>Acme Electronics</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 order_discounts</span>
+                    <span class="badge badge-pass">1,000 rows</span>
+                    <span class="badge badge-golden">23.4 KiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>discount_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>order_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>amount</code> <small>(DECIMAL(10,2))</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>discount_id</th>
+<th>order_id</th>
+<th>amount</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>101</td>
+<td>10</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>101</td>
+<td>5</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>101</td>
+<td>10.38</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>102</td>
+<td>8.25</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>103</td>
+<td>11.93</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>104</td>
+<td>6.49</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>105</td>
+<td>8.83</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>106</td>
+<td>15.72</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>107</td>
+<td>19.38</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>108</td>
+<td>6.95</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>109</td>
+<td>5.08</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>110</td>
+<td>6.79</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>111</td>
+<td>5.23</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>112</td>
+<td>9.65</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>113</td>
+<td>7</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 order_shipments</span>
+                    <span class="badge badge-pass">1,000 rows</span>
+                    <span class="badge badge-golden">23.4 KiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>shipment_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>order_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>shipping_fee</code> <small>(DECIMAL(10,2))</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>shipment_id</th>
+<th>order_id</th>
+<th>shipping_fee</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>101</td>
+<td>4</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>101</td>
+<td>6</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>101</td>
+<td>5.78</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>102</td>
+<td>4.7</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>103</td>
+<td>5.82</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>104</td>
+<td>5.72</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>105</td>
+<td>5.41</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>106</td>
+<td>3.97</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>107</td>
+<td>5.28</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>108</td>
+<td>6.59</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>109</td>
+<td>4.01</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>110</td>
+<td>6.39</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>111</td>
+<td>6.13</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>112</td>
+<td>3.91</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>113</td>
+<td>5.28</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 orders</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">22.9 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>order_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>merchant_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>base_amount</code> <small>(DECIMAL(10,2))</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>order_id</th>
+<th>merchant_id</th>
+<th>base_amount</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>101</td>
+<td>1</td>
+<td>100</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>101</td>
+<td>1</td>
+<td>90.94</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>102</td>
+<td>2</td>
+<td>91.54</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>103</td>
+<td>3</td>
+<td>115.57</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>104</td>
+<td>4</td>
+<td>119.81</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>105</td>
+<td>5</td>
+<td>90.5</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>106</td>
+<td>6</td>
+<td>102.73</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>107</td>
+<td>7</td>
+<td>109.63</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>108</td>
+<td>8</td>
+<td>102.33</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>109</td>
+<td>9</td>
+<td>97.54</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>110</td>
+<td>10</td>
+<td>110.28</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>111</td>
+<td>11</td>
+<td>105.29</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>112</td>
+<td>12</td>
+<td>90.88</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>113</td>
+<td>13</td>
+<td>97.27</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>114</td>
+<td>14</td>
+<td>108.95</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 359.79 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 86.04404744167394%; background: #f85149;" title="HASH_GROUP_BY: 309.58ms (86.0%)"></div><div class="cost-bar-seg" style="width: 4.009421065052601%; background: #f85149;" title="HASH_JOIN: 14.43ms (4.0%)"></div><div class="cost-bar-seg" style="width: 3.1267578583059246%; background: #3fb950;" title="HASH_JOIN: 11.25ms (3.1%)"></div><div class="cost-bar-seg" style="width: 3.032932873670511%; background: #d29922;" title="PROJECTION: 10.91ms (3.0%)"></div><div class="cost-bar-seg" style="width: 2.3546325659529876%; background: #bc8cff;" title="HASH_JOIN: 8.47ms (2.4%)"></div><div class="cost-bar-seg" style="width: 1.3223931960421127%; background: #39c5cf;" title="TABLE_SCAN: 4.76ms (1.3%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.10 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.06 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;merchant_id&#x27;, &#x27;merchant_name&#x27;, &#x27;t">📁 Projections: [&#x27;merchant_id&#x27;, &#x27;me...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">2.4%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">8.47 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.06 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">3.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">10.91 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,999</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.59 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;merchant_id&#x27;, &#x27;total_gross_sales&#x27;">📁 Projections: [&#x27;merchant_id&#x27;, &#x27;to...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
+                <span class="high-cost-tag">🔥 86.0% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">309.58 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,999</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.84 MB</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (86.0% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.19 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">42.20 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;merchant_id&#x27;, &#x27;base_amount&#x27;, &#x27;dis">📁 Projections: [&#x27;merchant_id&#x27;, &#x27;ba...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">3.1%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">11.25 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">42.20 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="node-cost-tag">4.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">14.43 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.64 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">1.3%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">4.76 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.26 MB</span></div>
+                <div class="nm-tbl" title="memory.main.orders">📁 memory.main.orders</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>PERFECT_HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10,000 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;order_id&#x27;, &#x27;amount&#x27;]">📁 Projections: [&#x27;order_id&#x27;, &#x27;amoun...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10,000 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS SMALLI...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.01 MB</span></div>
+                <div class="nm-tbl" title="memory.main.order_discounts">📁 memory.main.order_discounts</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📊 <strong>PERFECT_HASH_GROUP_BY</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">998</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
+                
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10,000 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;order_id&#x27;, &#x27;shipping_fee&#x27;]">📁 Projections: [&#x27;order_id&#x27;, &#x27;shipp...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10,000 B</span></div>
+                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS SMALLI...</div>
+            </div>
+            
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.01 MB</span></div>
+                <div class="nm-tbl" title="memory.main.order_shipments">📁 memory.main.order_shipments</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.0%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
+                <div class="nm-tbl" title="memory.main.merchants">📁 memory.main.merchants</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>HASH_GROUP_BY</strong></td>
+            <td><strong>86.0%</strong></td>
+            <td>309.58 ms</td>
+            <td>999,999</td>
+            <td>49.84 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>4.0%</strong></td>
+            <td>14.43 ms</td>
+            <td>1,000,000</td>
+            <td>30.64 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>3.1%</strong></td>
+            <td>11.25 ms</td>
+            <td>1,000,000</td>
+            <td>42.20 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>3.0%</strong></td>
+            <td>10.91 ms</td>
+            <td>999,999</td>
+            <td>49.59 MB</td>
+            <td><small>Projections: [&#x27;merchant_id&#x27;, &#x27;total_gross_sales&#x27;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>2.4%</strong></td>
+            <td>8.47 ms</td>
+            <td>1,000</td>
+            <td>0.06 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>1.3%</strong></td>
+            <td>4.76 ms</td>
+            <td>1,000,000</td>
+            <td>15.26 MB</td>
+            <td><small>memory.main.orders</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.1%</strong></td>
+            <td>0.19 ms</td>
+            <td>1,000,000</td>
+            <td>42.20 MB</td>
+            <td><small>Projections: [&#x27;merchant_id&#x27;, &#x27;base_amount&#x27;, &#x27;dis</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.10 ms</td>
+            <td>1,000</td>
+            <td>0.06 MB</td>
+            <td><small>Projections: [&#x27;merchant_id&#x27;, &#x27;merchant_name&#x27;, &#x27;t</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>1,000</td>
+            <td>0.02 MB</td>
+            <td><small>memory.main.merchants</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PERFECT_HASH_GROUP_BY</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>998</td>
+            <td>0.02 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PERFECT_HASH_GROUP_BY</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>998</td>
+            <td>0.02 MB</td>
+            <td><small>-</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.02 ms</td>
+            <td>1,000</td>
+            <td>0.01 MB</td>
+            <td><small>memory.main.order_discounts</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>1,000</td>
+            <td>0.01 MB</td>
+            <td><small>memory.main.order_shipments</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.01 ms</td>
+            <td>1,000</td>
+            <td>0.01 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>998</td>
+            <td>0.02 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>998</td>
+            <td>0.02 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1,000</td>
+            <td>0.01 MB</td>
+            <td><small>Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1,000</td>
+            <td>0.01 MB</td>
+            <td><small>Projections: [&#x27;order_id&#x27;, &#x27;amount&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>PROJECTION</strong></td>
+            <td><strong>0.0%</strong></td>
+            <td>0.00 ms</td>
+            <td>1,000</td>
+            <td>0.01 MB</td>
+            <td><small>Projections: [&#x27;order_id&#x27;, &#x27;shipping_fee&#x27;]</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 88.52 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">order_level_discounts</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">order_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">amount</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">discount_amount</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">order_discounts</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">order_id</span><span class="p">),</span>
+<span class="w">     </span><span class="n">order_level_shipments</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">order_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">shipping_fee</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">shipping_fee</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">order_shipments</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">order_id</span><span class="p">),</span>
+<span class="w">     </span><span class="n">merchant_order_metrics</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">o</span><span class="p">.</span><span class="n">merchant_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">o</span><span class="p">.</span><span class="n">base_amount</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_gross_sales</span><span class="p">,</span>
+<span class="w">          </span><span class="k">coalesce</span><span class="p">(</span><span class="k">sum</span><span class="p">(</span><span class="n">d</span><span class="p">.</span><span class="n">discount_amount</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_discount_amount</span><span class="p">,</span>
+<span class="w">          </span><span class="k">coalesce</span><span class="p">(</span><span class="k">sum</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">shipping_fee</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_shipping_fees</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">orders</span><span class="w"> </span><span class="n">o</span>
+<span class="w">   </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">order_level_discounts</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">o</span><span class="p">.</span><span class="n">order_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">order_id</span>
+<span class="w">   </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">order_level_shipments</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">o</span><span class="p">.</span><span class="n">order_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">order_id</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">o</span><span class="p">.</span><span class="n">merchant_id</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">merchant_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">m</span><span class="p">.</span><span class="n">merchant_name</span><span class="p">,</span>
+<span class="w">       </span><span class="k">coalesce</span><span class="p">(</span><span class="n">mom</span><span class="p">.</span><span class="n">total_gross_sales</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_gross_sales</span><span class="p">,</span>
+<span class="w">       </span><span class="k">coalesce</span><span class="p">(</span><span class="n">mom</span><span class="p">.</span><span class="n">total_discount_amount</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_discount_amount</span><span class="p">,</span>
+<span class="w">       </span><span class="k">coalesce</span><span class="p">(</span><span class="n">mom</span><span class="p">.</span><span class="n">total_shipping_fees</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_shipping_fees</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">merchants</span><span class="w"> </span><span class="n">m</span>
+<span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">merchant_order_metrics</span><span class="w"> </span><span class="n">mom</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">merchant_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mom</span><span class="p">.</span><span class="n">merchant_id</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 6.05 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">agg_discounts</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">order_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">amount</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_discount</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">order_discounts</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">order_id</span><span class="p">),</span>
+<span class="w">     </span><span class="n">agg_shipments</span><span class="w"> </span><span class="k">AS</span>
+<span class="w">  </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="n">order_id</span><span class="p">,</span>
+<span class="w">          </span><span class="k">sum</span><span class="p">(</span><span class="n">shipping_fee</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_shipping</span>
+<span class="w">   </span><span class="k">FROM</span><span class="w"> </span><span class="n">order_shipments</span>
+<span class="w">   </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">order_id</span><span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">merchant_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">m</span><span class="p">.</span><span class="n">merchant_name</span><span class="p">,</span>
+<span class="w">       </span><span class="k">sum</span><span class="p">(</span><span class="n">o</span><span class="p">.</span><span class="n">base_amount</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_gross_sales</span><span class="p">,</span>
+<span class="w">       </span><span class="k">coalesce</span><span class="p">(</span><span class="k">sum</span><span class="p">(</span><span class="n">d</span><span class="p">.</span><span class="n">total_discount</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_discount_amount</span><span class="p">,</span>
+<span class="w">       </span><span class="k">coalesce</span><span class="p">(</span><span class="k">sum</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">total_shipping</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">.</span><span class="mi">00</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">total_shipping_fees</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">merchants</span><span class="w"> </span><span class="n">m</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">orders</span><span class="w"> </span><span class="n">o</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">merchant_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">o</span><span class="p">.</span><span class="n">merchant_id</span>
+<span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">agg_discounts</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">o</span><span class="p">.</span><span class="n">order_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">order_id</span>
+<span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">agg_shipments</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">o</span><span class="p">.</span><span class="n">order_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">order_id</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">merchant_id</span><span class="p">,</span>
+<span class="w">         </span><span class="n">m</span><span class="p">.</span><span class="n">merchant_name</span><span class="p">;</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">merchants</span><span class="w"> </span><span class="p">(</span><span class="n">merchant_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">merchant_name</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">);</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">orders</span><span class="w"> </span><span class="p">(</span><span class="n">order_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">merchant_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">base_amount</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">));</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">order_discounts</span><span class="w"> </span><span class="p">(</span><span class="n">discount_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">order_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">amount</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">));</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">order_shipments</span><span class="w"> </span><span class="p">(</span><span class="n">shipment_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">order_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">shipping_fee</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">));</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">merchants</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'Acme Electronics'</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">orders</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">.</span><span class="mi">00</span><span class="p">);</span>
+
+<span class="c1">-- 2 discounts applied to Order 101 ($10 and $5 = $15 total)</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">order_discounts</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">.</span><span class="mi">00</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">.</span><span class="mi">00</span><span class="p">);</span>
+
+<span class="c1">-- 2 split shipments for Order 101 ($4 and $6 = $10 total)</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">order_shipments</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">.</span><span class="mi">00</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">.</span><span class="mi">00</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1,000 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>merchant_id</th>
+<th>merchant_name</th>
+<th>total_gross_sales</th>
+<th>total_discount_amount</th>
+<th>total_shipping_fees</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>31</td>
+<td>Acme Electronics</td>
+<td>92.69</td>
+<td>4.83</td>
+<td>3.71</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>32</td>
+<td>Acme Electronics</td>
+<td>119.22</td>
+<td>9.37</td>
+<td>6.3</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>97</td>
+<td>Acme Electronics</td>
+<td>115.51</td>
+<td>10.39</td>
+<td>2.13</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>163</td>
+<td>Acme Electronics</td>
+<td>98.63</td>
+<td>9.34</td>
+<td>4.57</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>179</td>
+<td>Acme Electronics</td>
+<td>113.99</td>
+<td>7.01</td>
+<td>5.52</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>204</td>
+<td>Acme Electronics</td>
+<td>93.09</td>
+<td>10.3</td>
+<td>6.45</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>338</td>
+<td>Acme Electronics</td>
+<td>111.76</td>
+<td>5</td>
+<td>2.15</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>351</td>
+<td>Acme Electronics</td>
+<td>121.5</td>
+<td>11.84</td>
+<td>4.45</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>355</td>
+<td>Acme Electronics</td>
+<td>94.53</td>
+<td>6.81</td>
+<td>4.81</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>364</td>
+<td>Acme Electronics</td>
+<td>139.5</td>
+<td>3.62</td>
+<td>6.48</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>403</td>
+<td>Acme Electronics</td>
+<td>118.61</td>
+<td>9.09</td>
+<td>5.16</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>440</td>
+<td>Acme Electronics</td>
+<td>95.5</td>
+<td>8.88</td>
+<td>3.25</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>479</td>
+<td>Acme Electronics</td>
+<td>109.52</td>
+<td>8.13</td>
+<td>3.33</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>480</td>
+<td>Acme Electronics</td>
+<td>83.99</td>
+<td>10.21</td>
+<td>3.89</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>522</td>
+<td>Acme Electronics</td>
+<td>110.12</td>
+<td>7.71</td>
+<td>2.53</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>617</td>
+<td>Acme Electronics</td>
+<td>111.08</td>
+<td>12.58</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>620</td>
+<td>Acme Electronics</td>
+<td>95.24</td>
+<td>6.17</td>
+<td>4.46</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>636</td>
+<td>Acme Electronics</td>
+<td>111.45</td>
+<td>3.75</td>
+<td>4.42</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>681</td>
+<td>Acme Electronics</td>
+<td>69.56</td>
+<td>9.35</td>
+<td>4.03</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>733</td>
+<td>Acme Electronics</td>
+<td>99.75</td>
+<td>10.81</td>
+<td>7.01</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>738</td>
+<td>Acme Electronics</td>
+<td>117.04</td>
+<td>3.89</td>
+<td>2.91</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>789</td>
+<td>Acme Electronics</td>
+<td>110.6</td>
+<td>7.56</td>
+<td>3.66</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>918</td>
+<td>Acme Electronics</td>
+<td>99.24</td>
+<td>6.97</td>
+<td>1.67</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>933</td>
+<td>Acme Electronics</td>
+<td>116.51</td>
+<td>9.18</td>
+<td>5.77</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>939</td>
+<td>Acme Electronics</td>
+<td>104.92</td>
+<td>5.71</td>
+<td>4.61</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 1,000 total rows.</div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(999 rows × 5 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>merchant_id</th>
+<th>merchant_name</th>
+<th>total_gross_sales</th>
+<th>total_discount_amount</th>
+<th>total_shipping_fees</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>2</td>
+<td>Acme Electronics</td>
+<td>91.54</td>
+<td>8.25</td>
+<td>4.7</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>5</td>
+<td>Acme Electronics</td>
+<td>90.5</td>
+<td>8.83</td>
+<td>5.41</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>9</td>
+<td>Acme Electronics</td>
+<td>97.54</td>
+<td>5.08</td>
+<td>4.01</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>10</td>
+<td>Acme Electronics</td>
+<td>110.28</td>
+<td>6.79</td>
+<td>6.39</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>19</td>
+<td>Acme Electronics</td>
+<td>90.41</td>
+<td>8.24</td>
+<td>4.4</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>20</td>
+<td>Acme Electronics</td>
+<td>111.25</td>
+<td>9.58</td>
+<td>3.42</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>22</td>
+<td>Acme Electronics</td>
+<td>87.27</td>
+<td>6</td>
+<td>4.06</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>24</td>
+<td>Acme Electronics</td>
+<td>107.25</td>
+<td>14.07</td>
+<td>6.7</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>27</td>
+<td>Acme Electronics</td>
+<td>96.76</td>
+<td>14.68</td>
+<td>4</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>42</td>
+<td>Acme Electronics</td>
+<td>117.51</td>
+<td>7.85</td>
+<td>1.4</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>44</td>
+<td>Acme Electronics</td>
+<td>97.93</td>
+<td>8.3</td>
+<td>5.22</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>49</td>
+<td>Acme Electronics</td>
+<td>88.7</td>
+<td>7.37</td>
+<td>5.28</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>53</td>
+<td>Acme Electronics</td>
+<td>87.56</td>
+<td>4.77</td>
+<td>4.09</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>79</td>
+<td>Acme Electronics</td>
+<td>110.47</td>
+<td>7.95</td>
+<td>2.86</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>84</td>
+<td>Acme Electronics</td>
+<td>84.88</td>
+<td>8.09</td>
+<td>4.64</td>
+</tr>
+<tr>
+<td class="td-idx">16</td>
+<td>88</td>
+<td>Acme Electronics</td>
+<td>83.44</td>
+<td>10.31</td>
+<td>7.32</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>89</td>
+<td>Acme Electronics</td>
+<td>110.14</td>
+<td>8.73</td>
+<td>6.36</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>98</td>
+<td>Acme Electronics</td>
+<td>122.46</td>
+<td>7.25</td>
+<td>4.66</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>106</td>
+<td>Acme Electronics</td>
+<td>91.53</td>
+<td>2.66</td>
+<td>4.61</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>117</td>
+<td>Acme Electronics</td>
+<td>104.09</td>
+<td>9.72</td>
+<td>5.57</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>125</td>
+<td>Acme Electronics</td>
+<td>104.44</td>
+<td>7.99</td>
+<td>3.13</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>137</td>
+<td>Acme Electronics</td>
+<td>74.95</td>
+<td>5.93</td>
+<td>6.2</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>140</td>
+<td>Acme Electronics</td>
+<td>109.34</td>
+<td>2.21</td>
+<td>6.6</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>141</td>
+<td>Acme Electronics</td>
+<td>100.44</td>
+<td>12.53</td>
+<td>4.92</td>
+</tr>
+<tr>
+<td class="td-idx">25</td>
+<td>145</td>
+<td>Acme Electronics</td>
+<td>117.68</td>
+<td>9.2</td>
+<td>3.45</td>
+</tr>
+</tbody></table></div>
+<div class="table-more-note">Showing first 25 of 999 total rows.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_019_Q19_intermittent_inactivity_anomaly.html" class="nav-btn">← Prev: Customer Churn Anomaly De...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_020_Q20_interval_overlap_concurrency.html" class="nav-btn">Next: Peak Concurrent Workforce... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>

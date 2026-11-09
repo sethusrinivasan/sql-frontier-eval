@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task_04_three_valued_logic - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="query-detail-page">
+    <header class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="../index.html" class="brand-link">
+                    <span class="brand-badge">SQL-FRONTIER</span>
+                    <span class="brand-title">Benchmark Deep-Dive</span>
+                </a>
+                <span class="nav-separator">/</span>
+                <span class="nav-cat">Three-Valued Logic in Anti-Joins</span>
+                <span class="nav-separator">/</span>
+                <span class="nav-task-id">task_04_three_valued_logic</span>
+            </div>
+            <div class="nav-right">
+                <a href="task_049_Q49_prototype_intent_classification.html" class="nav-btn">← Prev: Zero-Shot Query Intent Cl...</a>
+                <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
+                <a href="task_050_Q50_contrastive_triplet_loss_evaluation.html" class="nav-btn">Next: Contrastive Triplet Evalu... →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Header -->
+        <section class="task-hero">
+            <div class="task-hero-top">
+                <div class="task-badge-row">
+                    <span class="badge badge-pass">✔ PASS</span>
+                    <span class="badge badge-domain">Three-Valued Logic in Anti-Joins</span>
+                    <span class="badge badge-id">task_04_three_valued_logic</span>
+                    <span class="badge badge-pass">Scaled: 1M+ Records</span>
+                    <span class="badge badge-neutral">Ordered: No</span>
+                </div>
+                <h1 class="task-title">Customer Anti-Join with Three-Valued Null Semantics</h1>
+            </div>
+
+            <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Candidate Latency (1M Rows)</div>
+                    <div class="stat-val">44.67 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.1x faster than golden)</span></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Golden Latency (1M Rows)</div>
+                    <div class="stat-val">48.48 ms</div>
+                    <div class="stat-sub">DuckDB in-memory engine</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Underlying Data Volume</div>
+                    <div class="stat-val">3,000,000 rows</div>
+                    <div class="stat-sub">45.8 MiB across 3 tables</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated Model</div>
+                    <div class="stat-val stat-model">gemini-3.8-flash-low</div>
+                    <div class="stat-sub">Gen Latency: 5.1s</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagnostics Alert -->
+        
+        <div class="callout callout-success">
+            <div class="callout-title">✔ Correctness Verified on 1M+ Records</div>
+            <div class="callout-body">
+                Candidate SQL output matches ground truth golden query across all multiset rows and numeric tolerances (tol=1e-3). Zero data skew or anti-patterns detected on full dataset scale.
+            </div>
+        </div>
+        
+
+        <!-- Section 1: What It Means -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>1. Analytical Significance & What It Means</h2>
+                <span class="section-badge">Scenario & Frontier Trap</span>
+            </div>
+            <div class="card">
+                <div class="analysis-grid">
+                    <div class="analysis-item">
+                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <p>Exposes silent data loss caused by SQL three-valued logic when models use NOT IN over subqueries containing NULLs.</p>
+                    </div>
+                    <div class="analysis-item highlight-trap">
+                        <div class="analysis-subtitle">⚡ The Frontier Trap (Why LLMs Fail)</div>
+                        <p>In ANSI SQL three-valued logic, `x NOT IN (1, NULL)` evaluates to `UNKNOWN` rather than TRUE because SQL cannot guarantee x is not equal to the unknown value. Consequently, any query using `WHERE id NOT IN (SELECT id FROM ...)` where the subquery contains even a single NULL value evaluates to UNKNOWN for all rows, silently returning 0 results. Correct solutions require NOT EXISTS or LEFT JOIN ... WHERE ... IS NULL.</p>
+                    </div>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-title">Prompt / User Request Given to Model</div>
+                    <pre class="prompt-code">Find all customers who have NEVER filed a product return. Check against the `returns` table.
+
+Required output columns:
+- customer_id (INT)
+- customer_name (VARCHAR)
+
+Row order does not matter.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Underlying Tables & Data Volume -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <span class="section-badge">3 Tables (3,000,000 rows &bull; 45.8 MiB)</span>
+            </div>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 customers</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">22.9 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>customer_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>customer_name</code> <small>(VARCHAR)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>customer_id</th>
+<th>customer_name</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>Alice Smith</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>Bob Jones</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>3</td>
+<td>Charlie Brown</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>Alice Smith</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>Bob Jones</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>Charlie Brown</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>Alice Smith</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>Bob Jones</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>Charlie Brown</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>Alice Smith</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>Bob Jones</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>Charlie Brown</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>Alice Smith</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>Bob Jones</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>Charlie Brown</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 orders</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">11.4 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>order_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>customer_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>order_date</code> <small>(DATE)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>order_id</th>
+<th>customer_id</th>
+<th>order_date</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>101</td>
+<td>1</td>
+<td>2025-01-01 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>102</td>
+<td>2</td>
+<td>2025-01-02 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>103</td>
+<td>3</td>
+<td>2025-01-03 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>103</td>
+<td>3</td>
+<td>2026-01-01 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>104</td>
+<td>4</td>
+<td>2026-01-02 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>105</td>
+<td>5</td>
+<td>2026-01-03 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>106</td>
+<td>6</td>
+<td>2026-01-04 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>107</td>
+<td>7</td>
+<td>2026-01-05 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>108</td>
+<td>8</td>
+<td>2026-01-06 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>109</td>
+<td>9</td>
+<td>2026-01-07 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>110</td>
+<td>10</td>
+<td>2026-01-08 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>111</td>
+<td>11</td>
+<td>2026-01-09 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>112</td>
+<td>12</td>
+<td>2026-01-10 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>113</td>
+<td>13</td>
+<td>2026-01-11 00:00:00</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>114</td>
+<td>14</td>
+<td>2026-01-12 00:00:00</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+
+        <div class="card table-card">
+            <div class="table-card-header">
+                <div>
+                    <span class="table-name">📊 returns</span>
+                    <span class="badge badge-pass">1,000,000 rows</span>
+                    <span class="badge badge-golden">11.4 MiB Data Volume</span>
+                </div>
+                <div class="table-cols"><span class="col-pill"><code>return_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>order_id</code> <small>(INTEGER)</small></span> <span class="col-pill"><code>customer_id</code> <small>(INTEGER)</small></span></div>
+            </div>
+            <div class="table-card-body">
+                <div class="sample-intro">Data Preview (showing sample rows from 1,000,000 total rows):</div>
+                <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>return_id</th>
+<th>order_id</th>
+<th>customer_id</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>1</td>
+<td>101</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>2</td>
+<td>999</td>
+<td><span class="cell-null">NULL</span></td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>2</td>
+<td>999</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>3</td>
+<td>1,000</td>
+<td>2</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>4</td>
+<td>1,001</td>
+<td>3</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>5</td>
+<td>1,002</td>
+<td>4</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>6</td>
+<td>1,003</td>
+<td>5</td>
+</tr>
+<tr>
+<td class="td-idx">8</td>
+<td>7</td>
+<td>1,004</td>
+<td>6</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>8</td>
+<td>1,005</td>
+<td>7</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>9</td>
+<td>1,006</td>
+<td>8</td>
+</tr>
+<tr>
+<td class="td-idx">11</td>
+<td>10</td>
+<td>1,007</td>
+<td>9</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>11</td>
+<td>1,008</td>
+<td>10</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>12</td>
+<td>1,009</td>
+<td>11</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>13</td>
+<td>1,010</td>
+<td>12</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>14</td>
+<td>1,011</td>
+<td>13</td>
+</tr>
+</tbody></table></div>
+            </div>
+        </div>
+        
+        </section>
+
+        <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+            </div>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            
+    <div class="execution-plan-wrapper">
+        <div class="plan-bar-header">
+            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 73.09 ms)</span>
+            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
+        </div>
+        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 84.36067527460999%; background: #f85149;" title="HASH_JOIN: 61.66ms (84.4%)"></div><div class="cost-bar-seg" style="width: 14.761695931334556%; background: #f85149;" title="TABLE_SCAN: 10.79ms (14.8%)"></div><div class="cost-bar-seg" style="width: 0.8776287940554449%; background: #3fb950;" title="TABLE_SCAN: 0.64ms (0.9%)"></div></div>
+        <div class="plan-tree-scroll-container">
+            <div class="graphical-plan-tree"><div class="tree-node-wrap">
+        <div class="plan-node high-cost">
+            <div class="node-header">
+                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
+                <span class="high-cost-tag">🔥 84.4% Cost</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">61.66 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">20 B</span></div>
+                
+            </div>
+            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (84.4% of query runtime)</div>
+        </div>
+        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">14.8%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">10.79 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
+                <div class="nm-tbl" title="memory.main.customers">📁 memory.main.customers</div>
+            </div>
+            
+        </div>
+        </div></div><div class="child-branch"><div class="tree-node-wrap">
+        <div class="plan-node">
+            <div class="node-header">
+                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
+                <span class="node-cost-tag">0.9%</span>
+            </div>
+            <div class="node-metrics">
+                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.64 ms</span></div>
+                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,999</span></div>
+                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">3.81 MB</span></div>
+                <div class="nm-tbl" title="memory.main.&quot;returns&quot;">📁 memory.main.&quot;returns&quot;</div>
+            </div>
+            
+        </div>
+        </div></div></div></div></div>
+        </div>
+        
+    <div class="table-responsive" style="margin-top: 16px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Cost %</th>
+                    <th>Latency</th>
+                    <th>Processed Rows</th>
+                    <th>Data Volume</th>
+                    <th>Details / Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td><strong>HASH_JOIN</strong></td>
+            <td><strong>84.4%</strong></td>
+            <td>61.66 ms</td>
+            <td>1</td>
+            <td>0.00 MB</td>
+            <td><small>-</small></td>
+            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>14.8%</strong></td>
+            <td>10.79 ms</td>
+            <td>1,000,000</td>
+            <td>19.07 MB</td>
+            <td><small>memory.main.customers</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+        <tr>
+            <td><strong>TABLE_SCAN</strong></td>
+            <td><strong>0.9%</strong></td>
+            <td>0.64 ms</td>
+            <td>999,999</td>
+            <td>3.81 MB</td>
+            <td><small>memory.main.&quot;returns&quot;</small></td>
+            <td><span class="badge badge-neutral">Normal</span></td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+    
+    </div>
+    
+        </section>
+
+        <!-- Section 4: Colored & Formatted Queries -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
+                <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                </div>
+
+                <div id="tab-candidate" class="tab-content active">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 44.67 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
+                    </div>
+                    <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">customer_id</span><span class="p">,</span>
+<span class="w">       </span><span class="k">c</span><span class="p">.</span><span class="n">customer_name</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">customers</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">c</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span>
+<span class="w">    </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">     </span><span class="k">FROM</span><span class="w"> </span><span class="k">RETURNS</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">r</span>
+<span class="w">     </span><span class="k">WHERE</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">customer_id</span><span class="p">);</span>
+</code></pre>
+                </div>
+
+                <div id="tab-golden" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 48.48 ms)</span>
+                        <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
+                    </div>
+                    <pre id="code-golden" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">customer_id</span><span class="p">,</span>
+<span class="w">       </span><span class="k">c</span><span class="p">.</span><span class="n">customer_name</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">customers</span><span class="w"> </span><span class="k">c</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span>
+<span class="w">    </span><span class="p">(</span><span class="k">SELECT</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">     </span><span class="k">FROM</span><span class="w"> </span><span class="k">RETURNS</span><span class="w"> </span><span class="n">r</span>
+<span class="w">     </span><span class="k">WHERE</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">customer_id</span><span class="p">);</span>
+</code></pre>
+                </div>
+
+                <div id="tab-setup" class="tab-content">
+                    <div class="code-toolbar">
+                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
+                    </div>
+                    <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">customers</span><span class="w"> </span><span class="p">(</span><span class="n">customer_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">customer_name</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">);</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">orders</span><span class="w"> </span><span class="p">(</span><span class="n">order_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">order_date</span><span class="w"> </span><span class="nb">DATE</span><span class="p">);</span>
+
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="k">RETURNS</span><span class="w"> </span><span class="p">(</span><span class="n">return_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">order_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">customers</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'Alice Smith'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'Bob Jones'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'Charlie Brown'</span><span class="p">);</span>
+
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">orders</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-01'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">102</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-02'</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">103</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s1">'2025-01-03'</span><span class="p">);</span>
+
+<span class="c1">-- Alice returned order 101. An anonymous/guest return has customer_id = NULL</span>
+
+<span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="k">RETURNS</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">),</span>
+<span class="w">       </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">999</span><span class="p">,</span><span class="w"> </span><span class="k">NULL</span><span class="p">);</span>
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Query Results Comparison -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>5. Query Results & Expected Ground Truth</h2>
+                <span class="section-badge">Tabular Comparison</span>
+            </div>
+
+            <div class="results-comparison-grid">
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Actual Candidate Output</span>
+                        <span class="badge badge-pass">(1 rows × 2 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>customer_id</th>
+<th>customer_name</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>999,999</td>
+<td>Alice Smith</td>
+</tr>
+</tbody></table></div>
+                </div>
+
+                <div class="result-column">
+                    <div class="result-header">
+                        <span class="result-title">Expected Golden Output</span>
+                        <span class="badge badge-golden">(1 rows × 2 cols)</span>
+                    </div>
+                    <div class="table-responsive"><table class="data-table">
+<thead><tr><th class="th-idx">#</th>
+<th>customer_id</th>
+<th>customer_name</th>
+</tr></thead><tbody>
+<tr>
+<td class="td-idx">1</td>
+<td>999,999</td>
+<td>Alice Smith</td>
+</tr>
+</tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="task_049_Q49_prototype_intent_classification.html" class="nav-btn">← Prev: Zero-Shot Query Intent Cl...</a>
+            <a href="../index.html" class="nav-btn dashboard-btn">⊞ Back to Benchmark Dashboard</a>
+            <a href="task_050_Q50_contrastive_triplet_loss_evaluation.html" class="nav-btn">Next: Contrastive Triplet Evalu... →</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+    </footer>
+
+    <script src="../script.js"></script>
+</body>
+</html>
