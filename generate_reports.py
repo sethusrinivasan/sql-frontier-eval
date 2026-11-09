@@ -2572,6 +2572,8 @@ function setStatusFilter(status, btn) {
         f.write(css_content)
     with open(os.path.join(out_dir, "script.js"), "w", encoding="utf-8") as f:
         f.write(js_content)
+    with open(os.path.join(out_dir, ".nojekyll"), "w", encoding="utf-8") as f:
+        f.write("")
 
 def main():
     parser = argparse.ArgumentParser(description="Generate SQL-Frontier-Eval Static HTML Reports with 1M+ Records & Graphical Execution Plans")

@@ -6,8 +6,8 @@
 [![CI](https://github.com/sethusrinivasan/sql-frontier-eval/actions/workflows/ci.yml/badge.svg)](https://github.com/sethusrinivasan/sql-frontier-eval/actions/workflows/ci.yml)
 [![Unit Tests](https://img.shields.io/badge/pytest-12%20passed-3fb950.svg?logo=pytest&logoColor=white)](tests/)
 [![Golden Baseline](https://img.shields.io/badge/golden%20suite-120%2F120%20(100%25)-3fb950.svg?logo=duckdb&logoColor=white)](results/eval_run_offline_1794210761.json)
-[![Static HTML Report](https://img.shields.io/badge/HTML%20Report-120%20Interactive%20Deep--Dives-1f6feb.svg?logo=html5&logoColor=white)](reports/index.html)
-[![Data Volume: 108M+](https://img.shields.io/badge/Data%20Volume-108M%2B%20Records%20Tested-3fb950.svg?logo=duckdb&logoColor=white)](reports/index.html)
+[![Live GitHub Pages](https://img.shields.io/badge/Live%20Dashboard-sethusrinivasan.github.io%2Fsql--frontier--eval-1f6feb.svg?logo=github&logoColor=white)](https://sethusrinivasan.github.io/sql-frontier-eval/)
+[![Data Volume: 108M+](https://img.shields.io/badge/Data%20Volume-108M%2B%20Records%20Tested-3fb950.svg?logo=duckdb&logoColor=white)](https://sethusrinivasan.github.io/sql-frontier-eval/)
 [![Zero-LLM CI](https://img.shields.io/badge/CI%20Dependency-Zero%20LLM%20Required-success.svg?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
 [![Engine: DuckDB 2.0](https://img.shields.io/badge/Engine-DuckDB%202.0-FFF000.svg?logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![Python: 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
@@ -46,18 +46,18 @@ Evaluated across the 8-category failure taxonomy using DuckDB 2.0:
 | **Golden Ground Truth** | **100.0%** | **8 / 8** | N/A | **3.8 ms** | Baseline Verification (0% False Negatives) | [`eval_run_offline_1794186318.json`](results/eval_run_offline_1794186318.json) |
 | **Offline Reference / Naive** | **0.0%** | **0 / 8** | N/A | **2.6 ms** | 100% Trap Detection (Metric skew, row loss, O(N²) joins) | [`eval_run_offline_1794186320.json`](results/eval_run_offline_1794186320.json) |
 
-### 🌐 Interactive Static HTML Reports & Deep-Dive Explorer
+### 🌐 Live Interactive Benchmark Report Dashboard (GitHub Pages)
 
-Comprehensive static HTML reports tested on **108,027,582 records across 148 tables** with DuckDB physical operator execution plans:
+The full interactive reporting suite is deployed live at **[https://sethusrinivasan.github.io/sql-frontier-eval/](https://sethusrinivasan.github.io/sql-frontier-eval/)**, tested across **108,027,582 records across 148 tables** with DuckDB physical operator execution plans:
 
-* 📊 **[Executive Benchmark Dashboard (`reports/index.html`)](reports/index.html)**: High-level KPI summary, multi-model leaderboard, domain scorecards, Ubuntu OOM-kill root cause analysis, real-time live search, domain filter pills, and query status table.
-* 🔍 **[120 Query Deep-Dive Pages (`reports/queries/`)](reports/queries/)**: Dedicated per-query reports detailing:
+* 📊 **[Live Executive Benchmark Dashboard](https://sethusrinivasan.github.io/sql-frontier-eval/)**: High-level KPI summary, multi-model leaderboard, domain scorecards, Ubuntu OOM-kill root cause analysis, real-time live search, domain filter pills, and query status table.
+* 🔍 **[120 Query Deep-Dive Pages](https://sethusrinivasan.github.io/sql-frontier-eval/)** (also in [`reports/queries/`](reports/queries/)): Dedicated per-query reports detailing:
   - **What It Means**: Business scenario, analytical requirement, and semantic failure trap analysis.
   - **Graphical Execution Plans**: Physical operator trees with radiant flame highlights (`🔥 BOTTLENECK`) on nodes consuming $\ge 20\%$ cost or heavy latency.
   - **Data Volume Details**: Underlying table counts, schema, and volume (MiB/GiB) with rich scenario data preview.
   - **Colored & Formatted Queries**: Side-by-side candidate SQL vs golden reference vs setup DDL with syntax highlighting.
   - **Result Sets**: Side-by-side tabular candidate vs expected outputs.
-* 📦 **[Self-Contained Report Bundle (`reports.tar.gz`)](reports.tar.gz)**: 560 KiB compressed archive containing the entire dashboard and all 120 deep-dive pages.
+* 📦 **[Self-Contained Report Bundle (`reports.tar.gz`)](reports.tar.gz)**: 560 KiB compressed archive containing the entire dashboard and all 120 deep-dive pages for offline deployment.
 
 ---
 
