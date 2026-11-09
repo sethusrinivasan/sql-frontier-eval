@@ -1,0 +1,16 @@
+{
+  "id": "task_054_Q54_fuzzy_levenshtein_length_pruning",
+  "name": "Typo-Tolerant Search with Levenshtein Edit Distance & Length Bounds",
+  "category": "Search & Retrieval",
+  "description": "Users frequently misspell search terms (e.g. 'postgre' -> 'postgresql'). Levenshtein distance counts insertions, deletions, and substitutions.",
+  "prompt": "Users frequently misspell search terms (e.g. 'postgre' -> 'postgresql'). Levenshtein distance counts insertions, deletions, and substitutions.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: keyword_id, keyword, edit_distance.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE catalog_keywords (\n                keyword_id INT,\n                keyword VARCHAR\n            );\n            INSERT INTO catalog_keywords VALUES\n                (1, 'postgresql'),\n                (2, 'postgres'),\n                (3, 'postgress'),\n                (4, 'python'),\n                (5, 'javascript');",
+  "golden_sql": "-- Find keywords within edit distance <= 2 of search query 'posgresql'\n            SELECT \n                keyword_id,\n                keyword,\n                levenshtein(keyword, 'posgresql') AS edit_distance\n            FROM catalog_keywords\n            -- Pre-filter: word length cannot differ by more than max allowed edit distance (2)\n            WHERE ABS(LENGTH(keyword) - LENGTH('posgresql')) <= 2\n              AND levenshtein(keyword, 'posgresql') <= 2\n            ORDER BY edit_distance ASC;",
+  "ordered": true,
+  "expected_columns": [
+    "keyword_id",
+    "keyword",
+    "edit_distance"
+  ],
+  "why_it_fails": "Computing Levenshtein distance on every catalog word is CPU intensive without pre-filtering on string length (ABS(len_a - len_b) <= max_distance)."
+}

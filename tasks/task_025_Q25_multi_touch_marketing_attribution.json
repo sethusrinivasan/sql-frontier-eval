@@ -1,0 +1,17 @@
+{
+  "id": "task_025_Q25_multi_touch_marketing_attribution",
+  "name": "Multi-Touch Marketing Attribution Comparison in a Single Pass",
+  "category": "Temporal & Time-Series",
+  "description": "CMOs need to compare 3 attribution models (First-Touch, Last-Touch, and Uniform Linear) for touchpoints occurring within 30 days prior to conversion.",
+  "prompt": "CMOs need to compare 3 attribution models (First-Touch, Last-Touch, and Uniform Linear) for touchpoints occurring within 30 days prior to conversion.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: channel, first_touch_revenue, last_touch_revenue, linear_touch_revenue.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE ad_clicks (\n                user_id INT,\n                channel VARCHAR,\n                click_time TIMESTAMP\n            );\n            CREATE TABLE conversions (\n                user_id INT,\n                conversion_time TIMESTAMP,\n                revenue DECIMAL(10,2)\n            );\n            INSERT INTO ad_clicks VALUES\n                (10, 'Google Search', '2026-03-01 09:00:00'),\n                (10, 'Facebook Ad',   '2026-03-05 14:00:00'),\n                (10, 'Email Promo',   '2026-03-10 18:00:00');\n            INSERT INTO conversions VALUES\n                (10, '2026-03-11 10:00:00', 300.00);",
+  "golden_sql": "-- Multi-touch attribution comparison (First-touch, Last-touch, Linear)\n            WITH eligible_touches AS (\n                SELECT \n                    c.user_id,\n                    c.revenue,\n                    a.channel,\n                    a.click_time,\n                    ROW_NUMBER() OVER (PARTITION BY c.user_id ORDER BY a.click_time ASC) AS touch_asc,\n                    ROW_NUMBER() OVER (PARTITION BY c.user_id ORDER BY a.click_time DESC) AS touch_desc,\n                    COUNT(*) OVER (PARTITION BY c.user_id) AS total_touches\n                FROM conversions c\n                JOIN ad_clicks a \n                  ON c.user_id = a.user_id \n                 AND a.click_time >= c.conversion_time - INTERVAL '30 days'\n                 AND a.click_time <= c.conversion_time\n            )\n            SELECT \n                channel,\n                -- First Touch: 100% credit if first\n                SUM(CASE WHEN touch_asc = 1 THEN revenue ELSE 0 END) AS first_touch_revenue,\n                -- Last Touch: 100% credit if last\n                SUM(CASE WHEN touch_desc = 1 THEN revenue ELSE 0 END) AS last_touch_revenue,\n                -- Linear: Equal credit across all touchpoints\n                ROUND(SUM(revenue / total_touches), 2) AS linear_touch_revenue\n            FROM eligible_touches\n            GROUP BY channel\n            ORDER BY channel;",
+  "ordered": true,
+  "expected_columns": [
+    "channel",
+    "first_touch_revenue",
+    "last_touch_revenue",
+    "linear_touch_revenue"
+  ],
+  "why_it_fails": "Running three separate join queries triples warehouse compute costs and risks data inconsistency."
+}

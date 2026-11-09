@@ -1,0 +1,18 @@
+{
+  "id": "task_007_Q07_scd2_open_ended_intervals",
+  "name": "Slowly Changing Dimension Type 2 Join with Open-Ended Future",
+  "category": "Temporal & Time-Series",
+  "description": "Customers change addresses or account tiers over time. Joining historical orders to customer profile dimensions requires matching the order date to the active validity interval.",
+  "prompt": "Customers change addresses or account tiers over time. Joining historical orders to customer profile dimensions requires matching the order date to the active validity interval.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: order_id, customer_id, order_date, amount, customer_tier_at_purchase.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE dim_customer_scd (\n                customer_id INT,\n                tier VARCHAR,\n                valid_from DATE,\n                valid_to DATE\n            );\n            CREATE TABLE fact_orders (\n                order_id INT,\n                customer_id INT,\n                order_date DATE,\n                amount DECIMAL(10,2)\n            );\n            INSERT INTO dim_customer_scd VALUES\n                (88, 'Silver', '2026-01-01', '2026-02-01'),\n                (88, 'Gold',   '2026-02-01', NULL);\n            INSERT INTO fact_orders VALUES\n                (1, 88, '2026-01-15', 100.00),\n                (2, 88, '2026-02-20', 250.00);",
+  "golden_sql": "-- Join fact orders to historical customer dimension without dropping active records\n            SELECT \n                o.order_id,\n                o.customer_id,\n                o.order_date,\n                o.amount,\n                c.tier AS customer_tier_at_purchase\n            FROM fact_orders o\n            JOIN dim_customer_scd c\n              ON o.customer_id = c.customer_id\n             AND o.order_date >= c.valid_from\n             AND o.order_date < COALESCE(c.valid_to, DATE '9999-12-31')\n            ORDER BY o.order_id;",
+  "ordered": true,
+  "expected_columns": [
+    "order_id",
+    "customer_id",
+    "order_date",
+    "amount",
+    "customer_tier_at_purchase"
+  ],
+  "why_it_fails": "Current active records typically have `valid_to IS NULL`. A simple `order_date BETWEEN valid_from AND valid_to` drops all current active records."
+}

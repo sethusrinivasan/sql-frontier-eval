@@ -1,0 +1,16 @@
+{
+  "id": "task_027_Q27_euclidean_l2_nearest_neighbors",
+  "name": "L2 Euclidean Distance Nearest Neighbors Search via array_distance",
+  "category": "Vector & Embeddings",
+  "description": "In computer vision feature retrieval (facial recognition, product image matching), feature vectors are compared using Euclidean (L2) distance where lower distance equals higher visual similarity.",
+  "prompt": "In computer vision feature retrieval (facial recognition, product image matching), feature vectors are compared using Euclidean (L2) distance where lower distance equals higher visual similarity.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: image_id, label, l2_distance.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE image_features (\n                image_id INT,\n                label VARCHAR,\n                vector FLOAT[3]\n            );\n            INSERT INTO image_features VALUES\n                (101, 'Red Running Shoe',  [1.0, 2.0, 3.0]::FLOAT[3]),\n                (102, 'Crimson Sneaker',   [1.1, 2.1, 2.9]::FLOAT[3]),\n                (103, 'Blue Hiking Boot',  [5.0, 8.0, 9.0]::FLOAT[3]);",
+  "golden_sql": "-- Find visual nearest neighbors to query image vector [1.05, 2.05, 3.0]\n            SELECT \n                image_id,\n                label,\n                ROUND(array_distance(vector, [1.05, 2.05, 3.0]::FLOAT[3]), 4) AS l2_distance\n            FROM image_features\n            ORDER BY l2_distance ASC\n            LIMIT 2;",
+  "ordered": true,
+  "expected_columns": [
+    "image_id",
+    "label",
+    "l2_distance"
+  ],
+  "why_it_fails": "LLMs often try to write SQRT(SUM(POW(a - b, 2))) which prevents vectorized hardware acceleration."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "task_053_Q53_min_max_convex_hybrid_search",
+  "name": "Min-Max Normalized Convex Combination Hybrid Search",
+  "category": "Search & Retrieval",
+  "description": "An alternative to rank-based RRF is score-based fusion: min-max scale lexical scores to [0, 1] and vector scores to [0, 1], then take alpha * lexical + (1 - alpha) * vector.",
+  "prompt": "An alternative to rank-based RRF is score-based fusion: min-max scale lexical scores to [0, 1] and vector scores to [0, 1], then take alpha * lexical + (1 - alpha) * vector.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: doc_id, title, norm_bm25, norm_vec, convex_hybrid_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE search_candidates (\n                doc_id INT,\n                title VARCHAR,\n                raw_bm25 DOUBLE,\n                vector_sim DOUBLE\n            );\n            INSERT INTO search_candidates VALUES\n                (101, 'Data Warehousing Fundamentals', 25.0, 0.85),\n                (102, 'Columnar Storage Internals',    10.0, 0.92),\n                (103, 'SQL Query Optimization',         5.0, 0.70);",
+  "golden_sql": "-- Min-Max normalization and 50/50 convex combination\n            WITH bounds AS (\n                SELECT \n                    doc_id,\n                    title,\n                    raw_bm25,\n                    vector_sim,\n                    MIN(raw_bm25) OVER () AS min_bm25,\n                    MAX(raw_bm25) OVER () AS max_bm25,\n                    MIN(vector_sim) OVER () AS min_vec,\n                    MAX(vector_sim) OVER () AS max_vec\n                FROM search_candidates\n            ),\n            normalized AS (\n                SELECT \n                    doc_id,\n                    title,\n                    COALESCE((raw_bm25 - min_bm25) / NULLIF(max_bm25 - min_bm25, 0), 1.0) AS norm_bm25,\n                    COALESCE((vector_sim - min_vec) / NULLIF(max_vec - min_vec, 0), 1.0) AS norm_vec\n                FROM bounds\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(norm_bm25, 4) AS norm_bm25,\n                ROUND(norm_vec, 4) AS norm_vec,\n                ROUND(0.50 * norm_bm25 + 0.50 * norm_vec, 4) AS convex_hybrid_score\n            FROM normalized\n            ORDER BY convex_hybrid_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "doc_id",
+    "title",
+    "norm_bm25",
+    "norm_vec",
+    "convex_hybrid_score"
+  ],
+  "why_it_fails": "Division by zero when all scores in a small result set are identical."
+}

@@ -1,0 +1,15 @@
+{
+  "id": "task_082_Q82_connected_components_community_labeling",
+  "name": "Graph Connected Components Labeling via Min-ID Propagation",
+  "category": "Graph & Hierarchy",
+  "description": "Graph connected components partition isolated clusters of customers or machines. Propagating the minimum account ID across edges assigns every node in the same component a shared group ID.",
+  "prompt": "Graph connected components partition isolated clusters of customers or machines. Propagating the minimum account ID across edges assigns every node in the same component a shared group ID.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: node_id, cluster_id.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE graph_edges (\n                node_a INT,\n                node_b INT\n            );\n            -- Component 1: Nodes 1, 2, 3\n            -- Component 2: Nodes 8, 9\n            INSERT INTO graph_edges VALUES\n                (1, 2), (2, 3),\n                (8, 9);",
+  "golden_sql": "-- Symmetric edges\n            WITH RECURSIVE symmetric_edges AS (\n                SELECT node_a AS src, node_b AS dst FROM graph_edges\n                UNION\n                SELECT node_b AS src, node_a AS dst FROM graph_edges\n            ),\n            components AS (\n                -- Anchor: Initial component label is node itself\n                SELECT src AS node_id, src AS component_id, 0 AS iteration\n                FROM symmetric_edges\n                \n                UNION ALL\n                \n                -- Propagate smaller component ID across edges\n                SELECT \n                    e.dst AS node_id,\n                    c.component_id,\n                    c.iteration + 1\n                FROM components c\n                JOIN symmetric_edges e ON c.node_id = e.src\n                WHERE c.component_id < e.dst AND c.iteration < 5\n            )\n            SELECT \n                node_id,\n                MIN(component_id) AS cluster_id\n            FROM components\n            GROUP BY node_id\n            ORDER BY cluster_id, node_id;",
+  "ordered": true,
+  "expected_columns": [
+    "node_id",
+    "cluster_id"
+  ],
+  "why_it_fails": "Standard SQL engines lack graph primitives, forcing expensive external graph database licenses."
+}

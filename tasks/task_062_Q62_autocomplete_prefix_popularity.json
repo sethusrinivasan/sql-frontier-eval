@@ -1,0 +1,16 @@
+{
+  "id": "task_062_Q62_autocomplete_prefix_popularity",
+  "name": "Search Autocomplete Suggestion with Popularity Frequency Weighting",
+  "category": "Search & Retrieval",
+  "description": "As users type 'air...', instant search suggests 'air fryer' (100k searches) before 'air mattress' (5k searches). Suggestions must match the prefix AND rank by historical popularity.",
+  "prompt": "As users type 'air...', instant search suggests 'air fryer' (100k searches) before 'air mattress' (5k searches). Suggestions must match the prefix AND rank by historical popularity.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: query_string, monthly_search_volume, popularity_rank_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE search_telemetry (\n                query_string VARCHAR,\n                monthly_search_volume INT,\n                conversion_rate DECIMAL(4,3)\n            );\n            INSERT INTO search_telemetry VALUES\n                ('air fryer ninja', 120000, 0.085),\n                ('airpods pro 2',    250000, 0.120),\n                ('air mattress queen', 15000, 0.040),\n                ('airplane pillow',     3000, 0.025);",
+  "golden_sql": "-- Autocomplete suggestions for prefix 'air' ranked by volume * conversion\n            SELECT \n                query_string,\n                monthly_search_volume,\n                ROUND(monthly_search_volume * conversion_rate, 0) AS popularity_rank_score\n            FROM search_telemetry\n            WHERE query_string LIKE 'air%'\n            ORDER BY popularity_rank_score DESC\n            LIMIT 3;",
+  "ordered": true,
+  "expected_columns": [
+    "query_string",
+    "monthly_search_volume",
+    "popularity_rank_score"
+  ],
+  "why_it_fails": "Alphabetical sorting of prefix matches suggests obscure terms before popular items."
+}

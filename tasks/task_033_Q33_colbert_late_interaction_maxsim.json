@@ -1,0 +1,15 @@
+{
+  "id": "task_033_Q33_colbert_late_interaction_maxsim",
+  "name": "ColBERT Multi-Vector Late Interaction (MaxSim) in Pure SQL",
+  "category": "Vector & Embeddings",
+  "description": "Advanced retrieval models (ColBERT / Sanity) represent queries and documents as collections of token vectors. Scoring computes MaxSim: for each query token, take the maximum cosine similarity across all document tokens, then sum.",
+  "prompt": "Advanced retrieval models (ColBERT / Sanity) represent queries and documents as collections of token vectors. Scoring computes MaxSim: for each query token, take the maximum cosine similarity across all document tokens, then sum.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: doc_id, colbert_maxsim_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE query_tokens (\n                q_token_id INT,\n                token_text VARCHAR,\n                vec FLOAT[2]\n            );\n            CREATE TABLE doc_token_embeddings (\n                doc_id INT,\n                d_token_id INT,\n                token_text VARCHAR,\n                vec FLOAT[2]\n            );\n            -- Query: \"fast database\"\n            INSERT INTO query_tokens VALUES\n                (1, 'fast',     [1.0, 0.0]::FLOAT[2]),\n                (2, 'database', [0.0, 1.0]::FLOAT[2]);\n            -- Document 10: \"quick relational store\"\n            INSERT INTO doc_token_embeddings VALUES\n                (10, 1, 'quick',      [0.9, 0.1]::FLOAT[2]),\n                (10, 2, 'relational', [0.1, 0.85]::FLOAT[2]),\n                (10, 3, 'store',      [0.2, 0.7]::FLOAT[2]);",
+  "golden_sql": "-- ColBERT MaxSim calculation: SUM_q( MAX_d( sim(q, d) ) )\n            WITH token_sims AS (\n                SELECT \n                    q.q_token_id,\n                    q.token_text AS q_token,\n                    d.doc_id,\n                    d.token_text AS d_token,\n                    array_cosine_similarity(q.vec, d.vec) AS sim\n                FROM query_tokens q\n                CROSS JOIN doc_token_embeddings d\n            ),\n            max_sim_per_query_token AS (\n                SELECT \n                    doc_id,\n                    q_token_id,\n                    MAX(sim) AS max_token_sim\n                FROM token_sims\n                GROUP BY doc_id, q_token_id\n            )\n            SELECT \n                doc_id,\n                ROUND(SUM(max_token_sim), 4) AS colbert_maxsim_score\n            FROM max_sim_per_query_token\n            GROUP BY doc_id\n            ORDER BY colbert_maxsim_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "doc_id",
+    "colbert_maxsim_score"
+  ],
+  "why_it_fails": "Implementing late interaction typically requires specialized Python tensor pipelines."
+}

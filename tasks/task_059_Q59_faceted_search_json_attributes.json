@@ -1,0 +1,16 @@
+{
+  "id": "task_059_Q59_faceted_search_json_attributes",
+  "name": "Faceted Search Aggregations over Semi-Structured JSON Attributes",
+  "category": "Search & Retrieval",
+  "description": "When a customer searches for 'laptops', e-commerce search engines return matching items along with dynamic facet counts (e.g. Brand: Apple (12), Dell (8); RAM: 16GB (15), 32GB (5)) extracted from JSON specs.",
+  "prompt": "When a customer searches for 'laptops', e-commerce search engines return matching items along with dynamic facet counts (e.g. Brand: Apple (12), Dell (8); RAM: 16GB (15), 32GB (5)) extracted from JSON specs.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: facet_dimension, facet_value, match_count.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE electronics_catalog (\n                item_id INT,\n                title VARCHAR,\n                specs JSON\n            );\n            INSERT INTO electronics_catalog VALUES\n                (1, 'MacBook Pro 16', '{\"brand\": \"Apple\", \"ram\": \"32GB\", \"screen\": 16}'),\n                (2, 'MacBook Air 13', '{\"brand\": \"Apple\", \"ram\": \"16GB\", \"screen\": 13}'),\n                (3, 'XPS 15 Laptop',  '{\"brand\": \"Dell\",  \"ram\": \"16GB\", \"screen\": 15}'),\n                (4, 'ThinkPad X1',    '{\"brand\": \"Lenovo\",\"ram\": \"16GB\", \"screen\": 14}');",
+  "golden_sql": "-- Extract faceted breakdown of matching laptop brands and RAM capacities\n            WITH matching_items AS (\n                SELECT \n                    item_id,\n                    title,\n                    specs->>'brand' AS brand,\n                    specs->>'ram' AS ram\n                FROM electronics_catalog\n            )\n            SELECT \n                'brand' AS facet_dimension,\n                brand AS facet_value,\n                COUNT(*) AS match_count\n            FROM matching_items\n            GROUP BY brand\n            UNION ALL\n            SELECT \n                'ram' AS facet_dimension,\n                ram AS facet_value,\n                COUNT(*) AS match_count\n            FROM matching_items\n            GROUP BY ram\n            ORDER BY facet_dimension, match_count DESC, facet_value ASC;",
+  "ordered": true,
+  "expected_columns": [
+    "facet_dimension",
+    "facet_value",
+    "match_count"
+  ],
+  "why_it_fails": "Running separate queries for each facet dimension multiplies query latency and database load."
+}

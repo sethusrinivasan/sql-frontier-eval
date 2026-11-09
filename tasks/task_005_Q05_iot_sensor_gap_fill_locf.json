@@ -1,0 +1,17 @@
+{
+  "id": "task_005_Q05_iot_sensor_gap_fill_locf",
+  "name": "IoT Sensor Telemetry Gap-Filling via generate_series and LOCF",
+  "category": "Temporal & Time-Series",
+  "description": "Industrial IoT sensors emit readings intermittently to save bandwidth. Downstream machine learning models require strict continuous 1-minute time grids with Last Observation Carried Forward (LOCF).",
+  "prompt": "Industrial IoT sensors emit readings intermittently to save bandwidth. Downstream machine learning models require strict continuous 1-minute time grids with Last Observation Carried Forward (LOCF).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: bucket_time, device_id, raw_reading, filled_temperature.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE sensor_telemetry (\n                device_id INT,\n                recorded_at TIMESTAMP,\n                temperature DOUBLE\n            );\n            INSERT INTO sensor_telemetry VALUES\n                (42, '2026-03-01 08:00:00', 21.5),\n                (42, '2026-03-01 08:02:00', 22.0),\n                (42, '2026-03-01 08:05:00', 22.8);",
+  "golden_sql": "-- Resample sparse telemetry into continuous 1-minute intervals with Last Observation Carried Forward\n            WITH time_grid AS (\n                SELECT UNNEST(generate_series(\n                    TIMESTAMP '2026-03-01 08:00:00',\n                    TIMESTAMP '2026-03-01 08:05:00',\n                    INTERVAL '1 minute'\n                )) AS bucket_time\n            ),\n            aligned_readings AS (\n                SELECT \n                    grid.bucket_time,\n                    42 AS device_id,\n                    st.temperature\n                FROM time_grid grid\n                LEFT JOIN sensor_telemetry st\n                  ON grid.bucket_time = st.recorded_at\n                 AND st.device_id = 42\n            )\n            SELECT \n                bucket_time,\n                device_id,\n                temperature AS raw_reading,\n                -- Forward fill the most recent non-null temperature\n                COALESCE(\n                    temperature,\n                    LAST_VALUE(temperature IGNORE NULLS) OVER (\n                        PARTITION BY device_id \n                        ORDER BY bucket_time \n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    )\n                ) AS filled_temperature\n            FROM aligned_readings\n            ORDER BY bucket_time;",
+  "ordered": true,
+  "expected_columns": [
+    "bucket_time",
+    "device_id",
+    "raw_reading",
+    "filled_temperature"
+  ],
+  "why_it_fails": "Using OUTER JOIN without dynamic range generation leaves temporal voids, leading to missing periods in downstream feature stores."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "task_022_Q22_linear_interpolation_missing_points",
+  "name": "Bi-directional Linear Value Interpolation between Observations",
+  "category": "Temporal & Time-Series",
+  "description": "When a sensor drops offline for 30 minutes, data scientists prefer linear interpolation between the last known reading and the next recovered reading rather than flat zero-filling.",
+  "prompt": "When a sensor drops offline for 30 minutes, data scientists prefer linear interpolation between the last known reading and the next recovered reading rather than flat zero-filling.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: ts, raw_psi, interpolated_psi.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE pressure_readings (\n                ts TIMESTAMP,\n                psi DOUBLE\n            );\n            INSERT INTO pressure_readings VALUES\n                ('2026-03-01 10:00:00', 100.0),\n                ('2026-03-01 10:01:00', NULL),\n                ('2026-03-01 10:02:00', NULL),\n                ('2026-03-01 10:03:00', 130.0);",
+  "golden_sql": "-- Linearly interpolate missing PSI values based on preceding and following known points\n            WITH bounds AS (\n                SELECT \n                    ts,\n                    psi,\n                    LAST_VALUE(psi IGNORE NULLS) OVER (ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS prev_psi,\n                    LAST_VALUE(ts IGNORE NULLS) OVER (ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS prev_ts,\n                    FIRST_VALUE(psi IGNORE NULLS) OVER (ORDER BY ts ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS next_psi,\n                    FIRST_VALUE(ts IGNORE NULLS) OVER (ORDER BY ts ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS next_ts\n                FROM pressure_readings\n            )\n            SELECT \n                ts,\n                psi AS raw_psi,\n                CASE \n                    WHEN psi IS NOT NULL THEN psi\n                    ELSE ROUND(\n                        prev_psi + (next_psi - prev_psi) * \n                        (date_diff('second', prev_ts, ts) * 1.0 / date_diff('second', prev_ts, next_ts)), 2\n                    )\n                END AS interpolated_psi\n            FROM bounds\n            ORDER BY ts;",
+  "ordered": true,
+  "expected_columns": [
+    "ts",
+    "raw_psi",
+    "interpolated_psi"
+  ],
+  "why_it_fails": "Requires simultaneous look-behind (LAG) and look-ahead (LEAD) across varying time distances."
+}

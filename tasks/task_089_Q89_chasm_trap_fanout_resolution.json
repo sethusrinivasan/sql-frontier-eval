@@ -1,0 +1,18 @@
+{
+  "id": "task_089_Q89_chasm_trap_fanout_resolution",
+  "name": "Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation",
+  "category": "Warehouse & Statistical",
+  "description": "When an order has multiple discounts AND multiple shipment records, joining both child tables directly to the order creates a cross product that multiplies sales figures by 4x. Pre-aggregating each child table in CTEs before joining preserves financial integrity.",
+  "prompt": "When an order has multiple discounts AND multiple shipment records, joining both child tables directly to the order creates a cross product that multiplies sales figures by 4x. Pre-aggregating each child table in CTEs before joining preserves financial integrity.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: customer_id, total_gross_sales, total_discount_amount, total_shipping_fees, net_revenue.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE orders (order_id INT, customer_id INT, base_amount DECIMAL(10,2));\n            CREATE TABLE order_discounts (discount_id INT, order_id INT, amount DECIMAL(10,2));\n            CREATE TABLE order_shipments (shipment_id INT, order_id INT, fee DECIMAL(10,2));\n            INSERT INTO orders VALUES (101, 1, 100.00);\n            INSERT INTO order_discounts VALUES (1, 101, 10.00), (2, 101, 5.00);\n            INSERT INTO order_shipments VALUES (1, 101, 4.00),  (2, 101, 6.00);",
+  "golden_sql": "-- Correctly aggregate discounts and shipments without fan-out inflation\n            WITH agg_discounts AS (\n                SELECT order_id, SUM(amount) AS total_discount\n                FROM order_discounts\n                GROUP BY order_id\n            ),\n            agg_shipments AS (\n                SELECT order_id, SUM(fee) AS total_shipping\n                FROM order_shipments\n                GROUP BY order_id\n            )\n            SELECT \n                o.customer_id,\n                SUM(o.base_amount) AS total_gross_sales,\n                COALESCE(SUM(d.total_discount), 0.00) AS total_discount_amount,\n                COALESCE(SUM(s.total_shipping), 0.00) AS total_shipping_fees,\n                ROUND(SUM(o.base_amount) - COALESCE(SUM(d.total_discount), 0.00) + COALESCE(SUM(s.total_shipping), 0.00), 2) AS net_revenue\n            FROM orders o\n            LEFT JOIN agg_discounts d ON o.order_id = d.order_id\n            LEFT JOIN agg_shipments s ON o.order_id = s.order_id\n            GROUP BY o.customer_id;",
+  "ordered": false,
+  "expected_columns": [
+    "customer_id",
+    "total_gross_sales",
+    "total_discount_amount",
+    "total_shipping_fees",
+    "net_revenue"
+  ],
+  "why_it_fails": "Frontier models routinely join all tables before GROUP BY, causing catastrophic silent metric corruption."
+}

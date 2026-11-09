@@ -1,0 +1,19 @@
+{
+  "id": "task_114_asof_tolerance_expiry",
+  "name": "ASOF Point-in-Time Quote Matching with 500ms Expiry Tolerance",
+  "category": "Temporal & Time-Series",
+  "description": "Matches executed trades with the prevailing market quote as-of the trade timestamp, but enforces a strict 500ms staleness tolerance. Stale market data must not be matched.",
+  "prompt": "Match each executed trade with the most recent prevailing market quote.\nCRITICAL CONSTRAINT: If the most recent quote is older than 500 milliseconds prior to the trade execution time, the quote is considered stale and must be returned as NULL.\n\nRequired output columns:\n- trade_id (INT)\n- trade_time (TIMESTAMP)\n- symbol (VARCHAR)\n- prevailing_ask (DOUBLE)\n\nOrder by trade_id ASC.",
+  "setup_sql": "\nCREATE TABLE market_quotes (quote_time TIMESTAMP, symbol VARCHAR, bid DOUBLE, ask DOUBLE);\nCREATE TABLE market_trades (trade_id INT, trade_time TIMESTAMP, symbol VARCHAR, shares INT);\n\n-- Quote 1: 10:00:00 (Stale for trade at 10:02:00)\n-- Quote 2: 10:05:00 (Fresh for trade at 10:05:00.200)\nINSERT INTO market_quotes VALUES\n  ('2026-03-01 10:00:00', 'AAPL', 150.00, 150.10),\n  ('2026-03-01 10:05:00', 'AAPL', 151.00, 151.10);\n\nINSERT INTO market_trades VALUES\n  (1, '2026-03-01 10:02:00', 'AAPL', 100),         -- 2 minutes after Quote 1 -> STALE (>500ms) -> NULL\n  (2, '2026-03-01 10:05:00.200', 'AAPL', 200);     -- 200ms after Quote 2 -> FRESH (<=500ms) -> 151.10\n",
+  "golden_sql": "\nSELECT \n    t.trade_id,\n    t.trade_time,\n    t.symbol,\n    CASE \n        WHEN date_diff('millisecond', q.quote_time, t.trade_time) <= 500 \n        THEN q.ask \n        ELSE NULL \n    END AS prevailing_ask\nFROM market_trades t\nASOF JOIN market_quotes q\n  ON t.symbol = q.symbol \n AND t.trade_time >= q.quote_time\nORDER BY t.trade_id ASC;\n",
+  "naive_llm_sql": "\nSELECT \n    t.trade_id,\n    t.trade_time,\n    t.symbol,\n    q.ask AS prevailing_ask\nFROM market_trades t\nASOF JOIN market_quotes q\n  ON t.symbol = q.symbol \n AND t.trade_time >= q.quote_time\nORDER BY t.trade_id ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "trade_id",
+    "trade_time",
+    "symbol",
+    "prevailing_ask"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Standard ASOF joins without a staleness tolerance check blindly match trades to arbitrarily old quotes from hours or days ago. For Trade 1, naive SQL matches the 2-minute-old quote ($150.10) instead of returning NULL, resulting in stale execution data."
+}

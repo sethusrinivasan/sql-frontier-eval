@@ -1,0 +1,16 @@
+{
+  "id": "task_051_Q51_fts_bm25_lexical_search",
+  "name": "DuckDB Full-Text Search (FTS) BM25 Term Relevance Scoring",
+  "category": "Search & Retrieval",
+  "description": "Traditional databases use simple `LIKE '%search%'` which treats 1 mention the same as 10 mentions and ignores document frequency. BM25 scores term saturation and document rarity.",
+  "prompt": "Traditional databases use simple `LIKE '%search%'` which treats 1 mention the same as 10 mentions and ignores document frequency. BM25 scores term saturation and document rarity.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: doc_id, title, bm25_score.\nResults should be ordered as specified.",
+  "setup_sql": "INSTALL fts; LOAD fts;\n            CREATE TABLE articles (\n                doc_id INT,\n                title VARCHAR,\n                body VARCHAR\n            );\n            INSERT INTO articles VALUES\n                (1, 'Fast Columnar Databases', 'DuckDB is a vectorized analytical database designed for fast analytics.'),\n                (2, 'Postgres Tuning Guide',    'Relational database indexing and buffer pool optimization.'),\n                (3, 'Vector Search Frontiers', 'Combining dense vector embeddings with sparse BM25 indexing.');\n            PRAGMA create_fts_index('articles', 'doc_id', 'title', 'body');",
+  "golden_sql": "-- BM25 full-text search for 'analytical database'\n            WITH scored_articles AS (\n                SELECT \n                    doc_id,\n                    title,\n                    body,\n                    fts_main_articles.match_bm25(doc_id, 'analytical database') AS bm25_score\n                FROM articles\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(bm25_score, 4) AS bm25_score\n            FROM scored_articles\n            WHERE bm25_score IS NOT NULL\n            ORDER BY bm25_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "doc_id",
+    "title",
+    "bm25_score"
+  ],
+  "why_it_fails": "ILIKE matches substrings blindly (e.g. 'cat' matches 'scattered' or 'certificate') with zero relevancy ranking."
+}

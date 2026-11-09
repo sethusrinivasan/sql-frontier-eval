@@ -1,0 +1,19 @@
+{
+  "id": "task_118_reversal_interleaved_ledger",
+  "name": "Financial Ledger Running Total with Transaction Reversal Nullification",
+  "category": "Warehouse & Statistical",
+  "description": "Calculates running account balance where REVERSAL records completely void specific prior transaction IDs, removing both the original transaction and the reversal record from net cumulative balance.",
+  "prompt": "Calculate the active cumulative balance for each non-reversed transaction.\nIf a transaction was later reversed (by a record with action = 'REVERSAL' referencing its entry_id), BOTH the original entry AND the reversal record must be completely excluded from the running balance.\n\nRequired output columns:\n- entry_id (INT)\n- account_id (INT)\n- amount (DECIMAL)\n- net_running_balance (DECIMAL)\n\nOrder by entry_id ASC.",
+  "setup_sql": "\nCREATE TABLE financial_ledger (\n    entry_id INT,\n    account_id INT,\n    action VARCHAR, -- 'PAYMENT', 'REFUND', 'REVERSAL'\n    reverses_entry_id INT,\n    amount DECIMAL(10,2)\n);\nINSERT INTO financial_ledger VALUES\n  (1, 100, 'PAYMENT',  NULL, 500.00),  -- Active\n  (2, 100, 'PAYMENT',  NULL, 200.00),  -- Reversed by #4!\n  (3, 100, 'PAYMENT',  NULL, 150.00),  -- Active\n  (4, 100, 'REVERSAL', 2,    -200.00); -- Reversal entry\n",
+  "golden_sql": "\nWITH reversed_ids AS (\n    SELECT reverses_entry_id AS void_id\n    FROM financial_ledger\n    WHERE action = 'REVERSAL' AND reverses_entry_id IS NOT NULL\n    UNION\n    SELECT entry_id AS void_id\n    FROM financial_ledger\n    WHERE action = 'REVERSAL'\n),\nactive_entries AS (\n    SELECT \n        l.entry_id,\n        l.account_id,\n        l.amount\n    FROM financial_ledger l\n    WHERE l.entry_id NOT IN (SELECT void_id FROM reversed_ids)\n)\nSELECT \n    entry_id,\n    account_id,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id \n        ORDER BY entry_id \n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS net_running_balance\nFROM active_entries\nORDER BY entry_id ASC;\n",
+  "naive_llm_sql": "\nSELECT \n    entry_id,\n    account_id,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id \n        ORDER BY entry_id \n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS net_running_balance\nFROM financial_ledger\nORDER BY entry_id ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "entry_id",
+    "account_id",
+    "amount",
+    "net_running_balance"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Naive queries sum all records including reversed transactions. In our ledger, naive sum includes entry 2 (+$200) at step 2, temporarily inflating the running balance to $700 before entry 4 subtracts it. True ledger auditing requires excluding voided entries from the active sequence."
+}

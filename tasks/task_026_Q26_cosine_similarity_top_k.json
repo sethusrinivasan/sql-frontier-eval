@@ -1,0 +1,16 @@
+{
+  "id": "task_026_Q26_cosine_similarity_top_k",
+  "name": "Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)",
+  "category": "Vector & Embeddings",
+  "description": "When a user asks a question in an AI assistant, the query is embedded into a dense vector (e.g. 4-dimensional here for illustration, or 384/1536 in prod). We retrieve the top most semantically relevant documentation chunks.",
+  "prompt": "When a user asks a question in an AI assistant, the query is embedded into a dense vector (e.g. 4-dimensional here for illustration, or 384/1536 in prod). We retrieve the top most semantically relevant documentation chunks.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: doc_id, title, similarity_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE doc_embeddings (\n                doc_id INT,\n                title VARCHAR,\n                embedding FLOAT[4]\n            );\n            INSERT INTO doc_embeddings VALUES\n                (1, 'DuckDB Architecture Overview', [0.9, 0.1, 0.2, 0.0]::FLOAT[4]),\n                (2, 'PostgreSQL Vacuum Internals',  [0.1, 0.8, 0.3, 0.1]::FLOAT[4]),\n                (3, 'Vector Search & Embeddings',   [0.85, 0.15, 0.3, 0.05]::FLOAT[4]),\n                (4, 'Kafka Event Streaming Guide',  [0.0, 0.2, 0.9, 0.4]::FLOAT[4]);",
+  "golden_sql": "-- Find the top 2 documents closest to the query embedding [0.9, 0.1, 0.25, 0.0]\n            WITH scored_docs AS (\n                SELECT \n                    doc_id,\n                    title,\n                    embedding,\n                    -- Native SIMD cosine similarity\n                    array_cosine_similarity(embedding, [0.9, 0.1, 0.25, 0.0]::FLOAT[4]) AS cosine_score\n                FROM doc_embeddings\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(cosine_score, 4) AS similarity_score\n            FROM scored_docs\n            ORDER BY cosine_score DESC\n            LIMIT 2;",
+  "ordered": true,
+  "expected_columns": [
+    "doc_id",
+    "title",
+    "similarity_score"
+  ],
+  "why_it_fails": "Models frequently try to calculate cosine similarity manually using dot product divided by norms in SQL, which is slow, verbose, and numerically unstable with zero vectors."
+}

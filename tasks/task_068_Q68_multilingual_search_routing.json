@@ -1,0 +1,16 @@
+{
+  "id": "task_068_Q68_multilingual_search_routing",
+  "name": "Multi-Lingual Catalog Routing by Detected ISO Language Code",
+  "category": "Search & Retrieval",
+  "description": "Global portals store titles in multiple localized columns (title_en, title_es, title_fr). Queries are dynamically routed to the matching language column based on user locale.",
+  "prompt": "Global portals store titles in multiple localized columns (title_en, title_es, title_fr). Queries are dynamically routed to the matching language column based on user locale.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: product_id, matched_title, language_used.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE localized_products (\n                product_id INT,\n                title_en VARCHAR,\n                title_es VARCHAR,\n                title_fr VARCHAR\n            );\n            INSERT INTO localized_products VALUES\n                (1, 'Red Bicycle',   'Bicicleta Roja',  'Velo Rouge'),\n                (2, 'Green Helmet',  'Casco Verde',     'Casque Vert');",
+  "golden_sql": "-- Match Spanish query 'Bicicleta' routed dynamically to title_es\n            SELECT \n                product_id,\n                title_es AS matched_title,\n                'es' AS language_used\n            FROM localized_products\n            WHERE title_es ILIKE '%Bicicleta%'\n            ORDER BY product_id;",
+  "ordered": true,
+  "expected_columns": [
+    "product_id",
+    "matched_title",
+    "language_used"
+  ],
+  "why_it_fails": "Searching across all language columns simultaneously creates false-positive matches due to inter-language false cognates."
+}

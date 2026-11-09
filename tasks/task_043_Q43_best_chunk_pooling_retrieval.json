@@ -1,0 +1,18 @@
+{
+  "id": "task_043_Q43_best_chunk_pooling_retrieval",
+  "name": "Document-Level Aggregation with Best-Chunk Pooling in RAG",
+  "category": "Vector & Embeddings",
+  "description": "Long PDF manuals are split into 50 chunks each. To avoid returning 5 chunks from the exact same PDF manual, we retrieve the best chunk per document and aggregate at the document level.",
+  "prompt": "Long PDF manuals are split into 50 chunks each. To avoid returning 5 chunks from the exact same PDF manual, we retrieve the best chunk per document and aggregate at the document level.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: doc_id, doc_title, chunk_id, chunk_text, chunk_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE document_chunks (\n                chunk_id INT,\n                doc_id INT,\n                doc_title VARCHAR,\n                chunk_text VARCHAR,\n                vec FLOAT[2]\n            );\n            INSERT INTO document_chunks VALUES\n                (101, 1, 'Manual A', 'Setup guide section 1', [0.95, 0.1]::FLOAT[2]),\n                (102, 1, 'Manual A', 'Setup guide section 2', [0.92, 0.15]::FLOAT[2]),\n                (103, 2, 'Manual B', 'Troubleshooting section 1', [0.88, 0.2]::FLOAT[2]);",
+  "golden_sql": "-- Retrieve the single highest-scoring chunk per document using QUALIFY\n            SELECT \n                doc_id,\n                doc_title,\n                chunk_id,\n                chunk_text,\n                ROUND(array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 4) AS chunk_score\n            FROM document_chunks\n            QUALIFY ROW_NUMBER() OVER (\n                PARTITION BY doc_id \n                ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC\n            ) = 1\n            ORDER BY chunk_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "doc_id",
+    "doc_title",
+    "chunk_id",
+    "chunk_text",
+    "chunk_score"
+  ],
+  "why_it_fails": "Returning raw chunk Top-K dominates the context window with duplicates from a single document."
+}

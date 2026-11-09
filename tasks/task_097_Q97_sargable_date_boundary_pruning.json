@@ -1,0 +1,15 @@
+{
+  "id": "task_097_Q97_sargable_date_boundary_pruning",
+  "name": "SARGable Partition Pruning: Exact Half-Open Date Boundary Ranges",
+  "category": "Warehouse & Statistical",
+  "description": "When filtering analytical partitions for a calendar month, `BETWEEN '2026-01-01' AND '2026-01-31'` leaks into February 1st if timestamps contain hours/minutes, while `strftime('%m', ts) = '01'` disables partition pruning entirely.",
+  "prompt": "When filtering analytical partitions for a calendar month, `BETWEEN '2026-01-01' AND '2026-01-31'` leaks into February 1st if timestamps contain hours/minutes, while `strftime('%m', ts) = '01'` disables partition pruning entirely.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: event_id, created_at.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE audit_events (\n                event_id INT,\n                created_at TIMESTAMP\n            );\n            INSERT INTO audit_events VALUES\n                (1, '2026-01-31 23:59:59'),\n                (2, '2026-02-01 00:00:00'), -- Should NOT be in January\n                (3, '2026-01-15 12:00:00');",
+  "golden_sql": "-- Exact SARGable half-open January 2026 boundary query\n            SELECT \n                event_id,\n                created_at\n            FROM audit_events\n            WHERE created_at >= TIMESTAMP '2026-01-01 00:00:00'\n              AND created_at <  TIMESTAMP '2026-02-01 00:00:00'\n            ORDER BY created_at;",
+  "ordered": true,
+  "expected_columns": [
+    "event_id",
+    "created_at"
+  ],
+  "why_it_fails": "Subtle boundary leakage or full table scans caused by non-SARGable WHERE predicates."
+}

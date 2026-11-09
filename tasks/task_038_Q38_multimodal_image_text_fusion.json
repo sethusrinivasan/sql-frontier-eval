@@ -1,0 +1,18 @@
+{
+  "id": "task_038_Q38_multimodal_image_text_fusion",
+  "name": "Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)",
+  "category": "Vector & Embeddings",
+  "description": "In e-commerce search, users submit a photo and a text clarification (e.g. photo of dress + 'in floral silk'). We compute a weighted combination of image-vector and text-vector similarity.",
+  "prompt": "In e-commerce search, users submit a photo and a text clarification (e.g. photo of dress + 'in floral silk'). We compute a weighted combination of image-vector and text-vector similarity.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: item_id, title, img_sim, txt_sim, joint_multimodal_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE fashion_items (\n                item_id INT,\n                title VARCHAR,\n                img_vec FLOAT[2],\n                txt_vec FLOAT[2]\n            );\n            INSERT INTO fashion_items VALUES\n                (1, 'Silk Floral Summer Dress', [0.8, 0.2]::FLOAT[2], [0.9, 0.1]::FLOAT[2]),\n                (2, 'Cotton Floral Blouse',    [0.75, 0.25]::FLOAT[2], [0.6, 0.4]::FLOAT[2]),\n                (3, 'Leather Biker Jacket',    [0.1, 0.9]::FLOAT[2], [0.0, 1.0]::FLOAT[2]);",
+  "golden_sql": "-- Joint multi-modal score: 60% image vector similarity + 40% text vector similarity\n            SELECT \n                item_id,\n                title,\n                ROUND(array_cosine_similarity(img_vec, [0.82, 0.18]::FLOAT[2]), 4) AS img_sim,\n                ROUND(array_cosine_similarity(txt_vec, [0.92, 0.08]::FLOAT[2]), 4) AS txt_sim,\n                ROUND(\n                    0.60 * array_cosine_similarity(img_vec, [0.82, 0.18]::FLOAT[2]) +\n                    0.40 * array_cosine_similarity(txt_vec, [0.92, 0.08]::FLOAT[2]), 4\n                ) AS joint_multimodal_score\n            FROM fashion_items\n            ORDER BY joint_multimodal_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "item_id",
+    "title",
+    "img_sim",
+    "txt_sim",
+    "joint_multimodal_score"
+  ],
+  "why_it_fails": "Treating text and image vectors as independent queries yields conflicting rank lists."
+}

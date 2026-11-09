@@ -1,0 +1,16 @@
+{
+  "id": "task_083_Q83_degree_centrality_pagerank_step",
+  "name": "Network Node In-Degree Centrality and Influence Ranking",
+  "category": "Graph & Hierarchy",
+  "description": "Social network influence and API hub criticality are determined by node in-degree centrality (number of inbound links from distinct entities).",
+  "prompt": "Social network influence and API hub criticality are determined by node in-degree centrality (number of inbound links from distinct entities).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: influencer_id, in_degree_centrality, influence_rank.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE network_follows (\n                follower_id INT,\n                target_user_id INT\n            );\n            INSERT INTO network_follows VALUES\n                (101, 1), (102, 1), (103, 1), (104, 1), -- Node 1 has 4 followers\n                (101, 2), (102, 2),                     -- Node 2 has 2 followers\n                (101, 3);                               -- Node 3 has 1 follower",
+  "golden_sql": "-- Compute in-degree centrality and influence rank\n            SELECT \n                target_user_id AS influencer_id,\n                COUNT(DISTINCT follower_id) AS in_degree_centrality,\n                DENSE_RANK() OVER (ORDER BY COUNT(DISTINCT follower_id) DESC) AS influence_rank\n            FROM network_follows\n            GROUP BY target_user_id\n            ORDER BY influence_rank;",
+  "ordered": true,
+  "expected_columns": [
+    "influencer_id",
+    "in_degree_centrality",
+    "influence_rank"
+  ],
+  "why_it_fails": "Counting total edges without filtering distinct source nodes allows a single spammer to inflate influencer metrics."
+}

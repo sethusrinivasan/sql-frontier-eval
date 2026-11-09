@@ -1,0 +1,19 @@
+{
+  "id": "task_008_Q08_hopping_sliding_time_buckets",
+  "name": "Hopping / Overlapping Window Aggregations via time_bucket",
+  "category": "Temporal & Time-Series",
+  "description": "Real-time surveillance monitors rolling 15-minute average latency stepped forward every 5 minutes (a hopping window).",
+  "prompt": "Real-time surveillance monitors rolling 15-minute average latency stepped forward every 5 minutes (a hopping window).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: window_start, window_end, server_id, sample_count, avg_cpu, peak_cpu.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE server_metrics (\n                server_id VARCHAR,\n                metric_time TIMESTAMP,\n                cpu_utilization DOUBLE\n            );\n            INSERT INTO server_metrics VALUES\n                ('web-01', '2026-03-01 10:02:00', 45.0),\n                ('web-01', '2026-03-01 10:07:00', 78.0),\n                ('web-01', '2026-03-01 10:12:00', 92.0),\n                ('web-01', '2026-03-01 10:17:00', 60.0);",
+  "golden_sql": "-- Generate 15-minute sliding windows stepped every 5 minutes (hopping window)\n            WITH window_steps AS (\n                SELECT UNNEST(generate_series(\n                    TIMESTAMP '2026-03-01 10:00:00',\n                    TIMESTAMP '2026-03-01 10:15:00',\n                    INTERVAL '5 minutes'\n                )) AS window_start\n            )\n            SELECT \n                w.window_start,\n                w.window_start + INTERVAL '15 minutes' AS window_end,\n                m.server_id,\n                COUNT(m.cpu_utilization) AS sample_count,\n                ROUND(AVG(m.cpu_utilization), 2) AS avg_cpu,\n                MAX(m.cpu_utilization) AS peak_cpu\n            FROM window_steps w\n            JOIN server_metrics m\n              ON m.metric_time >= w.window_start\n             AND m.metric_time < w.window_start + INTERVAL '15 minutes'\n            GROUP BY w.window_start, m.server_id\n            ORDER BY w.window_start;",
+  "ordered": true,
+  "expected_columns": [
+    "window_start",
+    "window_end",
+    "server_id",
+    "sample_count",
+    "avg_cpu",
+    "peak_cpu"
+  ],
+  "why_it_fails": "Standard GROUP BY time_bucket only produces non-overlapping tumbling windows, missing cross-boundary bursts."
+}

@@ -1,0 +1,46 @@
+/*
+ ==============================================================================
+ Query ID:         Q42_negative_prompting_vector_repulsion
+ Title:            Vector Repulsion Scoring (Positive vs Negative Query Guidance)
+ Domain:           Vector & Embeddings
+ ------------------------------------------------------------------------------
+ Human Context:
+ In image generation and semantic search, users supply positive and negative prompts (e.g. 'cyberpunk city' NOT 'blurry / low quality'). The score boosts positive similarity and penalizes negative similarity.
+
+ The Hidden Trap:
+ Filtering out negatives with boolean NOT drops items that have even slight overlap with negative words.
+
+ The DuckDB Advantage:
+ DuckDB computes continuous vector repulsion formulas in standard SQL expressions.
+ ==============================================================================
+*/
+
+-- ----------------------------------------------------------------------------
+-- 1. SETUP DDL & FIXTURES
+-- ----------------------------------------------------------------------------
+CREATE TABLE generative_assets (
+                asset_id INT,
+                name VARCHAR,
+                vec FLOAT[2]
+            );
+            INSERT INTO generative_assets VALUES
+                (1, 'Sharp Neon Skyline',      [0.9, 0.1]::FLOAT[2]),
+                (2, 'Blurry Neon Streetscape', [0.8, 0.7]::FLOAT[2]),
+                (3, 'Rustic Wooden Cabin',     [0.0, 0.9]::FLOAT[2]);
+
+-- ----------------------------------------------------------------------------
+-- 2. PRODUCTION ANALYTICAL QUERY
+-- ----------------------------------------------------------------------------
+-- Positive query: [1.0, 0.0] (cyberpunk neon), Negative query: [0.0, 1.0] (blurry/rustic)
+            -- Net Score = Cosine(vec, pos) - (0.5 * Cosine(vec, neg))
+            SELECT 
+                asset_id,
+                name,
+                ROUND(array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 4) AS pos_sim,
+                ROUND(array_cosine_similarity(vec, [0.0, 1.0]::FLOAT[2]), 4) AS neg_sim,
+                ROUND(
+                    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) - 
+                    (0.50 * array_cosine_similarity(vec, [0.0, 1.0]::FLOAT[2])), 4
+                ) AS net_guided_score
+            FROM generative_assets
+            ORDER BY net_guided_score DESC;

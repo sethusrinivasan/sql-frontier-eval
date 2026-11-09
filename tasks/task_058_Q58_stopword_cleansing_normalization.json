@@ -1,0 +1,15 @@
+{
+  "id": "task_058_Q58_stopword_cleansing_normalization",
+  "name": "Stopword Filtering and Query Token Cleansing in SQL",
+  "category": "Search & Retrieval",
+  "description": "Search queries like 'what is the best laptop' contain stop words ('what', 'is', 'the') that dilute search precision if not filtered prior to catalog matching.",
+  "prompt": "Search queries like 'what is the best laptop' contain stop words ('what', 'is', 'the') that dilute search precision if not filtered prior to catalog matching.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: clean_tokens, cleansed_search_query.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE stopwords (word VARCHAR);\n            INSERT INTO stopwords VALUES ('what'), ('is'), ('the'), ('and'), ('or'), ('a'), ('an');",
+  "golden_sql": "-- Cleanse raw search tokens by filtering out stopwords\n            WITH raw_query AS (\n                SELECT UNNEST(string_split(lower('what is the best gaming laptop'), ' ')) AS token\n            ),\n            clean_tokens AS (\n                SELECT q.token\n                FROM raw_query q\n                LEFT JOIN stopwords s ON q.token = s.word\n                WHERE s.word IS NULL\n            )\n            SELECT \n                list(token) AS clean_tokens,\n                string_agg(token, ' ') AS cleansed_search_query\n            FROM clean_tokens;",
+  "ordered": false,
+  "expected_columns": [
+    "clean_tokens",
+    "cleansed_search_query"
+  ],
+  "why_it_fails": "Leaving stopwords in keyword queries causes high-frequency words to trigger millions of false positive matches."
+}

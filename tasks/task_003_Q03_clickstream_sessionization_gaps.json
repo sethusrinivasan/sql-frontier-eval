@@ -1,0 +1,17 @@
+{
+  "id": "task_003_Q03_clickstream_sessionization_gaps",
+  "name": "Clickstream Sessionization with Inactivity Timeouts (Gaps & Islands)",
+  "category": "Temporal & Time-Series",
+  "description": "Digital analytics platforms group raw user pageviews into 'sessions'. If a user is inactive for more than 30 minutes, the next click begins a brand-new session.",
+  "prompt": "Digital analytics platforms group raw user pageviews into 'sessions'. If a user is inactive for more than 30 minutes, the next click begins a brand-new session.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: user_id, event_time, page_url, session_id.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE user_events (\n                user_id INT,\n                event_time TIMESTAMP,\n                page_url VARCHAR\n            );\n            INSERT INTO user_events VALUES\n                (101, '2026-03-01 10:00:00', '/home'),\n                (101, '2026-03-01 10:05:00', '/products'),\n                (101, '2026-03-01 10:45:00', '/checkout'), -- 40m gap -> New session\n                (101, '2026-03-01 10:50:00', '/confirmation');",
+  "golden_sql": "-- Detect session breaks (>30 min inactivity) and assign deterministic session UUIDs\n            WITH event_lags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Compare against preceding event timestamp for this user\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_event_time\n                FROM user_events\n            ),\n            session_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Mark 1 if first event or gap exceeds 30 minutes, else 0\n                    CASE \n                        WHEN prev_event_time IS NULL THEN 1\n                        WHEN date_diff('second', prev_event_time, event_time) > 1800 THEN 1 \n                        ELSE 0 \n                    END AS is_new_session\n                FROM event_lags\n            )\n            SELECT \n                user_id,\n                event_time,\n                page_url,\n                -- Cumulative sum over flags establishes monotonically increasing session ID\n                SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY event_time) AS session_id\n            FROM session_flags\n            ORDER BY user_id, event_time;",
+  "ordered": true,
+  "expected_columns": [
+    "user_id",
+    "event_time",
+    "page_url",
+    "session_id"
+  ],
+  "why_it_fails": "Models mistakenly partition by user_id and take ROW_NUMBER(), which fails to segment sessions by time gaps, or use self-joins which scale quadratically."
+}

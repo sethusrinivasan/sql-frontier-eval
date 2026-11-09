@@ -1,0 +1,17 @@
+{
+  "id": "task_069_Q69_query_relaxation_fallback",
+  "name": "Zero-Result Search Query Relaxation (Strict AND -> Loose OR Fallback)",
+  "category": "Search & Retrieval",
+  "description": "If a multi-word search query (e.g. 'ergonomic mechanical wireless split keyboard') returns zero results under strict AND matching, modern engines gracefully relax to OR matching.",
+  "prompt": "If a multi-word search query (e.g. 'ergonomic mechanical wireless split keyboard') returns zero results under strict AND matching, modern engines gracefully relax to OR matching.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: id, title, match_score, match_tier.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE keyboard_catalog (\n                id INT,\n                title VARCHAR\n            );\n            INSERT INTO keyboard_catalog VALUES\n                (1, 'Ergonomic Split Keyboard Wired'),\n                (2, 'Mechanical Wireless Office Keyboard'),\n                (3, 'Standard Membrane Keyboard');",
+  "golden_sql": "-- Query tokens: 'ergonomic', 'mechanical', 'wireless'\n            WITH scored_matches AS (\n                SELECT \n                    id,\n                    title,\n                    (CASE WHEN title ILIKE '%ergonomic%' THEN 1 ELSE 0 END +\n                     CASE WHEN title ILIKE '%mechanical%' THEN 1 ELSE 0 END +\n                     CASE WHEN title ILIKE '%wireless%' THEN 1 ELSE 0 END) AS match_score\n                FROM keyboard_catalog\n            )\n            SELECT \n                id,\n                title,\n                match_score,\n                CASE WHEN match_score = 3 THEN 'STRICT_ALL_MATCH' ELSE 'RELAXED_PARTIAL_MATCH' END AS match_tier\n            FROM scored_matches\n            WHERE match_score >= 1\n            ORDER BY match_score DESC, id;",
+  "ordered": true,
+  "expected_columns": [
+    "id",
+    "title",
+    "match_score",
+    "match_tier"
+  ],
+  "why_it_fails": "Failing to return fallback results leads to user bounce and abandoned sessions."
+}

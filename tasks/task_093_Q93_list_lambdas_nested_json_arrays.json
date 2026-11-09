@@ -1,0 +1,17 @@
+{
+  "id": "task_093_Q93_list_lambdas_nested_json_arrays",
+  "name": "List Lambdas for High-Performance Nested Array Transformations",
+  "category": "Warehouse & Statistical",
+  "description": "Modern analytical warehouses store nested array payloads (e.g. array of discount percentages). Transforming or filtering elements directly inside the array without unnesting and re-aggregating saves massive compute.",
+  "prompt": "Modern analytical warehouses store nested array payloads (e.g. array of discount percentages). Transforming or filtering elements directly inside the array without unnesting and re-aggregating saves massive compute.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: cart_id, raw_discounts, qualifying_discounts, doubled_qualifying_discounts.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE shopping_carts (\n                cart_id INT,\n                discounts_applied INT[],\n                item_prices DOUBLE[]\n            );\n            INSERT INTO shopping_carts VALUES\n                (1, [5, 15, 25], [100.0, 50.0, 20.0]),\n                (2, [0, 10],     [200.0, 80.0]);",
+  "golden_sql": "-- Filter out discounts <= 5% and double remaining discount percentages using list lambdas\n            SELECT \n                cart_id,\n                discounts_applied AS raw_discounts,\n                list_filter(discounts_applied, lambda x: x > 5) AS qualifying_discounts,\n                list_transform(\n                    list_filter(discounts_applied, lambda x: x > 5), \n                    lambda x: x * 2\n                ) AS doubled_qualifying_discounts\n            FROM shopping_carts\n            ORDER BY cart_id;",
+  "ordered": true,
+  "expected_columns": [
+    "cart_id",
+    "raw_discounts",
+    "qualifying_discounts",
+    "doubled_qualifying_discounts"
+  ],
+  "why_it_fails": "Unnesting arrays to flat rows and re-aggregating with LIST() triggers expensive hash shuffles."
+}

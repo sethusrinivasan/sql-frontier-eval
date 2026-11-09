@@ -1,0 +1,17 @@
+{
+  "id": "task_116_graph_cycle_visited_protection",
+  "name": "Directed Dependency Graph Cycle Protection via Visited Array Path",
+  "category": "Graph & Hierarchy",
+  "description": "Traverses downstream dependencies in a directed acyclic graph that contains an intentional cyclic loop (A -> B -> C -> A), requiring visited path arrays to prevent infinite recursion OOM.",
+  "prompt": "Traverse all reachable downstream tasks starting from 'BUILD_CORE'.\nCRITICAL: The graph contains a cyclic dependency ('COMPILE_LIB' -> 'TEST_SUITE' -> 'BUILD_CORE'). The query MUST detect already-visited nodes and terminate traversal to prevent infinite recursion.\n\nRequired output columns:\n- task_id (VARCHAR)\n- min_depth (INT)\n\nOrder by min_depth ASC, task_id ASC.",
+  "setup_sql": "\nCREATE TABLE task_edges (parent_task VARCHAR, child_task VARCHAR);\nINSERT INTO task_edges VALUES\n  ('START', 'BUILD_CORE'),\n  ('BUILD_CORE', 'COMPILE_LIB'),\n  ('COMPILE_LIB', 'TEST_SUITE'),\n  ('TEST_SUITE', 'BUILD_CORE'),   -- Circular loop!\n  ('TEST_SUITE', 'PACKAGE_APP');\n",
+  "golden_sql": "\nWITH RECURSIVE downstream_graph AS (\n    SELECT \n        child_task AS task_id,\n        1 AS depth,\n        ['BUILD_CORE', child_task] AS path_nodes\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n    \n    UNION ALL\n    \n    SELECT \n        e.child_task,\n        g.depth + 1,\n        list_append(g.path_nodes, e.child_task)\n    FROM downstream_graph g\n    JOIN task_edges e ON g.task_id = e.parent_task\n    WHERE NOT list_contains(g.path_nodes, e.child_task)\n      AND g.depth < 10\n)\nSELECT \n    task_id,\n    MIN(depth) AS min_depth\nFROM downstream_graph\nGROUP BY task_id\nORDER BY min_depth ASC, task_id ASC;\n",
+  "naive_llm_sql": "\nWITH RECURSIVE downstream_graph AS (\n    SELECT child_task AS task_id, 1 AS depth\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n    UNION ALL\n    SELECT e.child_task, g.depth + 1\n    FROM downstream_graph g\n    JOIN task_edges e ON g.task_id = e.parent_task\n    WHERE g.depth < 3\n)\nSELECT task_id, MIN(depth) AS min_depth\nFROM downstream_graph\nGROUP BY task_id\nORDER BY min_depth ASC, task_id ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "task_id",
+    "min_depth"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Standard recursive CTEs without cycle tracking (omitting visited array state) enter an infinite recursion loop on cyclic graphs, causing DuckDB or any relational database to fail with a max-recursion limit error or crash with an Out-of-Memory exception."
+}

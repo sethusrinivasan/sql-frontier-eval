@@ -27,10 +27,13 @@ Built on an isolated in-memory **DuckDB 2.0 engine**, the harness enforces **zer
 
 1. **Silent Correctness vs. Syntax Errors**: Frontier models achieve near-perfect syntax validity, but regularly fail domain-level semantic invariants. In our offline reference evaluations, naive queries passed execution without syntax warnings while silently multiplying gross revenues by 400% or dropping active customer segments to zero rows.
 2. **Cross-Frontier Model Divergence (Gemini, Claude, GPT)**:
+   - **Claude Opus 4.6 (Thinking)** achieved a perfect **8/8 (100.0%)** (avg 6.9s/task), resolving funnel precedence cleanly without generating Cartesian cross products.
+   - **Gemini 3.8 Flash (Low Reasoning)** achieved a perfect **8/8 (100.0%)** as the fastest evaluated model (avg 4.6s/task, sub-5ms DuckDB execution).
    - **Gemini 3.8 Flash (Medium Reasoning)** scored a perfect **8/8 (100.0%)**, properly synthesizing CTE pre-aggregations, `NOT EXISTS` anti-joins, and single-scan conditional flags for funnel analysis.
-   - **Claude Opus 4.6 Thinking & Claude Sonnet 4.6** both scored **7/8 (87.5%)** with rapid inference (6.8s/task), but both failed Task 06 (Strict Funnel Precedence) due to multiple `COUNT(DISTINCT ...)` aggregations that DuckDB compiled into an internal `CROSS_PRODUCT`.
-   - **GPT-OSS 120B (Medium)** scored **7/8 (87.5%)**, exhibiting the same funnel precedence cross-product anti-pattern.
-   - **Gemini 3.8 Flash (Low Reasoning)** scored **7/8 (87.5%)** in just 4.2s/task, also failing Task 06.
+   - **Claude Sonnet 4.6 (Thinking)** and **GPT-OSS 120B (Medium)** scored **7/8 (87.5%)**, failing Task 06 (Strict Funnel Precedence) due to multiple `COUNT(DISTINCT ...)` aggregations that DuckDB compiled into an internal `CROSS_PRODUCT`.
+   - **Gemini 3.8 Flash (High Reasoning)** scored **6/8 (75.0%)**, suffering timeouts during extended deliberation on complex window frames.
+   - **Comprehensive 120-Task Baseline**: The benchmark spans 120 tasks (10 core failure traps, 100 master analytical queries across 5 modern domains, and 10 hardened frontier trap challenges) with **100% (120/120) Ground Truth Verification**. Hardened stress-testing exposed distinct model cracks in GPT-OSS 120B (66.7% pass rate: circular CTE recursion syntax, array type binder errors, and unnormalized decay revenue over-allocation).
+   - **Zero-LLM CI/CD Automation**: Complete automated testing runs via GitHub Actions without requiring external LLM API access.
 3. **Execution Plan Anti-Patterns**: Without deep warehouse optimization constraints, frontier models frequently substitute linear window range frames with quadratic triangular self-joins (`ON b.ts BETWEEN a.ts - INTERVAL 6 DAYS AND a.ts`), causing query planners to fall back to $O(N^2)$ merge joins or Cartesian cross products.
 
 ---

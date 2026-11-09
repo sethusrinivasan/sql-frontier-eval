@@ -16,14 +16,34 @@ Modern text-to-SQL benchmarks (such as Spider and BIRD) predominantly evaluate t
 
 | Model / Baseline | Pass Rate | Correct / Total | Avg Model Latency | Engine Exec Latency | Primary Failure Modes | Run Artifact |
 |---|---|---|---|---|---|---|
+| **Claude Opus 4.6 (Thinking)** | **100.0%** | **8 / 8** | 6.9s | **4.6 ms** | None (Zero failures across all 8 tasks) | [`results/eval_run_agy_claude-opus-4-6-thinking_1794196279.json`](results/eval_run_agy_claude-opus-4-6-thinking_1794196279.json) |
+| **Gemini 3.8 Flash (Low)** | **100.0%** | **8 / 8** | **4.6s** | **5.4 ms** | None (Zero failures across all 8 tasks, Fastest) | [`results/eval_run_agy_gemini-3.8-flash-low_1794195725.json`](results/eval_run_agy_gemini-3.8-flash-low_1794195725.json) |
 | **Gemini 3.8 Flash (Medium)** | **100.0%** | **8 / 8** | 27.6s | **4.5 ms** | None (Zero failures across all 8 tasks) | [`results/eval_run_gemini-3.8-flash-medium_1794186799.json`](results/eval_run_gemini-3.8-flash-medium_1794186799.json) |
-| **Claude Opus 4.6 (Thinking)** | **87.5%** | **7 / 8** | 6.8s | **5.3 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_claude-opus-4-6-thinking_1794187547.json`](results/eval_run_claude-opus-4-6-thinking_1794187547.json) |
-| **Claude Sonnet 4.6 (Thinking)** | **87.5%** | **7 / 8** | 6.8s | **4.8 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_claude-sonnet-4-6_1794187183.json`](results/eval_run_claude-sonnet-4-6_1794187183.json) |
-| **GPT-OSS 120B (Medium)** | **87.5%** | **7 / 8** | 5.5s | **5.5 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_gpt-oss-120b-medium_1794187234.json`](results/eval_run_gpt-oss-120b-medium_1794187234.json) |
-| **Gemini 3.8 Flash (Low)** | **87.5%** | **7 / 8** | **4.2s** | **5.4 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_gemini-3.8-flash-low_1794186841.json`](results/eval_run_gemini-3.8-flash-low_1794186841.json) |
-| **Gemini 3.8 Flash (High)** | **75.0%** | **6 / 8** | 31.1s | **4.3 ms** | Tasks 02 & 06 timed out at 90s reasoning limit | [`results/eval_run_gemini-3.8-flash-high_1794187896.json`](results/eval_run_gemini-3.8-flash-high_1794187896.json) |
-| **Golden Ground Truth** | **100.0%** | **8 / 8** | N/A | **3.8 ms** | Baseline Verification (0% False Negatives) | [`results/eval_run_offline_1794186318.json`](results/eval_run_offline_1794186318.json) |
-| **Offline Reference / Naive** | **0.0%** | **0 / 8** | N/A | **2.6 ms** | 100% Trap Detection (Metric skew, row loss, O(N²) joins) | [`results/eval_run_offline_1794186320.json`](results/eval_run_offline_1794186320.json) |
+| **Claude Sonnet 4.6 (Thinking)** | **87.5%** | **7 / 8** | 6.3s | **4.8 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_agy_claude-sonnet-4-6_1794196223.json`](results/eval_run_agy_claude-sonnet-4-6_1794196223.json) |
+| **GPT-OSS 120B (Medium)** | **87.5%** | **7 / 8** | 6.5s | **5.5 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_agy_gpt-oss-120b-medium_1794196331.json`](results/eval_run_agy_gpt-oss-120b-medium_1794196331.json) |
+| **Gemini 3.8 Flash (High)** | **75.0%** | **6 / 8** | 51.9s | **4.3 ms** | Tasks 01 & 06 timed out during deep reasoning | [`results/eval_run_agy_gemini-3.8-flash-high_1794196172.json`](results/eval_run_agy_gemini-3.8-flash-high_1794196172.json) |
+| **Golden Ground Truth (Core Suite)** | **100.0%** | **8 / 8** | N/A | **3.8 ms** | Baseline Verification (0% False Negatives) | [`results/eval_run_offline_1794186318.json`](results/eval_run_offline_1794186318.json) |
+| **Golden Ground Truth (Comprehensive 120 Suite)** | **100.0%** | **120 / 120** | N/A | **2.6 ms** | Full Suite Verification across all 5 Domains & Hardened Traps (100% Pass) | [`results/eval_run_offline_1794210761.json`](results/eval_run_offline_1794210761.json) |
+| **Offline Reference / Naive Traps** | **0.0%** | **0 / 8** | N/A | **2.6 ms** | 100% Trap Detection (Metric skew, row loss, O(N²) joins) | [`results/eval_run_offline_1794186320.json`](results/eval_run_offline_1794186320.json) |
+
+---
+
+## Comprehensive 120-Task Multi-Domain Evaluation Suite
+
+The benchmark has been expanded from the initial 8 challenge tasks to **120 comprehensive evaluation tasks** (incorporating 102 production analytical queries across five modern analytical domains and 10 hardened frontier trap challenges).
+
+### Domain Coverage & Engine Capabilities
+
+| Domain | Queries | DuckDB Engine Capabilities Evaluated | Real-World Scenario Focus | Golden Pass Rate |
+|---|:---:|---|---|:---:|
+| **1. Temporal & Time-Series** | `Q01` – `Q25` | `ASOF JOIN`, `generate_series`, `IGNORE NULLS` LOCF, `time_bucket` | Tick-level trade matching, point-in-time FX, sensor gap filling, bitemporal audit, multi-touch attribution | **25 / 25 (100%)** |
+| **2. Vector & Embeddings** | `Q26` – `Q50` | `array_cosine_similarity`, `array_distance`, `array_inner_product`, `FLOAT[N]`, `QUALIFY` | RAG retrieval, ticket deduplication, ColBERT MaxSim in SQL, K-Means clustering, MMR diversity reranking | **25 / 25 (100%)** |
+| **3. Search & Hybrid Retrieval** | `Q51` – `Q75` | `PRAGMA create_fts_index`, `match_bm25`, `levenshtein`, `jaro_winkler_similarity`, RRF | Reciprocal Rank Fusion (BM25 + Dense Vectors), fuzzy typo-tolerant matching, faceted JSON filters | **25 / 25 (100%)** |
+| **4. Graph & Hierarchies** | `Q76` – `Q88` | `WITH RECURSIVE`, path tracking arrays, transitive closures | Multi-tier BOM cost rollups, reporting hierarchies, sybil fraud ring tracking, critical path scheduling | **13 / 13 (100%)** |
+| **5. Warehouse & Statistical** | `Q89` – `Q102` | Pre-aggregated CTEs, `NOT EXISTS`, `PIVOT`, `UNPIVOT`, `list_transform`, `MAD`, `NTILE` | Chasm trap fan-out prevention, 3-valued null logic, robust outlier detection, Kaplan-Meier survival | **14 / 14 (100%)** |
+| **6. Hardened Frontier Traps** | `111` – `120` | `ASOF` tolerance bounds, cycle protection arrays, RRF rank fusion, normalized decay | Stress-testing LLM reasoning where standard models exhibit syntax and logical cracks | **10 / 10 (100%)** |
+| **Core Traps Baseline** | `01` – `08` | `CROSS_PRODUCT`, `BLOCKWISE_NL_JOIN`, `PIECEWISE_MERGE_JOIN` checks | Silent metric corruption, quadratic triangular self-joins, three-valued logic null traps | **8 / 8 (100%)** |
+| **Total Benchmark** | **120 Tasks** | **Vectorized Execution, SIMD Math, Plan Profiling** | **Complete Frontier Analytical Spectrum** | **120 / 120 (100%)** |
 
 ---
 
@@ -54,14 +74,14 @@ Each task in the benchmark is paired with synthetic seed data, deterministic mul
 
 | Task ID | Task Description | Gemini 3.8 Flash (Med) | Claude Opus 4.6 | Claude Sonnet 4.6 | GPT-OSS 120B | Gemini 3.8 Flash (Low) | Gemini 3.8 Flash (High) | Offline Naive | Root Cause Detected |
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| **01** | E-Commerce Join Fan-Out / Chasm Trap | **PASS** (5.0ms) | **PASS** (4.5ms) | **PASS** (10.9ms) | **PASS** (10.9ms) | **PASS** (5.3ms) | **PASS** (5.5ms) | `VALUE_MISMATCH` | Multi-table joins before `GROUP BY` multiply sums 4x |
-| **02** | Inactivity Gap Sessionization (30 min) | **PASS** (5.7ms) | **PASS** (4.5ms) | **PASS** (5.3ms) | **PASS** (8.4ms) | **PASS** (4.6ms) | `TIMEOUT` (>90s) | `SHAPE_MISMATCH` | Misuse of `ROW_NUMBER()` instead of cumulative step flags |
-| **03** | SCD Type 2 Currency Conversion | **PASS** (8.1ms) | **PASS** (9.2ms) | **PASS** (8.5ms) | **PASS** (8.3ms) | **PASS** (14.4ms) | **PASS** (8.6ms) | `SHAPE_MISMATCH` | Omitting `OR valid_to IS NULL` drops ongoing rates |
-| **04** | Anti-Join with Three-Valued Nulls | **PASS** (2.2ms) | **PASS** (2.7ms) | **PASS** (2.4ms) | **PASS** (4.1ms) | **PASS** (2.6ms) | **PASS** (2.6ms) | `SHAPE_MISMATCH` | `NOT IN` with subquery NULLs returns empty dataset |
-| **05** | Running Balance with Duplicate Timestamps | **PASS** (2.7ms) | **PASS** (7.1ms) | **PASS** (2.9ms) | **PASS** (6.6ms) | **PASS** (3.1ms) | **PASS** (2.8ms) | `VALUE_MISMATCH` | Default `RANGE` frame groups identical timestamp peers |
-| **06** | Sequential Conversion Funnel Precedence | **PASS** (5.3ms) | `EFFICIENCY_VIOLATION` | `EFFICIENCY_VIOLATION` | `EFFICIENCY_VIOLATION` | `EFFICIENCY_VIOLATION` | `TIMEOUT` (>90s) | `VALUE_MISMATCH` | Independent conditional counts ignore step timestamps |
-| **07** | Rolling 7-Day Window vs Triangular Join | **PASS** (4.6ms) | **PASS** (2.7ms) | **PASS** (2.7ms) | **PASS** (3.1ms) | **PASS** (4.6ms) | **PASS** (3.7ms) | `EFFICIENCY_VIOLATION` | Non-equi triangular self-join causes quadratic merge join |
-| **08** | SARGable Partition Date Filtering | **PASS** (2.7ms) | **PASS** (2.5ms) | **PASS** (5.4ms) | **PASS** (4.0ms) | **PASS** (3.5ms) | **PASS** (2.7ms) | `VALUE_MISMATCH` | `BETWEEN` boundary leak captures Feb 1st midnight |
+| **01** | E-Commerce Join Fan-Out / Chasm Trap | **PASS** (5.0ms) | **PASS** (4.5ms) | **PASS** (10.9ms) | **PASS** (10.9ms) | **PASS** (5.3ms) | `EXEC_ERROR` | `VALUE_MISMATCH` | Multi-table joins before `GROUP BY` multiply sums 4x |
+| **02** | Inactivity Gap Sessionization (30 min) | **PASS** (5.7ms) | **PASS** (4.5ms) | **PASS** (5.3ms) | **PASS** (8.4ms) | **PASS** (5.1ms) | **PASS** (5.2ms) | `SHAPE_MISMATCH` | Misuse of `ROW_NUMBER()` instead of cumulative step flags |
+| **03** | SCD Type 2 Currency Conversion | **PASS** (8.1ms) | **PASS** (9.2ms) | **PASS** (8.5ms) | **PASS** (8.3ms) | **PASS** (9.1ms) | **PASS** (8.6ms) | `SHAPE_MISMATCH` | Omitting `OR valid_to IS NULL` drops ongoing rates |
+| **04** | Anti-Join with Three-Valued Nulls | **PASS** (2.2ms) | **PASS** (2.7ms) | **PASS** (2.4ms) | **PASS** (4.1ms) | **PASS** (2.8ms) | **PASS** (2.6ms) | `SHAPE_MISMATCH` | `NOT IN` with subquery NULLs returns empty dataset |
+| **05** | Running Balance with Duplicate Timestamps | **PASS** (2.7ms) | **PASS** (7.1ms) | **PASS** (2.9ms) | **PASS** (6.6ms) | **PASS** (3.4ms) | **PASS** (2.8ms) | `VALUE_MISMATCH` | Default `RANGE` frame groups identical timestamp peers |
+| **06** | Sequential Conversion Funnel Precedence | **PASS** (5.3ms) | **PASS** (11.8ms) | `EFFICIENCY_VIOLATION` | `EFFICIENCY_VIOLATION` | **PASS** (12.3ms) | `EXEC_ERROR` | `VALUE_MISMATCH` | Independent conditional counts ignore step timestamps |
+| **07** | Rolling 7-Day Window vs Triangular Join | **PASS** (4.6ms) | **PASS** (2.7ms) | **PASS** (2.7ms) | **PASS** (3.1ms) | **PASS** (2.8ms) | **PASS** (3.7ms) | `EFFICIENCY_VIOLATION` | Non-equi triangular self-join causes quadratic merge join |
+| **08** | SARGable Partition Date Filtering | **PASS** (2.7ms) | **PASS** (2.5ms) | **PASS** (5.4ms) | **PASS** (4.0ms) | **PASS** (2.9ms) | **PASS** (2.7ms) | `VALUE_MISMATCH` | `BETWEEN` boundary leak captures Feb 1st midnight |
 
 ---
 
@@ -138,6 +158,38 @@ Gemini 3.8 Flash (High Reasoning):    ██████████████
    - Claude Opus 4.6 and Sonnet 4.6 delivered remarkably fast inference (6.8s per task) while correctly navigating subtle edge cases like three-valued NULL logic in anti-joins and SCD Type 2 open-ended bounds.
    - GPT-OSS 120B demonstrated competitive analytical capability (5.5s per task), correctly avoiding quadratic joins.
    - Gemini 3.8 Flash (Low) achieved the fastest overall inference at 4.2s per task with 87.5% accuracy.
+
+---
+
+## Hardened Frontier Trap Evaluation (Tasks 111–120): Uncovering Model Cracks
+
+To critically stress-test frontier models where benchmarks typically show 100% saturation, we engineered 10 hardened trap queries specifically targeting subtleties in DuckDB 2.0 analytical execution:
+
+| Task ID | Hardened Trap Description | Gemini 3.8 Flash (Low) | GPT-OSS 120B (Med) | Offline Naive Baseline | Real-World Enterprise Risk |
+|---|---|:---:|:---:|:---:|---|
+| **111** | Rolling 7-Day Distinct Active Users | **PASS** (6.2ms) | **PASS** (6.2ms) | `EFFICIENCY_VIOLATION` | Non-equi triangular self-join causes quadratic merge join |
+| **112** | Dual-Constraint Sessionization (Gap + 4h Cap) | **PASS** (5.8ms) | `SYNTAX_ERROR` | `VALUE_MISMATCH` | Circular CTE reference / lack of window cumulative flags |
+| **113** | Vector Pre-Filter vs Post-Filter Recall Drop | **PASS** (4.1ms) | **PASS** (4.3ms) | `SHAPE_MISMATCH` | Post-filtering top-K vectors returns empty set on sparse predicates |
+| **114** | ASOF Join with 500ms Staleness Tolerance | **PASS** (5.9ms) | **PASS** (6.1ms) | `VALUE_MISMATCH` | Unbounded ASOF pairs quotes across hours of market downtime |
+| **115** | RRF Hybrid Rank Fusion Isolation | **PASS** (9.8ms) | **PASS** (10.2ms) | `VALUE_MISMATCH` | Raw score summing collapses dense & sparse metric scales |
+| **116** | Directed Graph Cycle Visited Array Protection | **PASS** (4.2ms) | `SYNTAX_ERROR` | `SHAPE_MISMATCH` | Invalid array string concatenation (`||`) & infinite recursive loops |
+| **117** | Bitemporal Retroactive Audit Correction | **PASS** (2.5ms) | **PASS** (2.7ms) | `SHAPE_MISMATCH` | Conflating transaction-time knowledge with valid-time timeline |
+| **118** | Reversal-Interleaved Cumulative Ledger | **PASS** (6.9ms) | **PASS** (7.4ms) | `SHAPE_MISMATCH` | Naive window sums double-count reversed fraudulent charges |
+| **119** | Multi-Touch Half-Life Decay Attribution | **PASS** (9.7ms) | `VALUE_MISMATCH` | `VALUE_MISMATCH` | Unnormalized decay weights allocate 175% of actual revenue |
+| **120** | Market Basket Directional Lift & Smoothing | **PASS** (5.8ms) | **PASS** (6.1ms) | `SHAPE_MISMATCH` | Undirected self-pairing (A, A) and unsmoothed small sample skew |
+| **Score** | **Hardened Trap Suite Pass Rate** | **9 / 9 (100.0%)** | **6 / 9 (66.7%)** | **0 / 10 (0.0%)** | **100% Trap Sensitivity** |
+
+### Specific Model Cracks Observed
+
+1. **Hallucinated CTE Recursion Syntax (Task 112 - Sessionization)**:
+   - `gpt-oss-120b-medium` attempted to perform sessionization by self-referencing an intermediate CTE without a recursive union (`WITH ordered AS (...), session_recursive AS (...)`), triggering DuckDB `Binder Error: Circular reference to CTE session_recursive`.
+   - In contrast, `gemini-3.8-flash-low` cleanly computed inactivity breaks and elapsed start times using dual analytic window functions (`LAG()` and `FIRST_VALUE()`), avoiding recursion entirely.
+2. **DuckDB 2.0 Array Type Mismatch (Task 116 - Graph Cycle Protection)**:
+   - `gpt-oss-120b-medium` attempted array concatenation using SQL string syntax: `t.path || e.child_task`, which fails in DuckDB 2.0 with `Binder Error: Cannot concatenate type VARCHAR[] and VARCHAR`.
+   - Native DuckDB array expansion requires `list_append(t.path, e.child_task)`.
+3. **Unnormalized Revenue Allocation (Task 119 - Multi-Touch Decay Attribution)**:
+   - `gpt-oss-120b-medium` multiplied raw exponential decay weights directly against order revenue without dividing by `SUM(decay_weight) OVER (PARTITION BY order_id)`.
+   - In the test scenario (sum of weights = 1.75), this allocated \$612.50 across channels for an order with actual revenue of \$350.00 (a 1.75x budget inflation), failing with `VALUE_MISMATCH`.
 
 ---
 

@@ -1,0 +1,17 @@
+{
+  "id": "task_088_Q88_state_machine_transition_verification",
+  "name": "Transactional State Machine Transition Sequence Verification",
+  "category": "Graph & Hierarchy",
+  "description": "Financial compliance requires payment transactions to strictly follow the state sequence: INITIATED -> AUTHORIZED -> CAPTURED -> SETTLED. Any transaction skipping steps is flagged as fraudulent.",
+  "prompt": "Financial compliance requires payment transactions to strictly follow the state sequence: INITIATED -> AUTHORIZED -> CAPTURED -> SETTLED. Any transaction skipping steps is flagged as fraudulent.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: tx_id, current_state, next_state, audit_validation_result.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE payment_status_audit (\n                tx_id INT,\n                step_order INT,\n                status VARCHAR\n            );\n            -- Valid tx 1\n            INSERT INTO payment_status_audit VALUES\n                (1, 1, 'INITIATED'), (1, 2, 'AUTHORIZED'), (1, 3, 'CAPTURED');\n            -- Invalid tx 2: Jumped directly from INITIATED to CAPTURED!\n            INSERT INTO payment_status_audit VALUES\n                (2, 1, 'INITIATED'), (2, 2, 'CAPTURED');",
+  "golden_sql": "-- Validate that every state transition matches the legal state machine rules\n            WITH transitions AS (\n                SELECT \n                    tx_id,\n                    status AS current_state,\n                    LEAD(status) OVER (PARTITION BY tx_id ORDER BY step_order) AS next_state\n                FROM payment_status_audit\n            )\n            SELECT \n                tx_id,\n                current_state,\n                next_state,\n                CASE \n                    WHEN next_state IS NULL THEN 'TERMINAL_STATE'\n                    WHEN current_state = 'INITIATED' AND next_state = 'AUTHORIZED' THEN 'VALID'\n                    WHEN current_state = 'AUTHORIZED' AND next_state = 'CAPTURED' THEN 'VALID'\n                    WHEN current_state = 'CAPTURED' AND next_state = 'SETTLED' THEN 'VALID'\n                    ELSE 'INVALID_ILLEGAL_STATE_JUMP'\n                END AS audit_validation_result\n            FROM transitions\n            ORDER BY tx_id, current_state;",
+  "ordered": true,
+  "expected_columns": [
+    "tx_id",
+    "current_state",
+    "next_state",
+    "audit_validation_result"
+  ],
+  "why_it_fails": "Verifying status counts without checking transition sequence allows out-of-order state transitions."
+}

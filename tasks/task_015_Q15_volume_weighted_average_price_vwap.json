@@ -1,0 +1,18 @@
+{
+  "id": "task_015_Q15_volume_weighted_average_price_vwap",
+  "name": "Intraday Volume-Weighted Average Price (VWAP) Resetting Daily",
+  "category": "Temporal & Time-Series",
+  "description": "VWAP provides institutional traders the definitive benchmark price weighted by traded volume, resetting to zero at the start of every trading day.",
+  "prompt": "VWAP provides institutional traders the definitive benchmark price weighted by traded volume, resetting to zero at the start of every trading day.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: symbol, trade_time, price, volume, intraday_vwap.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE market_trades (\n                symbol VARCHAR,\n                trade_time TIMESTAMP,\n                price DOUBLE,\n                volume INT\n            );\n            INSERT INTO market_trades VALUES\n                ('AAPL', '2026-03-01 09:35:00', 180.00, 1000),\n                ('AAPL', '2026-03-01 09:40:00', 181.00, 2000),\n                ('AAPL', '2026-03-02 09:35:00', 182.00, 500); -- Next day reset",
+  "golden_sql": "-- Intraday continuous VWAP calculation\n            SELECT \n                symbol,\n                trade_time,\n                price,\n                volume,\n                ROUND(\n                    SUM(price * volume) OVER (\n                        PARTITION BY symbol, CAST(trade_time AS DATE)\n                        ORDER BY trade_time\n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    ) / \n                    SUM(volume) OVER (\n                        PARTITION BY symbol, CAST(trade_time AS DATE)\n                        ORDER BY trade_time\n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    ), 2\n                ) AS intraday_vwap\n            FROM market_trades\n            ORDER BY symbol, trade_time;",
+  "ordered": true,
+  "expected_columns": [
+    "symbol",
+    "trade_time",
+    "price",
+    "volume",
+    "intraday_vwap"
+  ],
+  "why_it_fails": "Failing to partition by trading date mixes multi-day volume into the intraday numerator and denominator."
+}

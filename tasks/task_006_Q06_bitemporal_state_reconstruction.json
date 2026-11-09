@@ -1,0 +1,19 @@
+{
+  "id": "task_006_Q06_bitemporal_state_reconstruction",
+  "name": "Bitemporal Auditing: Valid-Time vs. Transaction-Time Alignment",
+  "category": "Temporal & Time-Series",
+  "description": "Financial compliance requires knowing: 'What did we believe customer Alice's credit limit was on May 15th, based on what was entered into our database as of June 1st?' (Bitemporal query).",
+  "prompt": "Financial compliance requires knowing: 'What did we believe customer Alice's credit limit was on May 15th, based on what was entered into our database as of June 1st?' (Bitemporal query).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: customer_id, limit_as_known_then, valid_from, valid_to, system_from, system_to.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE credit_limits_audit (\n                customer_id INT,\n                credit_limit DECIMAL(10,2),\n                valid_from DATE,\n                valid_to DATE,\n                system_from TIMESTAMP,\n                system_to TIMESTAMP\n            );\n            INSERT INTO credit_limits_audit VALUES\n                -- Original belief entered on May 1st\n                (501, 5000.00, '2026-05-01', '2026-12-31', '2026-05-01 09:00:00', '2026-06-01 10:00:00'),\n                -- Retroactive correction entered on June 1st backdating Alice's limit to $8,000 effective May 15th\n                (501, 8000.00, '2026-05-15', '2026-12-31', '2026-06-01 10:00:00', '9999-12-31 23:59:59');",
+  "golden_sql": "-- Query credit limit effective on 2026-05-20 as known to the system on 2026-05-25 (before retroactive update)\n            SELECT \n                customer_id,\n                credit_limit AS limit_as_known_then,\n                valid_from,\n                valid_to,\n                system_from,\n                system_to\n            FROM credit_limits_audit\n            WHERE customer_id = 501\n              -- As-of Business Date: 2026-05-20\n              AND DATE '2026-05-20' >= valid_from \n              AND DATE '2026-05-20' < valid_to\n              -- As-of System State: 2026-05-25\n              AND TIMESTAMP '2026-05-25 00:00:00' >= system_from \n              AND TIMESTAMP '2026-05-25 00:00:00' < system_to;",
+  "ordered": false,
+  "expected_columns": [
+    "customer_id",
+    "limit_as_known_then",
+    "valid_from",
+    "valid_to",
+    "system_from",
+    "system_to"
+  ],
+  "why_it_fails": "Relying on a single timestamp column confuses retroactive corrections with real-world effective dates, causing compliance audit failures."
+}

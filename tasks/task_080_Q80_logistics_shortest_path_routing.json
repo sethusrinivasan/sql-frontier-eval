@@ -1,0 +1,18 @@
+{
+  "id": "task_080_Q80_logistics_shortest_path_routing",
+  "name": "Lowest-Cost Routing across Logistics Hubs via Recursive Dijkstra",
+  "category": "Graph & Hierarchy",
+  "description": "Supply chain networks ship containers through intermediary freight hubs. Finding the cheapest transit path from Source to Destination minimizes freight costs.",
+  "prompt": "Supply chain networks ship containers through intermediary freight hubs. Finding the cheapest transit path from Source to Destination minimizes freight costs.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: origin, destination, total_cost, route_path, hops.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE shipping_lanes (\n                origin VARCHAR,\n                destination VARCHAR,\n                cost DOUBLE\n            );\n            INSERT INTO shipping_lanes VALUES\n                ('SEA', 'ORD', 400.0),\n                ('ORD', 'JFK', 300.0),\n                ('SEA', 'DEN', 200.0),\n                ('DEN', 'JFK', 450.0);",
+  "golden_sql": "-- Find lowest cost route from Seattle ('SEA') to New York ('JFK')\n            WITH RECURSIVE routes AS (\n                SELECT \n                    origin,\n                    destination,\n                    cost AS total_cost,\n                    origin || ' -> ' || destination AS route_path,\n                    1 AS hops\n                FROM shipping_lanes\n                WHERE origin = 'SEA'\n                \n                UNION ALL\n                \n                SELECT \n                    r.origin,\n                    l.destination,\n                    r.total_cost + l.cost AS total_cost,\n                    r.route_path || ' -> ' || l.destination,\n                    r.hops + 1\n                FROM routes r\n                JOIN shipping_lanes l ON r.destination = l.origin\n                WHERE r.hops < 4\n            )\n            SELECT \n                origin,\n                destination,\n                total_cost,\n                route_path,\n                hops\n            FROM routes\n            WHERE destination = 'JFK'\n            ORDER BY total_cost ASC\n            LIMIT 1;",
+  "ordered": true,
+  "expected_columns": [
+    "origin",
+    "destination",
+    "total_cost",
+    "route_path",
+    "hops"
+  ],
+  "why_it_fails": "Evaluating all combinations without cost bounding leads to exponential path explosion."
+}

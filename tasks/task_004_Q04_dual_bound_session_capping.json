@@ -1,0 +1,18 @@
+{
+  "id": "task_004_Q04_dual_bound_session_capping",
+  "name": "Sliding Sessionization with Absolute Maximum Duration Cap",
+  "category": "Temporal & Time-Series",
+  "description": "Real-world web sessions often need dual constraints: a 30-minute inactivity timeout AND a strict maximum 4-hour absolute session duration to prevent bots from maintaining endless sessions.",
+  "prompt": "Real-world web sessions often need dual constraints: a 30-minute inactivity timeout AND a strict maximum 4-hour absolute session duration to prevent bots from maintaining endless sessions.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: user_id, event_time, action, raw_session_id, minutes_since_session_start.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE bot_events (\n                user_id INT,\n                event_time TIMESTAMP,\n                action VARCHAR\n            );\n            INSERT INTO bot_events VALUES\n                (1, '2026-03-01 00:00:00', 'ping'),\n                (1, '2026-03-01 02:00:00', 'ping'), -- +2 hrs\n                (1, '2026-03-01 04:30:00', 'ping'), -- +4.5 hrs (exceeds 4h cap)\n                (1, '2026-03-01 04:45:00', 'ping');",
+  "golden_sql": "-- Partition sessions by inactivity (>30m) OR exceeding 4 hours from session start\n            WITH ranked_events AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    action,\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time\n                FROM bot_events\n            ),\n            step_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    action,\n                    CASE \n                        WHEN prev_time IS NULL THEN 1\n                        WHEN date_diff('minute', prev_time, event_time) > 30 THEN 1\n                        ELSE 0\n                    END AS gap_split\n                FROM ranked_events\n            ),\n            base_sessions AS (\n                SELECT \n                    *,\n                    SUM(gap_split) OVER (PARTITION BY user_id ORDER BY event_time) AS raw_session_id\n                FROM step_flags\n            )\n            SELECT \n                user_id,\n                event_time,\n                action,\n                raw_session_id,\n                -- Measure elapsed minutes from session genesis\n                date_diff('minute', \n                    FIRST_VALUE(event_time) OVER (PARTITION BY user_id, raw_session_id ORDER BY event_time),\n                    event_time\n                ) AS minutes_since_session_start\n            FROM base_sessions\n            ORDER BY user_id, event_time;",
+  "ordered": true,
+  "expected_columns": [
+    "user_id",
+    "event_time",
+    "action",
+    "raw_session_id",
+    "minutes_since_session_start"
+  ],
+  "why_it_fails": "A simple inactivity check keeps sessions alive indefinitely if events happen every 10 minutes. Tracking session origin requires window frames with state."
+}

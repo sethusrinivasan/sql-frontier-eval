@@ -1,0 +1,17 @@
+{
+  "id": "task_016_Q16_sequential_funnel_precedence",
+  "name": "Chronological Multi-Stage Conversion Funnel with Time Boundaries",
+  "category": "Temporal & Time-Series",
+  "description": "In product funnels (Signup -> Verify -> Purchase), events must occur in exact chronological order, with each step completed within 24 hours of the previous.",
+  "prompt": "In product funnels (Signup -> Verify -> Purchase), events must occur in exact chronological order, with each step completed within 24 hours of the previous.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: total_signups, verified_users, completed_purchasers, end_to_end_conversion_pct.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE user_actions (\n                user_id INT,\n                stage VARCHAR,\n                action_time TIMESTAMP\n            );\n            INSERT INTO user_actions VALUES\n                (1, 'signup',   '2026-03-01 10:00:00'),\n                (1, 'verify',   '2026-03-01 11:00:00'),\n                (1, 'purchase', '2026-03-01 15:00:00'),\n                (2, 'signup',   '2026-03-01 10:00:00'),\n                (2, 'purchase', '2026-03-01 10:30:00'); -- Skipped verify",
+  "golden_sql": "-- Enforce Signup -> Verify -> Purchase chronological order\n            WITH step1 AS (\n                SELECT user_id, action_time AS signup_time\n                FROM user_actions\n                WHERE stage = 'signup'\n            ),\n            step2 AS (\n                SELECT s1.user_id, s1.signup_time, MIN(a.action_time) AS verify_time\n                FROM step1 s1\n                JOIN user_actions a \n                  ON s1.user_id = a.user_id \n                 AND a.stage = 'verify'\n                 AND a.action_time >= s1.signup_time\n                 AND a.action_time <= s1.signup_time + INTERVAL '24 hours'\n                GROUP BY s1.user_id, s1.signup_time\n            ),\n            step3 AS (\n                SELECT s2.user_id, s2.signup_time, s2.verify_time, MIN(a.action_time) AS purchase_time\n                FROM step2 s2\n                JOIN user_actions a \n                  ON s2.user_id = a.user_id \n                 AND a.stage = 'purchase'\n                 AND a.action_time >= s2.verify_time\n                 AND a.action_time <= s2.verify_time + INTERVAL '24 hours'\n                GROUP BY s2.user_id, s2.signup_time, s2.verify_time\n            )\n            SELECT \n                COUNT(s1.user_id) AS total_signups,\n                COUNT(s2.user_id) AS verified_users,\n                COUNT(s3.user_id) AS completed_purchasers,\n                ROUND(COUNT(s3.user_id) * 100.0 / COUNT(s1.user_id), 1) AS end_to_end_conversion_pct\n            FROM step1 s1\n            LEFT JOIN step2 s2 ON s1.user_id = s2.user_id\n            LEFT JOIN step3 s3 ON s1.user_id = s3.user_id;",
+  "ordered": false,
+  "expected_columns": [
+    "total_signups",
+    "verified_users",
+    "completed_purchasers",
+    "end_to_end_conversion_pct"
+  ],
+  "why_it_fails": "Models join events without checking timestamp ordering (e.g., verifying after purchase), artificially inflating funnel conversion."
+}

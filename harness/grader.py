@@ -35,7 +35,10 @@ class SQLGrader:
                     clean_df[col] = clean_df[col].apply(lambda x: str(x).strip() if pd.notnull(x) else np.nan)
             # Uniform integer bit-width
             elif pd.api.types.is_integer_dtype(series):
-                clean_df[col] = clean_df[col].astype("int64")
+                if series.isna().any():
+                    clean_df[col] = clean_df[col].astype("Int64")
+                else:
+                    clean_df[col] = clean_df[col].astype("int64")
 
         return clean_df
 
@@ -43,12 +46,19 @@ class SQLGrader:
     def sort_dataframe(cls, df: pd.DataFrame) -> pd.DataFrame:
         """
         Deterministically sorts rows by all columns when row ordering is unconstrained.
+        Handles unhashable types (lists, numpy arrays, dicts) cleanly.
         """
         if df.empty or len(df) == 1:
             return df.reset_index(drop=True)
 
-        sort_cols = list(df.columns)
-        return df.sort_values(by=sort_cols, na_position="first").reset_index(drop=True)
+        sort_df = df.copy()
+        for col in sort_df.columns:
+            val = sort_df[col].dropna().iloc[0] if not sort_df[col].dropna().empty else None
+            if isinstance(val, (list, np.ndarray, dict)):
+                sort_df[col] = sort_df[col].apply(lambda x: tuple(x) if isinstance(x, (list, np.ndarray)) else str(x))
+
+        sort_indices = sort_df.sort_values(by=list(sort_df.columns), na_position="first").index
+        return df.iloc[sort_indices].reset_index(drop=True)
 
     @classmethod
     def grade(

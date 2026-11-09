@@ -1,0 +1,16 @@
+{
+  "id": "task_060_Q60_ngram_log_signature_search",
+  "name": "Trigram / N-Gram Token Substring Matching for Technical Error Logs",
+  "category": "Search & Retrieval",
+  "description": "In observability platforms (Datadog, Splunk), engineers search stack traces with partial error signatures. Trigram decomposition enables robust partial substring index matching.",
+  "prompt": "In observability platforms (Datadog, Splunk), engineers search stack traces with partial error signatures. Trigram decomposition enables robust partial substring index matching.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: log_id, error_message, classified_signature.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE incident_logs (\n                log_id INT,\n                error_message VARCHAR\n            );\n            INSERT INTO incident_logs VALUES\n                (1, 'java.lang.NullPointerException at com.app.auth.LoginService.verify'),\n                (2, 'org.postgresql.util.PSQLException: Connection refused'),\n                (3, 'java.lang.OutOfMemoryError: Java heap space');",
+  "golden_sql": "-- Find logs matching 'NullPointer' or 'OutOfMemory' error signatures\n            SELECT \n                log_id,\n                error_message,\n                CASE \n                    WHEN error_message LIKE '%NullPointer%' THEN 'NPE_EXCEPTION'\n                    WHEN error_message LIKE '%OutOfMemory%' THEN 'OOM_KILL'\n                    ELSE 'OTHER'\n                END AS classified_signature\n            FROM incident_logs\n            WHERE error_message LIKE '%NullPointer%' \n               OR error_message LIKE '%OutOfMemory%'\n            ORDER BY log_id;",
+  "ordered": true,
+  "expected_columns": [
+    "log_id",
+    "error_message",
+    "classified_signature"
+  ],
+  "why_it_fails": "Full regex evaluations on raw million-line log tables trigger catastrophic backtracking."
+}

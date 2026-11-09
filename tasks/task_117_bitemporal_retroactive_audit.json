@@ -1,0 +1,17 @@
+{
+  "id": "task_117_bitemporal_retroactive_audit",
+  "name": "Bitemporal Auditing: Retroactive Policy Revision Point-in-Time State",
+  "category": "Temporal & Time-Series",
+  "description": "Reconstructs historical corporate insurance coverage on an effective business date, as known to the system on an audit date prior to a retroactive backdated modification.",
+  "prompt": "Determine customer 501's insurance deductible:\n1. Effective as of business date: 2026-04-10\n2. As known by the system on system audit date: 2026-04-15 (strictly BEFORE the retroactive update entered into the database on 2026-05-01).\n\nRequired output columns:\n- customer_id (INT)\n- active_deductible (DECIMAL)\n\nOrder by customer_id ASC.",
+  "setup_sql": "\nCREATE TABLE insurance_policy_bitemporal (\n    policy_id INT,\n    customer_id INT,\n    deductible DECIMAL(10,2),\n    valid_from DATE,\n    valid_to DATE,\n    system_from TIMESTAMP,\n    system_to TIMESTAMP\n);\nINSERT INTO insurance_policy_bitemporal VALUES\n  -- Original policy entered on 2026-01-01 ($1000 deductible)\n  (1, 501, 1000.00, '2026-01-01', '2026-12-31', '2026-01-01 00:00:00', '2026-05-01 12:00:00'),\n  -- Retroactive change entered on 2026-05-01 backdating deductible to $500 effective from 2026-04-01\n  (1, 501, 500.00,  '2026-04-01', '2026-12-31', '2026-05-01 12:00:00', '9999-12-31 23:59:59');\n",
+  "golden_sql": "\nSELECT \n    customer_id,\n    deductible AS active_deductible\nFROM insurance_policy_bitemporal\nWHERE customer_id = 501\n  -- Business valid time: 2026-04-10\n  AND DATE '2026-04-10' >= valid_from \n  AND DATE '2026-04-10' < valid_to\n  -- System knowledge time: 2026-04-15\n  AND TIMESTAMP '2026-04-15 00:00:00' >= system_from \n  AND TIMESTAMP '2026-04-15 00:00:00' < system_to\nORDER BY customer_id ASC;\n",
+  "naive_llm_sql": "\nSELECT \n    customer_id,\n    deductible AS active_deductible\nFROM insurance_policy_bitemporal\nWHERE customer_id = 501\n  AND DATE '2026-04-10' >= valid_from \n  AND DATE '2026-04-10' < valid_to\nORDER BY customer_id ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "customer_id",
+    "active_deductible"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Frontier models ignore the second time dimension (system transaction time) and only filter on valid_from / valid_to. This incorrectly matches the retroactive modification ($500), which was not entered into the database until May 1st, failing regulatory compliance auditing."
+}

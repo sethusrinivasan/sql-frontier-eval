@@ -1,0 +1,16 @@
+{
+  "id": "task_076_Q76_bill_of_materials_recursive_rollup",
+  "name": "Hierarchical Bill of Materials (BOM) Cost Rollup via Recursive CTE",
+  "category": "Graph & Hierarchy",
+  "description": "Manufacturing an electric vehicle requires thousands of nested parts (Car -> Battery Pack -> Cell Module -> Lithium Cathode). Calculating unit cost requires rolling up quantities across arbitrary depth levels.",
+  "prompt": "Manufacturing an electric vehicle requires thousands of nested parts (Car -> Battery Pack -> Cell Module -> Lithium Cathode). Calculating unit cost requires rolling up quantities across arbitrary depth levels.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: child_part, total_qty, depth.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE bom_parts (\n                parent_part VARCHAR,\n                child_part VARCHAR,\n                quantity_needed INT,\n                unit_cost DECIMAL(10,2)\n            );\n            INSERT INTO bom_parts VALUES\n                ('EV_CAR', 'CHASSIS', 1, 5000.00),\n                ('EV_CAR', 'BATTERY_PACK', 1, 0.00),\n                ('BATTERY_PACK', 'BATTERY_MODULE', 4, 0.00),\n                ('BATTERY_MODULE', 'LITHIUM_CELL', 100, 15.00);",
+  "golden_sql": "-- Recursively expand BOM tree to compute total quantity of base components\n            WITH RECURSIVE bom_tree AS (\n                -- Anchor: Top-level components of EV_CAR\n                SELECT \n                    parent_part,\n                    child_part,\n                    quantity_needed AS total_qty,\n                    1 AS depth\n                FROM bom_parts\n                WHERE parent_part = 'EV_CAR'\n                \n                UNION ALL\n                \n                -- Recursive: Multiply quantity down the hierarchy tree\n                SELECT \n                    t.child_part AS parent_part,\n                    b.child_part,\n                    t.total_qty * b.quantity_needed AS total_qty,\n                    t.depth + 1 AS depth\n                FROM bom_tree t\n                JOIN bom_parts b ON t.child_part = b.parent_part\n            )\n            SELECT \n                child_part,\n                total_qty,\n                depth\n            FROM bom_tree\n            ORDER BY depth, child_part;",
+  "ordered": true,
+  "expected_columns": [
+    "child_part",
+    "total_qty",
+    "depth"
+  ],
+  "why_it_fails": "Fixed joins only support fixed depth hierarchies (e.g. 3 levels max). If an assembly has 6 levels, fixed joins miss the lowest-tier parts entirely."
+}

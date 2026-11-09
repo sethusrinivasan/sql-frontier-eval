@@ -1,0 +1,210 @@
+{
+  "timestamp": "2026-11-09T07:51:50.625221+00:00",
+  "model": "agy/gpt-oss-120b-medium",
+  "is_golden_test": false,
+  "total_tasks": 9,
+  "passed": 6,
+  "failed": 3,
+  "pass_rate_pct": 66.66666666666666,
+  "tasks": [
+    {
+      "task_id": "task_111_rolling_distinct_active_users",
+      "name": "Rolling 7-Day Distinct Active Users without Triangular Join Explosion",
+      "category": "Algorithmic Efficiency / Window Distinct",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    d.report_date,\n    CAST(\n        (SELECT COUNT(DISTINCT ua.user_id)\n         FROM user_activity ua\n         WHERE ua.activity_date BETWEEN d.report_date - INTERVAL '6' DAY\n                                   AND d.report_date) AS BIGINT\n    ) AS rolling_7d_active_users\nFROM (\n    SELECT DISTINCT activity_date AS report_date\n    FROM user_activity\n) d\nORDER BY d.report_date ASC;",
+      "golden_sql": "\nWITH daily_users AS (\n    SELECT activity_date, list(DISTINCT user_id) AS user_list\n    FROM user_activity\n    GROUP BY activity_date\n),\ndistinct_dates AS (\n    SELECT DISTINCT activity_date AS report_date FROM user_activity\n)\nSELECT \n    d.report_date,\n    (\n        SELECT COUNT(DISTINCT u)\n        FROM (\n            SELECT UNNEST(user_list) AS u\n            FROM daily_users sub\n            WHERE sub.activity_date BETWEEN d.report_date - INTERVAL 6 DAYS AND d.report_date\n        )\n    ) AS rolling_7d_active_users\nFROM distinct_dates d\nORDER BY d.report_date ASC;\n",
+      "execution_time_ms": 6.216990994289517,
+      "golden_time_ms": 10.563949996139854,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 5
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 7406.3363449968165,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    d.report_date,\n    CAST(\n        (SELECT COUNT(DISTINCT ua.user_id)\n         FROM user_activity ua\n         WHERE ua.activity_date BETWEEN d.report_date - INTERVAL '6' DAY\n                                   AND d.report_date) AS BIGINT\n    ) AS rolling_7d_active_users\nFROM (\n    SELECT DISTINCT activity_date AS report_date\n    FROM user_activity\n) d\nORDER BY d.report_date ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_112_dual_constraint_sessionization",
+      "name": "Dual-Constraint Sessionization: 30-min Inactivity AND 4-Hour Absolute Hard Cap",
+      "category": "Sessionization (Gaps & Islands)",
+      "verdict": "SYNTAX_OR_EXECUTION_ERROR",
+      "passed": false,
+      "reason": "Query execution failed: Binder Error: Circular reference to CTE \"session_recursive\", use WITH RECURSIVE to use recursive CTEs.\n\nLINE 40:     JOIN session_recursive r\n                  ^^^^^^^^^^^^^^^^^^^",
+      "candidate_sql": "WITH ordered AS (\n    SELECT\n        user_id,\n        event_time,\n        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY event_time) AS rn\n    FROM clickstream_events\n),\n\nsession_recursive AS (\n    -- First event per user starts session 1\n    SELECT\n        user_id,\n        event_time,\n        1::BIGINT AS session_id,\n        event_time AS session_start,\n        rn\n    FROM ordered\n    WHERE rn = 1\n\n    UNION ALL\n\n    -- Subsequent events inherit or start a new session based on the two rules\n    SELECT\n        o.user_id,\n        o.event_time,\n        CASE\n            WHEN o.event_time - r.session_start > INTERVAL '4 hours'\n                 OR o.event_time - r.event_time > INTERVAL '30 minutes'\n            THEN r.session_id + 1\n            ELSE r.session_id\n        END AS session_id,\n        CASE\n            WHEN o.event_time - r.session_start > INTERVAL '4 hours'\n                 OR o.event_time - r.event_time > INTERVAL '30 minutes'\n            THEN o.event_time          -- new session start time\n            ELSE r.session_start       -- keep existing start time\n        END AS session_start,\n        o.rn\n    FROM ordered o\n    JOIN session_recursive r\n        ON o.user_id = r.user_id\n       AND o.rn = r.rn + 1\n)\n\nSELECT\n    user_id,\n    event_time,\n    session_id\nFROM session_recursive\nORDER BY user_id ASC, event_time ASC;",
+      "golden_sql": "\nWITH step_lags AS (\n    SELECT \n        user_id,\n        event_time,\n        LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time\n    FROM clickstream_events\n),\ninactivity_flags AS (\n    SELECT \n        user_id,\n        event_time,\n        CASE \n            WHEN prev_time IS NULL OR date_diff('second', prev_time, event_time) > 1800 THEN 1\n            ELSE 0\n        END AS is_inactivity_break\n    FROM step_lags\n),\nbase_sessions AS (\n    SELECT \n        user_id,\n        event_time,\n        SUM(is_inactivity_break) OVER (PARTITION BY user_id ORDER BY event_time) AS base_sess\n    FROM inactivity_flags\n),\ngenesis_diff AS (\n    SELECT \n        user_id,\n        event_time,\n        base_sess,\n        date_diff('second', FIRST_VALUE(event_time) OVER (PARTITION BY user_id, base_sess ORDER BY event_time), event_time) AS elapsed_from_start\n    FROM base_sessions\n)\nSELECT \n    user_id,\n    event_time,\n    (base_sess + (elapsed_from_start > 14400)::INT)::BIGINT AS session_id\nFROM genesis_diff\nORDER BY user_id ASC, event_time ASC;\n",
+      "execution_time_ms": 4.974960997060407,
+      "golden_time_ms": 4.545866999251302,
+      "diagnostics": {
+        "error": "Binder Error: Circular reference to CTE \"session_recursive\", use WITH RECURSIVE to use recursive CTEs.\n\nLINE 40:     JOIN session_recursive r\n                  ^^^^^^^^^^^^^^^^^^^"
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 11801.006581001275,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH ordered AS (\n    SELECT\n        user_id,\n        event_time,\n        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY event_time) AS rn\n    FROM clickstream_events\n),\n\nsession_recursive AS (\n    -- First event per user starts session 1\n    SELECT\n        user_id,\n        event_time,\n        1::BIGINT AS session_id,\n        event_time AS session_start,\n        rn\n    FROM ordered\n    WHERE rn = 1\n\n    UNION ALL\n\n    -- Subsequent events inherit or start a new session based on the two rules\n    SELECT\n        o.user_id,\n        o.event_time,\n        CASE\n            WHEN o.event_time - r.session_start > INTERVAL '4 hours'\n                 OR o.event_time - r.event_time > INTERVAL '30 minutes'\n            THEN r.session_id + 1\n            ELSE r.session_id\n        END AS session_id,\n        CASE\n            WHEN o.event_time - r.session_start > INTERVAL '4 hours'\n                 OR o.event_time - r.event_time > INTERVAL '30 minutes'\n            THEN o.event_time          -- new session start time\n            ELSE r.session_start       -- keep existing start time\n        END AS session_start,\n        o.rn\n    FROM ordered o\n    JOIN session_recursive r\n        ON o.user_id = r.user_id\n       AND o.rn = r.rn + 1\n)\n\nSELECT\n    user_id,\n    event_time,\n    session_id\nFROM session_recursive\nORDER BY user_id ASC, event_time ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_113_vector_prefilter_recall_drop",
+      "name": "Vector Nearest Neighbors: The Post-Filtering Empty Set Trap",
+      "category": "Vector & Retrieval",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH filtered AS (\n    SELECT\n        item_id,\n        price,\n        (vec[1] / sqrt(pow(vec[1], 2) + pow(vec[2], 2)))::DOUBLE AS similarity\n    FROM products_search\n    WHERE\n        category = 'electronics'\n        AND price <= 50.00\n        AND in_stock\n)\nSELECT\n    item_id,\n    price,\n    similarity\nFROM filtered\nORDER BY similarity DESC, item_id ASC\nLIMIT 2;",
+      "golden_sql": "\nSELECT \n    item_id,\n    price,\n    ROUND(array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 4) AS similarity\nFROM products_search\nWHERE category = 'electronics' \n  AND price <= 50.00 \n  AND in_stock = true\nORDER BY similarity DESC, item_id ASC\nLIMIT 2;\n",
+      "execution_time_ms": 4.337216996646021,
+      "golden_time_ms": 2.775203996861819,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 2
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 7348.527688998729,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH filtered AS (\n    SELECT\n        item_id,\n        price,\n        (vec[1] / sqrt(pow(vec[1], 2) + pow(vec[2], 2)))::DOUBLE AS similarity\n    FROM products_search\n    WHERE\n        category = 'electronics'\n        AND price <= 50.00\n        AND in_stock\n)\nSELECT\n    item_id,\n    price,\n    similarity\nFROM filtered\nORDER BY similarity DESC, item_id ASC\nLIMIT 2;\n```"
+      }
+    },
+    {
+      "task_id": "task_114_asof_tolerance_expiry",
+      "name": "ASOF Point-in-Time Quote Matching with 500ms Expiry Tolerance",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    t.trade_id,\n    t.trade_time,\n    t.symbol,\n    CASE\n        WHEN q.quote_time IS NULL THEN NULL\n        WHEN EXTRACT(EPOCH FROM (t.trade_time - q.quote_time)) * 1000 > 500 THEN NULL\n        ELSE q.ask\n    END AS prevailing_ask\nFROM market_trades AS t\nLEFT JOIN LATERAL (\n    SELECT ask, quote_time\n    FROM market_quotes AS q\n    WHERE q.symbol = t.symbol\n      AND q.quote_time <= t.trade_time\n    ORDER BY q.quote_time DESC\n    LIMIT 1\n) AS q ON TRUE\nORDER BY t.trade_id ASC;",
+      "golden_sql": "\nSELECT \n    t.trade_id,\n    t.trade_time,\n    t.symbol,\n    CASE \n        WHEN date_diff('millisecond', q.quote_time, t.trade_time) <= 500 \n        THEN q.ask \n        ELSE NULL \n    END AS prevailing_ask\nFROM market_trades t\nASOF JOIN market_quotes q\n  ON t.symbol = q.symbol \n AND t.trade_time >= q.quote_time\nORDER BY t.trade_id ASC;\n",
+      "execution_time_ms": 6.120976999227423,
+      "golden_time_ms": 3.2615640011499636,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 2
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 7522.2156870004255,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    t.trade_id,\n    t.trade_time,\n    t.symbol,\n    CASE\n        WHEN q.quote_time IS NULL THEN NULL\n        WHEN EXTRACT(EPOCH FROM (t.trade_time - q.quote_time)) * 1000 > 500 THEN NULL\n        ELSE q.ask\n    END AS prevailing_ask\nFROM market_trades AS t\nLEFT JOIN LATERAL (\n    SELECT ask, quote_time\n    FROM market_quotes AS q\n    WHERE q.symbol = t.symbol\n      AND q.quote_time <= t.trade_time\n    ORDER BY q.quote_time DESC\n    LIMIT 1\n) AS q ON TRUE\nORDER BY t.trade_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_115_rrf_hybrid_rank_fusion_isolation",
+      "name": "Reciprocal Rank Fusion (RRF) Hybrid Retrieval without Scale Collapse",
+      "category": "Search & Retrieval",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH bm25_ranked AS (\n    SELECT\n        doc_id,\n        title,\n        bm25_raw,\n        RANK() OVER (ORDER BY bm25_raw DESC) AS bm25_rank\n    FROM search_index\n),\nvector_ranked AS (\n    SELECT\n        doc_id,\n        SQRT(POW(vec[1], 2) + POW(vec[2], 2)) AS vec_magnitude,\n        RANK() OVER (ORDER BY SQRT(POW(vec[1], 2) + POW(vec[2], 2)) DESC) AS vector_rank\n    FROM search_index\n)\nSELECT\n    b.doc_id,\n    b.title,\n    CAST(b.bm25_rank AS BIGINT) AS bm25_rank,\n    CAST(v.vector_rank AS BIGINT) AS vector_rank,\n    (1.0 / (60.0 + CAST(b.bm25_rank AS DOUBLE))) \n    + (1.0 / (60.0 + CAST(v.vector_rank AS DOUBLE))) AS rrf_score\nFROM bm25_ranked b\nJOIN vector_ranked v USING (doc_id)\nORDER BY rrf_score DESC, doc_id ASC;",
+      "golden_sql": "\nWITH ranked_bm25 AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (ORDER BY bm25_raw DESC, doc_id ASC) AS bm25_rank\n    FROM search_index\n),\nranked_vector AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (\n            ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC, doc_id ASC\n        ) AS vector_rank\n    FROM search_index\n)\nSELECT \n    b.doc_id,\n    b.title,\n    b.bm25_rank,\n    v.vector_rank,\n    ROUND((1.0 / (60.0 + b.bm25_rank)) + (1.0 / (60.0 + v.vector_rank)), 6) AS rrf_score\nFROM ranked_bm25 b\nJOIN ranked_vector v ON b.doc_id = v.doc_id\nORDER BY rrf_score DESC, b.doc_id ASC;\n",
+      "execution_time_ms": 10.246981000818778,
+      "golden_time_ms": 4.025943999295123,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 3
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 6485.040464001941,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH bm25_ranked AS (\n    SELECT\n        doc_id,\n        title,\n        bm25_raw,\n        RANK() OVER (ORDER BY bm25_raw DESC) AS bm25_rank\n    FROM search_index\n),\nvector_ranked AS (\n    SELECT\n        doc_id,\n        SQRT(POW(vec[1], 2) + POW(vec[2], 2)) AS vec_magnitude,\n        RANK() OVER (ORDER BY SQRT(POW(vec[1], 2) + POW(vec[2], 2)) DESC) AS vector_rank\n    FROM search_index\n)\nSELECT\n    b.doc_id,\n    b.title,\n    CAST(b.bm25_rank AS BIGINT) AS bm25_rank,\n    CAST(v.vector_rank AS BIGINT) AS vector_rank,\n    (1.0 / (60.0 + CAST(b.bm25_rank AS DOUBLE))) \n    + (1.0 / (60.0 + CAST(v.vector_rank AS DOUBLE))) AS rrf_score\nFROM bm25_ranked b\nJOIN vector_ranked v USING (doc_id)\nORDER BY rrf_score DESC, doc_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_116_graph_cycle_visited_protection",
+      "name": "Directed Dependency Graph Cycle Protection via Visited Array Path",
+      "category": "Graph & Hierarchy",
+      "verdict": "SYNTAX_OR_EXECUTION_ERROR",
+      "passed": false,
+      "reason": "Query execution failed: Binder Error: Cannot concatenate types VARCHAR[] and VARCHAR - an explicit cast is required\n\nLINE 16:         t.path || e.child_task\n                           ^^^^^^^^^^^^",
+      "candidate_sql": "WITH RECURSIVE traversal(task, depth, path) AS (\n    -- start from immediate children of BUILD_CORE\n    SELECT\n        child_task,\n        1 AS depth,\n        ARRAY[child_task] AS path\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n\n    UNION ALL\n\n    -- recursively walk downstream, avoiding already\u2011visited nodes\n    SELECT\n        e.child_task,\n        t.depth + 1,\n        t.path || e.child_task\n    FROM traversal t\n    JOIN task_edges e\n        ON e.parent_task = t.task\n    WHERE NOT e.child_task = ANY(t.path)\n)\nSELECT\n    task AS task_id,\n    MIN(depth) AS min_depth\nFROM traversal\nGROUP BY task\nORDER BY min_depth ASC, task_id ASC;",
+      "golden_sql": "\nWITH RECURSIVE downstream_graph AS (\n    SELECT \n        child_task AS task_id,\n        1 AS depth,\n        ['BUILD_CORE', child_task] AS path_nodes\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n    \n    UNION ALL\n    \n    SELECT \n        e.child_task,\n        g.depth + 1,\n        list_append(g.path_nodes, e.child_task)\n    FROM downstream_graph g\n    JOIN task_edges e ON g.task_id = e.parent_task\n    WHERE NOT list_contains(g.path_nodes, e.child_task)\n      AND g.depth < 10\n)\nSELECT \n    task_id,\n    MIN(depth) AS min_depth\nFROM downstream_graph\nGROUP BY task_id\nORDER BY min_depth ASC, task_id ASC;\n",
+      "execution_time_ms": 1.4374589954968542,
+      "golden_time_ms": 3.867226005240809,
+      "diagnostics": {
+        "error": "Binder Error: Cannot concatenate types VARCHAR[] and VARCHAR - an explicit cast is required\n\nLINE 16:         t.path || e.child_task\n                           ^^^^^^^^^^^^"
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 8882.422351998684,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH RECURSIVE traversal(task, depth, path) AS (\n    -- start from immediate children of BUILD_CORE\n    SELECT\n        child_task,\n        1 AS depth,\n        ARRAY[child_task] AS path\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n\n    UNION ALL\n\n    -- recursively walk downstream, avoiding already\u2011visited nodes\n    SELECT\n        e.child_task,\n        t.depth + 1,\n        t.path || e.child_task\n    FROM traversal t\n    JOIN task_edges e\n        ON e.parent_task = t.task\n    WHERE NOT e.child_task = ANY(t.path)\n)\nSELECT\n    task AS task_id,\n    MIN(depth) AS min_depth\nFROM traversal\nGROUP BY task\nORDER BY min_depth ASC, task_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_117_bitemporal_retroactive_audit",
+      "name": "Bitemporal Auditing: Retroactive Policy Revision Point-in-Time State",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH filtered AS (\n    SELECT\n        customer_id,\n        deductible\n    FROM insurance_policy_bitemporal\n    WHERE customer_id = 501\n      AND DATE '2026-04-10' BETWEEN valid_from AND valid_to\n      AND TIMESTAMP '2026-04-15' BETWEEN system_from AND system_to\n)\nSELECT\n    customer_id,\n    deductible AS active_deductible\nFROM filtered\nORDER BY customer_id ASC;",
+      "golden_sql": "\nSELECT \n    customer_id,\n    deductible AS active_deductible\nFROM insurance_policy_bitemporal\nWHERE customer_id = 501\n  -- Business valid time: 2026-04-10\n  AND DATE '2026-04-10' >= valid_from \n  AND DATE '2026-04-10' < valid_to\n  -- System knowledge time: 2026-04-15\n  AND TIMESTAMP '2026-04-15 00:00:00' >= system_from \n  AND TIMESTAMP '2026-04-15 00:00:00' < system_to\nORDER BY customer_id ASC;\n",
+      "execution_time_ms": 2.7423540013842285,
+      "golden_time_ms": 1.7757220048224553,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 1
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 7230.845027996111,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH filtered AS (\n    SELECT\n        customer_id,\n        deductible\n    FROM insurance_policy_bitemporal\n    WHERE customer_id = 501\n      AND DATE '2026-04-10' BETWEEN valid_from AND valid_to\n      AND TIMESTAMP '2026-04-15' BETWEEN system_from AND system_to\n)\nSELECT\n    customer_id,\n    deductible AS active_deductible\nFROM filtered\nORDER BY customer_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_118_reversal_interleaved_ledger",
+      "name": "Financial Ledger Running Total with Transaction Reversal Nullification",
+      "category": "Warehouse & Statistical",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH active_transactions AS (\n    SELECT\n        entry_id,\n        account_id,\n        amount\n    FROM financial_ledger\n    WHERE\n        action <> 'REVERSAL'\n        AND entry_id NOT IN (\n            SELECT reverses_entry_id\n            FROM financial_ledger\n            WHERE action = 'REVERSAL'\n              AND reverses_entry_id IS NOT NULL\n        )\n)\nSELECT\n    entry_id,\n    account_id,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_id\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS net_running_balance\nFROM active_transactions\nORDER BY entry_id ASC;",
+      "golden_sql": "\nWITH reversed_ids AS (\n    SELECT reverses_entry_id AS void_id\n    FROM financial_ledger\n    WHERE action = 'REVERSAL' AND reverses_entry_id IS NOT NULL\n    UNION\n    SELECT entry_id AS void_id\n    FROM financial_ledger\n    WHERE action = 'REVERSAL'\n),\nactive_entries AS (\n    SELECT \n        l.entry_id,\n        l.account_id,\n        l.amount\n    FROM financial_ledger l\n    WHERE l.entry_id NOT IN (SELECT void_id FROM reversed_ids)\n)\nSELECT \n    entry_id,\n    account_id,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id \n        ORDER BY entry_id \n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS net_running_balance\nFROM active_entries\nORDER BY entry_id ASC;\n",
+      "execution_time_ms": 7.428878998325672,
+      "golden_time_ms": 4.470596999453846,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 2
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 7376.984631999221,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH active_transactions AS (\n    SELECT\n        entry_id,\n        account_id,\n        amount\n    FROM financial_ledger\n    WHERE\n        action <> 'REVERSAL'\n        AND entry_id NOT IN (\n            SELECT reverses_entry_id\n            FROM financial_ledger\n            WHERE action = 'REVERSAL'\n              AND reverses_entry_id IS NOT NULL\n        )\n)\nSELECT\n    entry_id,\n    account_id,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_id\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS net_running_balance\nFROM active_transactions\nORDER BY entry_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_119_multitouch_decay_attribution",
+      "name": "Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%",
+      "category": "Temporal & Time-Series",
+      "verdict": "VALUE_MISMATCH",
+      "passed": false,
+      "reason": "Data discrepancy: DataFrame.iloc[:, 2] (column name=\"attributed_revenue\") are different",
+      "candidate_sql": "WITH relevant AS (\n    SELECT\n        t.touch_id,\n        t.channel,\n        POW(0.5, date_diff('second', t.click_time, pc.conversion_time) / (7.0 * 86400.0)) AS raw_weight\n    FROM touchpoints t\n    JOIN purchase_conversions pc\n        ON t.user_id = pc.user_id\n    WHERE t.click_time BETWEEN pc.conversion_time - INTERVAL '30' DAY\n                          AND pc.conversion_time\n),\n\nweight_sum AS (\n    SELECT SUM(raw_weight) AS total_weight\n    FROM relevant\n),\n\nfinal AS (\n    SELECT\n        r.touch_id,\n        r.channel,\n        CAST((r.raw_weight / ws.total_weight) * 300.0 AS DECIMAL(10,2)) AS attributed_revenue\n    FROM relevant r\n    CROSS JOIN weight_sum ws\n)\n\nSELECT\n    touch_id,\n    channel,\n    attributed_revenue\nFROM final\nORDER BY touch_id ASC;",
+      "golden_sql": "\nWITH weighted_touches AS (\n    SELECT \n        t.touch_id,\n        t.channel,\n        c.order_revenue,\n        POW(0.5, date_diff('second', t.click_time, c.conversion_time) / (7.0 * 86400.0)) AS raw_weight\n    FROM purchase_conversions c\n    JOIN touchpoints t \n      ON c.user_id = t.user_id \n     AND t.click_time <= c.conversion_time\n     AND t.click_time >= c.conversion_time - INTERVAL 30 DAYS\n),\ntotal_weight AS (\n    SELECT \n        *,\n        SUM(raw_weight) OVER () AS sum_weights\n    FROM weighted_touches\n)\nSELECT \n    touch_id,\n    channel,\n    ROUND(order_revenue * (raw_weight / sum_weights), 2) AS attributed_revenue\nFROM total_weight\nORDER BY touch_id ASC;\n",
+      "execution_time_ms": 10.186644998611882,
+      "golden_time_ms": 4.096393997315317,
+      "diagnostics": {
+        "column": "attributed_revenue",
+        "row_index": 0,
+        "expected": 50.0,
+        "actual": 42.86,
+        "difference": -7.140000000000001
+      },
+      "llm_metadata": {
+        "model": "gpt-oss-120b-medium",
+        "latency_ms": 7453.682086998015,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH relevant AS (\n    SELECT\n        t.touch_id,\n        t.channel,\n        POW(0.5, date_diff('second', t.click_time, pc.conversion_time) / (7.0 * 86400.0)) AS raw_weight\n    FROM touchpoints t\n    JOIN purchase_conversions pc\n        ON t.user_id = pc.user_id\n    WHERE t.click_time BETWEEN pc.conversion_time - INTERVAL '30' DAY\n                          AND pc.conversion_time\n),\n\nweight_sum AS (\n    SELECT SUM(raw_weight) AS total_weight\n    FROM relevant\n),\n\nfinal AS (\n    SELECT\n        r.touch_id,\n        r.channel,\n        CAST((r.raw_weight / ws.total_weight) * 300.0 AS DECIMAL(10,2)) AS attributed_revenue\n    FROM relevant r\n    CROSS JOIN weight_sum ws\n)\n\nSELECT\n    touch_id,\n    channel,\n    attributed_revenue\nFROM final\nORDER BY touch_id ASC;\n```"
+      }
+    }
+  ]
+}

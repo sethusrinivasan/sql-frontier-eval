@@ -1,0 +1,17 @@
+{
+  "id": "task_040_Q40_cosine_matrix_cluster_pruning",
+  "name": "Pairwise Vector Similarity Self-Join with Coarse Cluster Pruning",
+  "category": "Vector & Embeddings",
+  "description": "Finding all similar document pairs across 100,000 docs is O(N^2) (10 billion checks). Partitioning into coarse category buckets first reduces search to O(N * (N/K)).",
+  "prompt": "Finding all similar document pairs across 100,000 docs is O(N^2) (10 billion checks). Partitioning into coarse category buckets first reduces search to O(N * (N/K)).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: doc_a, doc_b, bucket_id, similarity.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE corpus (\n                doc_id INT,\n                bucket_id INT,\n                vector FLOAT[2]\n            );\n            INSERT INTO corpus VALUES\n                (1, 10, [0.9, 0.1]::FLOAT[2]),\n                (2, 10, [0.88, 0.12]::FLOAT[2]),\n                (3, 20, [0.1, 0.9]::FLOAT[2]),\n                (4, 20, [0.12, 0.88]::FLOAT[2]);",
+  "golden_sql": "-- Pairwise similarity evaluated ONLY within shared bucket partitions\n            SELECT \n                a.doc_id AS doc_a,\n                b.doc_id AS doc_b,\n                a.bucket_id,\n                ROUND(array_cosine_similarity(a.vector, b.vector), 4) AS similarity\n            FROM corpus a\n            JOIN corpus b\n              ON a.bucket_id = b.bucket_id\n             AND a.doc_id < b.doc_id\n            WHERE array_cosine_similarity(a.vector, b.vector) >= 0.85\n            ORDER BY similarity DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "doc_a",
+    "doc_b",
+    "bucket_id",
+    "similarity"
+  ],
+  "why_it_fails": "Unpartitioned cross joins cause out-of-memory crashes on analytical engines."
+}

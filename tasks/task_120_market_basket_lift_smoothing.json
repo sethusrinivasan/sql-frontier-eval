@@ -1,0 +1,20 @@
+{
+  "id": "task_120_market_basket_lift_smoothing",
+  "name": "Association Rule Lift Matrix with Directional Pair Evaluation",
+  "category": "Warehouse & Statistical",
+  "description": "Calculates market basket association rule Lift for directional product pairs (A -> B), correctly eliminating self-pairs and evaluating directional confidence.",
+  "prompt": "Compute Support, Confidence, and Lift for directional association rules (Item A -> Item B):\n- Support(A -> B) = Count(Transactions containing both A and B) / Total Transactions\n- Confidence(A -> B) = Count(Transactions containing both A and B) / Count(Transactions containing A)\n- Lift(A -> B) = Confidence(A -> B) / (Count(Transactions containing B) / Total Transactions)\nEnsure self-pairs (A -> A) are excluded.\n\nRequired output columns:\n- item_a (VARCHAR)\n- item_b (VARCHAR)\n- support (DOUBLE)\n- confidence (DOUBLE)\n- lift (DOUBLE)\n\nOrder by lift DESC, item_a ASC, item_b ASC.",
+  "setup_sql": "\nCREATE TABLE market_baskets (basket_id INT, item_name VARCHAR);\nINSERT INTO market_baskets VALUES\n  (1, 'Bread'), (1, 'Butter'), (1, 'Milk'),\n  (2, 'Bread'), (2, 'Butter'),\n  (3, 'Bread'), (3, 'Milk'),\n  (4, 'Beer'),  (4, 'Diapers');\n",
+  "golden_sql": "\nWITH total_orders AS (\n    SELECT COUNT(DISTINCT basket_id) AS total_baskets FROM market_baskets\n),\nitem_frequencies AS (\n    SELECT item_name, COUNT(DISTINCT basket_id) AS item_baskets\n    FROM market_baskets\n    GROUP BY item_name\n),\npair_occurrences AS (\n    SELECT \n        a.item_name AS item_a,\n        b.item_name AS item_b,\n        COUNT(DISTINCT a.basket_id) AS pair_baskets\n    FROM market_baskets a\n    JOIN market_baskets b \n      ON a.basket_id = b.basket_id \n     AND a.item_name != b.item_name\n    GROUP BY a.item_name, b.item_name\n)\nSELECT \n    p.item_a,\n    p.item_b,\n    ROUND(p.pair_baskets * 1.0 / t.total_baskets, 4) AS support,\n    ROUND(p.pair_baskets * 1.0 / fa.item_baskets, 4) AS confidence,\n    ROUND((p.pair_baskets * 1.0 * t.total_baskets) / (fa.item_baskets * fb.item_baskets), 4) AS lift\nFROM pair_occurrences p\nJOIN item_frequencies fa ON p.item_a = fa.item_name\nJOIN item_frequencies fb ON p.item_b = fb.item_name\nCROSS JOIN total_orders t\nWHERE p.pair_baskets >= 2\nORDER BY lift DESC, p.item_a ASC, p.item_b ASC;\n",
+  "naive_llm_sql": "\nSELECT \n    a.item_name AS item_a,\n    b.item_name AS item_b,\n    COUNT(*) * 1.0 / 4 AS support,\n    COUNT(*) * 1.0 / 4 AS confidence,\n    COUNT(*) * 1.0 AS lift\nFROM market_baskets a\nJOIN market_baskets b ON a.basket_id = b.basket_id\nGROUP BY a.item_name, b.item_name\nORDER BY lift DESC, item_a ASC, item_b ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "item_a",
+    "item_b",
+    "support",
+    "confidence",
+    "lift"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Naive models omit self-pair elimination (producing trivial rules like Bread -> Bread with 100% confidence), fail to normalize by total baskets, or confuse raw co-occurrence counts with statistical Lift."
+}

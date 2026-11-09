@@ -1,0 +1,18 @@
+{
+  "id": "task_112_dual_constraint_sessionization",
+  "name": "Dual-Constraint Sessionization: 30-min Inactivity AND 4-Hour Absolute Hard Cap",
+  "category": "Sessionization (Gaps & Islands)",
+  "description": "Groups web clickstream events into sessions. A new session starts if: 1) more than 30 minutes pass between consecutive events, OR 2) more than 4 hours have elapsed since the session genesis event.",
+  "prompt": "Segment user event stream into deterministic sessions under dual constraints:\n1. An inactivity gap of > 30 minutes begins a new session.\n2. An absolute duration of > 4 hours from the start of the current session begins a new session (preventing bots or perpetual sessions from running indefinitely).\n\nRequired output columns:\n- user_id (INT)\n- event_time (TIMESTAMP)\n- session_id (BIGINT)\n\nOrder results by user_id ASC, event_time ASC.",
+  "setup_sql": "\nCREATE TABLE clickstream_events (user_id INT, event_time TIMESTAMP);\n-- 10 events spaced exactly 28 minutes apart (< 30m inactivity gap, but spans 4h 12m from genesis)\nINSERT INTO clickstream_events \nSELECT 1, TIMESTAMP '2026-03-01 08:00:00' + (i * INTERVAL '28 minutes')\nFROM range(10) t(i);\n",
+  "golden_sql": "\nWITH step_lags AS (\n    SELECT \n        user_id,\n        event_time,\n        LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time\n    FROM clickstream_events\n),\ninactivity_flags AS (\n    SELECT \n        user_id,\n        event_time,\n        CASE \n            WHEN prev_time IS NULL OR date_diff('second', prev_time, event_time) > 1800 THEN 1\n            ELSE 0\n        END AS is_inactivity_break\n    FROM step_lags\n),\nbase_sessions AS (\n    SELECT \n        user_id,\n        event_time,\n        SUM(is_inactivity_break) OVER (PARTITION BY user_id ORDER BY event_time) AS base_sess\n    FROM inactivity_flags\n),\ngenesis_diff AS (\n    SELECT \n        user_id,\n        event_time,\n        base_sess,\n        date_diff('second', FIRST_VALUE(event_time) OVER (PARTITION BY user_id, base_sess ORDER BY event_time), event_time) AS elapsed_from_start\n    FROM base_sessions\n)\nSELECT \n    user_id,\n    event_time,\n    (base_sess + (elapsed_from_start > 14400)::INT)::BIGINT AS session_id\nFROM genesis_diff\nORDER BY user_id ASC, event_time ASC;\n",
+  "naive_llm_sql": "\nWITH step_lags AS (\n    SELECT \n        user_id,\n        event_time,\n        LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time\n    FROM clickstream_events\n)\nSELECT \n    user_id,\n    event_time,\n    SUM(CASE WHEN prev_time IS NULL OR date_diff('second', prev_time, event_time) > 1800 THEN 1 ELSE 0 END) OVER (\n        PARTITION BY user_id ORDER BY event_time\n    )::BIGINT AS session_id\nFROM step_lags\nORDER BY user_id ASC, event_time ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "user_id",
+    "event_time",
+    "session_id"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Frontier models only check the consecutive step lag (> 30 min). When an automated bot or persistent user emits events every 15 minutes continuously for 12 hours, the naive query leaves them in a single endless session, completely violating the 4-hour max session cap constraint."
+}

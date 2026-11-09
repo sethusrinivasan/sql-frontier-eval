@@ -1,0 +1,16 @@
+{
+  "id": "task_023_Q23_trimmed_mean_rolling_window",
+  "name": "Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)",
+  "category": "Temporal & Time-Series",
+  "description": "Financial risk models compute a 7-day rolling average excluding the highest and lowest single observations in each 7-day window to eliminate transient flash crashes.",
+  "prompt": "Financial risk models compute a 7-day rolling average excluding the highest and lowest single observations in each 7-day window to eliminate transient flash crashes.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: trade_date, settlement_amount, trimmed_mean_5d.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE daily_settlement (\n                trade_date DATE,\n                settlement_amount DOUBLE\n            );\n            INSERT INTO daily_settlement VALUES\n                ('2026-03-01', 50.0),\n                ('2026-03-02', 52.0),\n                ('2026-03-03', 500.0), -- Flash spike outlier\n                ('2026-03-04', 51.0),\n                ('2026-03-05', 49.0);",
+  "golden_sql": "-- Calculate trimmed rolling mean excluding min and max values within a 5-day window\n            WITH windowed_stats AS (\n                SELECT \n                    trade_date,\n                    settlement_amount,\n                    COUNT(*) OVER w AS win_count,\n                    SUM(settlement_amount) OVER w AS win_sum,\n                    MIN(settlement_amount) OVER w AS win_min,\n                    MAX(settlement_amount) OVER w AS win_max\n                FROM daily_settlement\n                WINDOW w AS (ORDER BY trade_date ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING)\n            )\n            SELECT \n                trade_date,\n                settlement_amount,\n                -- Subtract min and max from sum and divide by (count - 2)\n                CASE \n                    WHEN win_count > 2 THEN ROUND((win_sum - win_min - win_max) / (win_count - 2), 2)\n                    ELSE settlement_amount\n                END AS trimmed_mean_5d\n            FROM windowed_stats\n            ORDER BY trade_date;",
+  "ordered": true,
+  "expected_columns": [
+    "trade_date",
+    "settlement_amount",
+    "trimmed_mean_5d"
+  ],
+  "why_it_fails": "Writing self-joins with sub-aggregations to filter min/max results in huge query execution trees."
+}

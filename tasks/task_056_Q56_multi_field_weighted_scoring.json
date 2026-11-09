@@ -1,0 +1,16 @@
+{
+  "id": "task_056_Q56_multi_field_weighted_scoring",
+  "name": "Multi-Field Weighted Full-Text Retrieval (Title 3x, Body 1x)",
+  "category": "Search & Retrieval",
+  "description": "A match in a document title or product headline is far more indicative of relevance than a passing mention in the body text.",
+  "prompt": "A match in a document title or product headline is far more indicative of relevance than a passing mention in the body text.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: post_id, title, multi_field_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE product_posts (\n                post_id INT,\n                title VARCHAR,\n                body VARCHAR\n            );\n            INSERT INTO product_posts VALUES\n                (1, 'Wireless Noise Canceling Headphones', 'These over-ear headphones feature active noise cancelling technology.'),\n                (2, 'Travel Accessories and Gadgets',     'A complete list of travel gear including a wireless charging pad and cables.'),\n                (3, 'Coffee Brewing Machines',          'Best espresso makers and grinders for home brewing.');",
+  "golden_sql": "-- Search for 'wireless headphones': Title matches weighted 3.0x, Body matches weighted 1.0x\n            WITH scored AS (\n                SELECT \n                    post_id,\n                    title,\n                    ROUND(\n                        (CASE WHEN title ILIKE '%wireless%' THEN 3.0 ELSE 0.0 END) +\n                        (CASE WHEN title ILIKE '%headphones%' THEN 3.0 ELSE 0.0 END) +\n                        (CASE WHEN body ILIKE '%wireless%' THEN 1.0 ELSE 0.0 END) +\n                        (CASE WHEN body ILIKE '%headphones%' THEN 1.0 ELSE 0.0 END), 2\n                    ) AS multi_field_score\n                FROM product_posts\n            )\n            SELECT \n                post_id,\n                title,\n                multi_field_score\n            FROM scored\n            WHERE multi_field_score > 0\n            ORDER BY multi_field_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "post_id",
+    "title",
+    "multi_field_score"
+  ],
+  "why_it_fails": "Concatenating title and body into a single column gives equal weight to all words."
+}

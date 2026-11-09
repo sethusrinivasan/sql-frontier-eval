@@ -1,0 +1,18 @@
+{
+  "id": "task_030_Q30_adaptive_similarity_threshold",
+  "name": "Adaptive Similarity Thresholding with Fallback Top-K Guarantee",
+  "category": "Vector & Embeddings",
+  "description": "RAG systems want high-confidence matches (similarity > 0.85) to avoid hallucinations, but if no document exceeds 0.85, they need a guaranteed top-1 fallback to provide at least some context.",
+  "prompt": "RAG systems want high-confidence matches (similarity > 0.85) to avoid hallucinations, but if no document exceeds 0.85, they need a guaranteed top-1 fallback to provide at least some context.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: kb_id, content, sim_score, rank_pos, match_type.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE knowledge_base (\n                kb_id INT,\n                content VARCHAR,\n                vector FLOAT[3]\n            );\n            INSERT INTO knowledge_base VALUES\n                (1, 'DuckDB uses columnar storage', [0.4, 0.4, 0.1]::FLOAT[3]),\n                (2, 'DuckDB vector execution engine', [0.5, 0.3, 0.2]::FLOAT[3]),\n                (3, 'French cuisine recipes',        [0.0, 0.1, 0.9]::FLOAT[3]);",
+  "golden_sql": "-- Score items, guarantee top 1 fallback even if below 0.85 threshold\n            WITH scored AS (\n                SELECT \n                    kb_id,\n                    content,\n                    array_cosine_similarity(vector, [0.9, 0.2, 0.1]::FLOAT[3]) AS sim_score,\n                    ROW_NUMBER() OVER (ORDER BY array_cosine_similarity(vector, [0.9, 0.2, 0.1]::FLOAT[3]) DESC) AS rank_pos\n                FROM knowledge_base\n            )\n            SELECT \n                kb_id,\n                content,\n                ROUND(sim_score, 4) AS sim_score,\n                rank_pos,\n                CASE WHEN sim_score >= 0.85 THEN 'CONFIDENT_MATCH' ELSE 'FALLBACK_TOP_MATCH' END AS match_type\n            FROM scored\n            WHERE sim_score >= 0.85 OR rank_pos = 1\n            ORDER BY rank_pos;",
+  "ordered": true,
+  "expected_columns": [
+    "kb_id",
+    "content",
+    "sim_score",
+    "rank_pos",
+    "match_type"
+  ],
+  "why_it_fails": "A hard WHERE similarity > 0.85 yields empty sets, while a raw LIMIT 5 includes irrelevant noise."
+}

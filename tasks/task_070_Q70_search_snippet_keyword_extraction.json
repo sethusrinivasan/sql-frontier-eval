@@ -1,0 +1,15 @@
+{
+  "id": "task_070_Q70_search_snippet_keyword_extraction",
+  "name": "Search Snippet Extraction: Context Window Around Matching Terms",
+  "category": "Search & Retrieval",
+  "description": "Search results show a preview snippet containing the searched keyword with 30 characters of surrounding context rather than the beginning of a 2,000-word article.",
+  "prompt": "Search results show a preview snippet containing the searched keyword with 30 characters of surrounding context rather than the beginning of a 2,000-word article.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: post_id, snippet_preview.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE blog_posts (\n                post_id INT,\n                content VARCHAR\n            );\n            INSERT INTO blog_posts VALUES\n                (1, 'In this tutorial we demonstrate high performance data analysis. The key feature of DuckDB is vectorized execution which processes data in columnar chunks for maximum CPU cache locality.'),\n                (2, 'PostgreSQL is an advanced open source relational database with robust ACID transaction support.');",
+  "golden_sql": "-- Extract 25-character window surrounding the word 'vectorized'\n            SELECT \n                post_id,\n                '...' || SUBSTRING(\n                    content,\n                    GREATEST(1, INSTR(lower(content), 'vectorized') - 15),\n                    LENGTH('vectorized') + 30\n                ) || '...' AS snippet_preview\n            FROM blog_posts\n            WHERE content ILIKE '%vectorized%';",
+  "ordered": false,
+  "expected_columns": [
+    "post_id",
+    "snippet_preview"
+  ],
+  "why_it_fails": "Substring extraction crashes when matching keywords appear near the very beginning or end of the text."
+}

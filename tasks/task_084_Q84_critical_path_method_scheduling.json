@@ -1,0 +1,16 @@
+{
+  "id": "task_084_Q84_critical_path_method_scheduling",
+  "name": "Task Scheduling Critical Path Method (CPM) Duration Analysis",
+  "category": "Graph & Hierarchy",
+  "description": "Project managers identify the 'Critical Path'\u2014the longest sequence of dependent tasks that dictates the minimum project completion time.",
+  "prompt": "Project managers identify the 'Critical Path'\u2014the longest sequence of dependent tasks that dictates the minimum project completion time.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: task_code, critical_path_duration, path_str.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE project_tasks (\n                task_code VARCHAR,\n                prerequisite_code VARCHAR,\n                duration_days INT\n            );\n            INSERT INTO project_tasks VALUES\n                ('START', NULL, 0),\n                ('DESIGN', 'START', 10),\n                ('BUILD_FRONTEND', 'DESIGN', 15),\n                ('BUILD_BACKEND',  'DESIGN', 25), -- Longest branch\n                ('DEPLOY', 'BUILD_BACKEND', 5);",
+  "golden_sql": "-- Find the longest path (Critical Path) from START to DEPLOY\n            WITH RECURSIVE task_paths AS (\n                SELECT \n                    task_code,\n                    duration_days AS cumulative_days,\n                    task_code AS path_str\n                FROM project_tasks\n                WHERE prerequisite_code IS NULL\n                \n                UNION ALL\n                \n                SELECT \n                    t.task_code,\n                    p.cumulative_days + t.duration_days,\n                    p.path_str || ' -> ' || t.task_code\n                FROM task_paths p\n                JOIN project_tasks t ON p.task_code = t.prerequisite_code\n            )\n            SELECT \n                task_code,\n                cumulative_days AS critical_path_duration,\n                path_str\n            FROM task_paths\n            ORDER BY cumulative_days DESC\n            LIMIT 1;",
+  "ordered": true,
+  "expected_columns": [
+    "task_code",
+    "critical_path_duration",
+    "path_str"
+  ],
+  "why_it_fails": "Adding task durations without considering parallel execution branches yields an unrealistically inflated project timeline."
+}

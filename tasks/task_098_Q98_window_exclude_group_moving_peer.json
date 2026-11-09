@@ -1,0 +1,17 @@
+{
+  "id": "task_098_Q98_window_exclude_group_moving_peer",
+  "name": "Window Peer Frame Exclusion: EXCLUDE GROUP for Clean Cross-Group Contrast",
+  "category": "Warehouse & Statistical",
+  "description": "When comparing sales across product categories or dates, analysts want to compute the average of all other groups, strictly excluding the entire current group.",
+  "prompt": "When comparing sales across product categories or dates, analysts want to compute the average of all other groups, strictly excluding the entire current group.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: region, order_id, sale_amount, other_regions_baseline_avg.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE regional_orders (\n                region VARCHAR,\n                order_id INT,\n                sale_amount DOUBLE\n            );\n            INSERT INTO regional_orders VALUES\n                ('North', 1, 100.0),\n                ('North', 2, 120.0),\n                ('South', 3, 200.0),\n                ('East',  4, 150.0);",
+  "golden_sql": "-- Compute baseline average across other regions strictly excluding current region group\n            SELECT \n                region,\n                order_id,\n                sale_amount,\n                ROUND(AVG(sale_amount) OVER (\n                    ORDER BY region\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING\n                    EXCLUDE GROUP\n                ), 2) AS other_regions_baseline_avg\n            FROM regional_orders\n            ORDER BY region, order_id;",
+  "ordered": true,
+  "expected_columns": [
+    "region",
+    "order_id",
+    "sale_amount",
+    "other_regions_baseline_avg"
+  ],
+  "why_it_fails": "Computing group baselines without excluding the current group dilutes contrast in small sample sizes."
+}

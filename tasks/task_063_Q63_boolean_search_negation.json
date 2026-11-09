@@ -1,0 +1,15 @@
+{
+  "id": "task_063_Q63_boolean_search_negation",
+  "name": "High-Precision Boolean Search with Negation and Grouping",
+  "category": "Search & Retrieval",
+  "description": "Legal e-discovery and patent search rely on exact Boolean syntax: (patent AND battery) NOT (lithium OR phone). Negations must be strictly applied without dropping valid candidate documents.",
+  "prompt": "Legal e-discovery and patent search rely on exact Boolean syntax: (patent AND battery) NOT (lithium OR phone). Negations must be strictly applied without dropping valid candidate documents.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: patent_id, abstract.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE patent_corpus (\n                patent_id INT,\n                abstract VARCHAR\n            );\n            INSERT INTO patent_corpus VALUES\n                (1, 'Solid-state battery chemistry for electric vehicles and heavy transport'),\n                (2, 'Lithium ion battery pack design for mobile phone handsets'),\n                (3, 'Wireless charging pad for mobile phone and earbuds');",
+  "golden_sql": "-- Query: ('battery') AND NOT ('lithium' OR 'phone')\n            SELECT \n                patent_id,\n                abstract\n            FROM patent_corpus\n            WHERE abstract ILIKE '%battery%'\n              AND NOT (abstract ILIKE '%lithium%' OR abstract ILIKE '%phone%')\n            ORDER BY patent_id;",
+  "ordered": true,
+  "expected_columns": [
+    "patent_id",
+    "abstract"
+  ],
+  "why_it_fails": "Poor operator precedence in SQL boolean expressions causes negated terms to drop unrelated valid results."
+}

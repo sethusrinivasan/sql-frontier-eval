@@ -1,0 +1,16 @@
+{
+  "id": "task_024_Q24_sargable_fiscal_partition_prune",
+  "name": "SARGable Fiscal Year Date Range Partition Pruning",
+  "category": "Temporal & Time-Series",
+  "description": "Data warehouses partition petabyte event tables by date. Wrapping date columns in functions (e.g. `WHERE strftime('%Y', event_time) = '2026'`) breaks partition pruning, forcing a full table scan.",
+  "prompt": "Data warehouses partition petabyte event tables by date. Wrapping date columns in functions (e.g. `WHERE strftime('%Y', event_time) = '2026'`) breaks partition pruning, forcing a full table scan.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: event_id, event_timestamp, payload.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE telemetry_partitions (\n                event_id INT,\n                event_timestamp TIMESTAMP,\n                payload VARCHAR\n            );\n            INSERT INTO telemetry_partitions VALUES\n                (1, '2025-12-31 23:59:59', 'old'),\n                (2, '2026-01-01 00:00:00', 'target_start'),\n                (3, '2026-06-15 12:00:00', 'target_mid'),\n                (4, '2027-01-01 00:00:00', 'out_of_bounds');",
+  "golden_sql": "-- Exact SARGable half-open date boundary pruning\n            SELECT \n                event_id,\n                event_timestamp,\n                payload\n            FROM telemetry_partitions\n            WHERE event_timestamp >= TIMESTAMP '2026-01-01 00:00:00'\n              AND event_timestamp <  TIMESTAMP '2027-01-01 00:00:00'\n            ORDER BY event_timestamp;",
+  "ordered": true,
+  "expected_columns": [
+    "event_id",
+    "event_timestamp",
+    "payload"
+  ],
+  "why_it_fails": "Non-SARGable functions force DuckDB/Snowflake to scan every Parquet row group."
+}

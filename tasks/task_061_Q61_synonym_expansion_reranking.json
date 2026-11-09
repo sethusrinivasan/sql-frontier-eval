@@ -1,0 +1,16 @@
+{
+  "id": "task_061_Q61_synonym_expansion_reranking",
+  "name": "Dynamic Query Synonym Expansion via Relational Thesaurus",
+  "category": "Search & Retrieval",
+  "description": "When a customer searches for 'sofa', they also expect to see listings titled 'couch' or 'settee'. Expanding queries using a synonym thesaurus bridges terminology gaps.",
+  "prompt": "When a customer searches for 'sofa', they also expect to see listings titled 'couch' or 'settee'. Expanding queries using a synonym thesaurus bridges terminology gaps.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: item_id, description, matched_alias.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE synonym_thesaurus (\n                base_term VARCHAR,\n                synonym VARCHAR\n            );\n            CREATE TABLE furniture_items (\n                item_id INT,\n                description VARCHAR\n            );\n            INSERT INTO synonym_thesaurus VALUES\n                ('sofa', 'couch'),\n                ('sofa', 'settee'),\n                ('sofa', 'loveseat');\n            INSERT INTO furniture_items VALUES\n                (1, 'Modern Italian leather sofa with oak legs'),\n                (2, 'Vintage velvet couch in emerald green'),\n                (3, 'Solid wood dining table and 6 chairs');",
+  "golden_sql": "-- Expand search term 'sofa' with all relational synonyms and match inventory\n            WITH expanded_terms AS (\n                SELECT 'sofa' AS search_term\n                UNION\n                SELECT synonym FROM synonym_thesaurus WHERE base_term = 'sofa'\n            )\n            SELECT \n                f.item_id,\n                f.description,\n                t.search_term AS matched_alias\n            FROM furniture_items f\n            JOIN expanded_terms t \n              ON f.description ILIKE ('%' || t.search_term || '%')\n            ORDER BY f.item_id;",
+  "ordered": true,
+  "expected_columns": [
+    "item_id",
+    "description",
+    "matched_alias"
+  ],
+  "why_it_fails": "Hardcoding synonyms into client-side application code makes vocabulary updates inflexible."
+}

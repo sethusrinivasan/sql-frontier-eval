@@ -1,0 +1,18 @@
+{
+  "id": "task_010_Q10_peer_exclusion_moving_average",
+  "name": "Window Frame Exclusion: Peer Period Average via EXCLUDE CURRENT ROW",
+  "category": "Temporal & Time-Series",
+  "description": "To detect anomalous spikes, analysts compare a metric against the average of neighboring days, strictly excluding the current day's value to avoid skewing the baseline.",
+  "prompt": "To detect anomalous spikes, analysts compare a metric against the average of neighboring days, strictly excluding the current day's value to avoid skewing the baseline.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: service_id, call_date, total_calls, peer_baseline_avg, spike_factor.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE daily_api_calls (\n                service_id VARCHAR,\n                call_date DATE,\n                total_calls INT\n            );\n            INSERT INTO daily_api_calls VALUES\n                ('auth-svc', '2026-03-01', 1000),\n                ('auth-svc', '2026-03-02', 1050),\n                ('auth-svc', '2026-03-03', 9500), -- Major spike\n                ('auth-svc', '2026-03-04', 1020),\n                ('auth-svc', '2026-03-05', 1010);",
+  "golden_sql": "-- Calculate 5-day baseline average strictly excluding current row\n            SELECT \n                service_id,\n                call_date,\n                total_calls,\n                -- 2 days before and 2 days after, excluding current day\n                ROUND(AVG(total_calls) OVER (\n                    PARTITION BY service_id\n                    ORDER BY call_date\n                    ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING\n                    EXCLUDE CURRENT ROW\n                ), 2) AS peer_baseline_avg,\n                -- Spikiness ratio\n                ROUND(total_calls / AVG(total_calls) OVER (\n                    PARTITION BY service_id\n                    ORDER BY call_date\n                    ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING\n                    EXCLUDE CURRENT ROW\n                ), 2) AS spike_factor\n            FROM daily_api_calls\n            ORDER BY call_date;",
+  "ordered": true,
+  "expected_columns": [
+    "service_id",
+    "call_date",
+    "total_calls",
+    "peer_baseline_avg",
+    "spike_factor"
+  ],
+  "why_it_fails": "Computing rolling averages without excluding the current row inflates the baseline during the spike itself, hiding the anomaly."
+}

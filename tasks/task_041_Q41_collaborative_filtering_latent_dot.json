@@ -1,0 +1,17 @@
+{
+  "id": "task_041_Q41_collaborative_filtering_latent_dot",
+  "name": "Latent Factor Matrix Factorization Dot Product Recommendation",
+  "category": "Vector & Embeddings",
+  "description": "Matrix factorization (SVD / ALS) maps users and movies to latent factor vectors. Predicted rating is dot product of user vector and movie vector plus user and movie bias terms.",
+  "prompt": "Matrix factorization (SVD / ALS) maps users and movies to latent factor vectors. Predicted rating is dot product of user vector and movie vector plus user and movie bias terms.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: user_id, movie_id, title, predicted_rating.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE user_latent (\n                user_id INT,\n                user_bias DOUBLE,\n                u_vec FLOAT[3]\n            );\n            CREATE TABLE item_latent (\n                movie_id INT,\n                title VARCHAR,\n                movie_bias DOUBLE,\n                m_vec FLOAT[3]\n            );\n            INSERT INTO user_latent VALUES\n                (1, 0.2, [0.5, 0.3, 0.1]::FLOAT[3]);\n            INSERT INTO item_latent VALUES\n                (101, 'Sci-Fi Odyssey', 0.5, [0.6, 0.2, 0.1]::FLOAT[3]),\n                (102, 'Romantic Comedy', -0.1, [0.1, 0.7, 0.2]::FLOAT[3]);",
+  "golden_sql": "-- Predict user rating: baseline (3.5) + u_bias + m_bias + (u_vec . m_vec)\n            SELECT \n                u.user_id,\n                m.movie_id,\n                m.title,\n                ROUND(\n                    3.5 + u.user_bias + m.movie_bias + array_inner_product(u.u_vec, m.m_vec), 2\n                ) AS predicted_rating\n            FROM user_latent u\n            CROSS JOIN item_latent m\n            WHERE u.user_id = 1\n            ORDER BY predicted_rating DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "user_id",
+    "movie_id",
+    "title",
+    "predicted_rating"
+  ],
+  "why_it_fails": "Omitting bias terms causes popular movies to be underrated and niche items to be overrated."
+}

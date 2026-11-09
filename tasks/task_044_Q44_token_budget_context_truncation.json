@@ -1,0 +1,17 @@
+{
+  "id": "task_044_Q44_token_budget_context_truncation",
+  "name": "Dynamic Context Window Token Budget Packing for LLM RAG",
+  "category": "Vector & Embeddings",
+  "description": "When assembling retrieved chunks for an LLM prompt, you have a strict token limit (e.g. 1,000 tokens). You must greedily pick highest-similarity chunks until the cumulative token sum would exceed the budget.",
+  "prompt": "When assembling retrieved chunks for an LLM prompt, you have a strict token limit (e.g. 1,000 tokens). You must greedily pick highest-similarity chunks until the cumulative token sum would exceed the budget.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: chunk_id, token_count, cumulative_tokens, similarity_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE rag_candidate_chunks (\n                chunk_id INT,\n                token_count INT,\n                vec FLOAT[2]\n            );\n            INSERT INTO rag_candidate_chunks VALUES\n                (1, 400, [0.95, 0.05]::FLOAT[2]),\n                (2, 350, [0.90, 0.10]::FLOAT[2]),\n                (3, 400, [0.85, 0.15]::FLOAT[2]); -- Exceeds 1000 total budget",
+  "golden_sql": "-- Greedily pack chunks ordered by similarity up to strict 1,000 token budget\n            WITH ranked_chunks AS (\n                SELECT \n                    chunk_id,\n                    token_count,\n                    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) AS score,\n                    SUM(token_count) OVER (\n                        ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC\n                    ) AS cumulative_tokens\n                FROM rag_candidate_chunks\n            )\n            SELECT \n                chunk_id,\n                token_count,\n                cumulative_tokens,\n                ROUND(score, 4) AS similarity_score\n            FROM ranked_chunks\n            WHERE cumulative_tokens <= 1000\n            ORDER BY similarity_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "chunk_id",
+    "token_count",
+    "cumulative_tokens",
+    "similarity_score"
+  ],
+  "why_it_fails": "Picking a fixed LIMIT 10 can overflow LLM token limits or waste available prompt capacity."
+}

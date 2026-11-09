@@ -1,0 +1,16 @@
+{
+  "id": "task_014_Q14_time_weighted_average_price_twap",
+  "name": "Time-Weighted Average Price (TWAP) with Variable Interval Weights",
+  "category": "Temporal & Time-Series",
+  "description": "TWAP measures the average price of an asset weighted by the duration of time that each price level was sustained, preventing brief price spikes from distorting valuation.",
+  "prompt": "TWAP measures the average price of an asset weighted by the duration of time that each price level was sustained, preventing brief price spikes from distorting valuation.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: symbol, twap_price, total_duration_seconds.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE price_ticks (\n                tick_time TIMESTAMP,\n                symbol VARCHAR,\n                price DOUBLE\n            );\n            INSERT INTO price_ticks VALUES\n                ('2026-03-01 10:00:00', 'ETH', 3000.00), -- lasted 10 min\n                ('2026-03-01 10:10:00', 'ETH', 3050.00), -- lasted 20 min\n                ('2026-03-01 10:30:00', 'ETH', 3010.00), -- lasted 30 min\n                ('2026-03-01 11:00:00', 'ETH', 3010.00); -- window end",
+  "golden_sql": "-- Calculate 1-hour TWAP from 10:00 to 11:00\n            WITH tick_durations AS (\n                SELECT \n                    symbol,\n                    tick_time,\n                    price,\n                    date_diff('second', tick_time, \n                        LEAD(tick_time, 1, TIMESTAMP '2026-03-01 11:00:00') OVER (PARTITION BY symbol ORDER BY tick_time)\n                    ) AS duration_seconds\n                FROM price_ticks\n                WHERE tick_time < TIMESTAMP '2026-03-01 11:00:00'\n            )\n            SELECT \n                symbol,\n                ROUND(SUM(price * duration_seconds) / SUM(duration_seconds), 2) AS twap_price,\n                SUM(duration_seconds) AS total_duration_seconds\n            FROM tick_durations\n            GROUP BY symbol;",
+  "ordered": true,
+  "expected_columns": [
+    "symbol",
+    "twap_price",
+    "total_duration_seconds"
+  ],
+  "why_it_fails": "Taking simple AVG(price) biases the result towards periods with frequent tick updates rather than sustained duration."
+}

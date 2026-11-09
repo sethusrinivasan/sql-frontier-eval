@@ -1,0 +1,18 @@
+{
+  "id": "task_086_Q86_multiparent_allocation_cost_rollup",
+  "name": "Multi-Parent Shared Infrastructure Cost Allocation Rollup",
+  "category": "Graph & Hierarchy",
+  "description": "Cloud infrastructure (e.g. shared Kubernetes cluster) is co-owned by multiple products with fractional split percentages. Costs must cascade down to consumer business units.",
+  "prompt": "Cloud infrastructure (e.g. shared Kubernetes cluster) is co-owned by multiple products with fractional split percentages. Costs must cascade down to consumer business units.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: parent_node, child_node, allocation_pct, raw_parent_cost, allocated_cost.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE cost_nodes (\n                node_id VARCHAR,\n                monthly_cost DECIMAL(10,2)\n            );\n            CREATE TABLE cost_allocations (\n                parent_node VARCHAR,\n                child_node VARCHAR,\n                allocation_pct DOUBLE\n            );\n            INSERT INTO cost_nodes VALUES ('K8S_SHARED', 10000.00);\n            INSERT INTO cost_allocations VALUES\n                ('K8S_SHARED', 'PRODUCT_SEARCH', 0.60),\n                ('K8S_SHARED', 'PRODUCT_CHECKOUT', 0.40);",
+  "golden_sql": "-- Allocate parent cost to child business units\n            SELECT \n                a.parent_node,\n                a.child_node,\n                a.allocation_pct,\n                n.monthly_cost AS raw_parent_cost,\n                ROUND(n.monthly_cost * a.allocation_pct, 2) AS allocated_cost\n            FROM cost_allocations a\n            JOIN cost_nodes n ON a.parent_node = n.node_id\n            ORDER BY allocated_cost DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "parent_node",
+    "child_node",
+    "allocation_pct",
+    "raw_parent_cost",
+    "allocated_cost"
+  ],
+  "why_it_fails": "Failing to multiply split percentages down the DAG results in allocated costs exceeding 100% of actual spend."
+}

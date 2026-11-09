@@ -1,0 +1,16 @@
+{
+  "id": "task_078_Q78_transitive_fraud_sybil_ring",
+  "name": "Transitive Fraud Ring & Sybil Account Detection via Device Links",
+  "category": "Graph & Hierarchy",
+  "description": "Financial fraudsters create hundreds of fake accounts linked by shared credit cards, device fingerprints, or IP addresses. Finding all accounts transitively connected to a confirmed fraudster exposes the syndicate.",
+  "prompt": "Financial fraudsters create hundreds of fake accounts linked by shared credit cards, device fingerprints, or IP addresses. Finding all accounts transitively connected to a confirmed fraudster exposes the syndicate.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: seed_account, connected_account, shortest_hop_distance.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE shared_identifiers (\n                account_id INT,\n                linked_account_id INT\n            );\n            INSERT INTO shared_identifiers VALUES\n                (101, 102), -- 101 shares credit card with 102\n                (102, 103), -- 102 shares device with 103\n                (103, 104), -- 103 shares bank account with 104\n                (201, 202); -- Separate cluster",
+  "golden_sql": "-- Find all accounts transitively linked to known bad actor 101\n            WITH RECURSIVE fraud_cluster AS (\n                SELECT \n                    101 AS seed_account,\n                    linked_account_id AS connected_account,\n                    1 AS hop_distance\n                FROM shared_identifiers\n                WHERE account_id = 101\n                \n                UNION ALL\n                \n                SELECT \n                    c.seed_account,\n                    s.linked_account_id,\n                    c.hop_distance + 1\n                FROM fraud_cluster c\n                JOIN shared_identifiers s ON c.connected_account = s.account_id\n                WHERE c.hop_distance < 5\n            )\n            SELECT DISTINCT \n                seed_account,\n                connected_account,\n                MIN(hop_distance) AS shortest_hop_distance\n            FROM fraud_cluster\n            GROUP BY seed_account, connected_account\n            ORDER BY shortest_hop_distance;",
+  "ordered": true,
+  "expected_columns": [
+    "seed_account",
+    "connected_account",
+    "shortest_hop_distance"
+  ],
+  "why_it_fails": "Looking only 1 hop away misses fraudsters who funnel funds through mule intermediary accounts."
+}

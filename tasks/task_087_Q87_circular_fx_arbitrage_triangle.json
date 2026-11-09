@@ -1,0 +1,19 @@
+{
+  "id": "task_087_Q87_circular_fx_arbitrage_triangle",
+  "name": "Triangular FX Currency Arbitrage Detection (Loop Profitability)",
+  "category": "Graph & Hierarchy",
+  "description": "High-frequency FX trading bots scan for triangular arbitrage where converting USD -> EUR -> JPY -> USD yields more than 1.00 USD after exchange rates.",
+  "prompt": "High-frequency FX trading bots scan for triangular arbitrage where converting USD -> EUR -> JPY -> USD yields more than 1.00 USD after exchange rates.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: curr_start, curr_mid1, curr_mid2, curr_end, loop_multiplier, profit_margin_pct.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE fx_pairs (\n                from_curr VARCHAR,\n                to_curr VARCHAR,\n                exchange_rate DOUBLE\n            );\n            INSERT INTO fx_pairs VALUES\n                ('USD', 'EUR', 0.92),\n                ('EUR', 'JPY', 160.0),\n                ('JPY', 'USD', 0.0069); -- Arbitrage loop: 0.92 * 160 * 0.0069 = 1.01568 (+1.5% profit)",
+  "golden_sql": "-- Detect 3-hop triangular arbitrage opportunities where effective rate > 1.005\n            SELECT \n                a.from_curr AS curr_start,\n                a.to_curr AS curr_mid1,\n                b.to_curr AS curr_mid2,\n                c.to_curr AS curr_end,\n                ROUND(a.exchange_rate * b.exchange_rate * c.exchange_rate, 4) AS loop_multiplier,\n                ROUND((a.exchange_rate * b.exchange_rate * c.exchange_rate - 1.0) * 100, 2) AS profit_margin_pct\n            FROM fx_pairs a\n            JOIN fx_pairs b ON a.to_curr = b.from_curr\n            JOIN fx_pairs c ON b.to_curr = c.from_curr AND c.to_curr = a.from_curr\n            WHERE (a.exchange_rate * b.exchange_rate * c.exchange_rate) > 1.005;",
+  "ordered": false,
+  "expected_columns": [
+    "curr_start",
+    "curr_mid1",
+    "curr_mid2",
+    "curr_end",
+    "loop_multiplier",
+    "profit_margin_pct"
+  ],
+  "why_it_fails": "Missing currency conversion bid-ask spreads causes false positive arbitrage signals that lose money in practice."
+}

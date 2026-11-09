@@ -1,0 +1,18 @@
+{
+  "id": "task_031_Q31_semantic_deduplication_support_tickets",
+  "name": "Semantic Deduplication of IT Incident Tickets via Vector Cosine Threshold",
+  "category": "Vector & Embeddings",
+  "description": "During service outages, hundreds of users submit identically phrased IT support tickets ('login down', 'cannot access account'). Clustering tickets with vector similarity > 0.88 consolidates duplicates into a single incident.",
+  "prompt": "During service outages, hundreds of users submit identically phrased IT support tickets ('login down', 'cannot access account'). Clustering tickets with vector similarity > 0.88 consolidates duplicates into a single incident.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: primary_ticket_id, primary_subject, duplicate_ticket_id, duplicate_subject, similarity.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE support_tickets (\n                ticket_id INT,\n                subject VARCHAR,\n                vector FLOAT[3]\n            );\n            INSERT INTO support_tickets VALUES\n                (1, 'Cannot log into customer portal',  [0.9, 0.1, 0.0]::FLOAT[3]),\n                (2, 'Portal login failing with 500 error', [0.89, 0.12, 0.01]::FLOAT[3]),\n                (3, 'Billing address invoice update',   [0.1, 0.8, 0.2]::FLOAT[3]),\n                (4, 'Unable to authenticate on website', [0.91, 0.09, 0.02]::FLOAT[3]);",
+  "golden_sql": "-- Detect duplicate ticket pairs with cosine similarity >= 0.88\n            SELECT \n                t1.ticket_id AS primary_ticket_id,\n                t1.subject AS primary_subject,\n                t2.ticket_id AS duplicate_ticket_id,\n                t2.subject AS duplicate_subject,\n                ROUND(array_cosine_similarity(t1.vector, t2.vector), 4) AS similarity\n            FROM support_tickets t1\n            JOIN support_tickets t2 \n              ON t1.ticket_id < t2.ticket_id -- strictly upper triangle to avoid duplicates and self-matching\n             AND array_cosine_similarity(t1.vector, t2.vector) >= 0.88\n            ORDER BY similarity DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "primary_ticket_id",
+    "primary_subject",
+    "duplicate_ticket_id",
+    "duplicate_subject",
+    "similarity"
+  ],
+  "why_it_fails": "Quadratic N x N self-joins without ordering check (`t1.id < t2.id`) double compute and compare tickets to themselves."
+}

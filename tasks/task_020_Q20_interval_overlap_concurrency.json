@@ -1,0 +1,14 @@
+{
+  "id": "task_020_Q20_interval_overlap_concurrency",
+  "name": "Peak Concurrent Workforce Capacity via Interval Overlap Scan",
+  "category": "Temporal & Time-Series",
+  "description": "Workforce managers must calculate maximum concurrent staffing levels from employee shift start and end times to ensure warehouse safety limits are never breached.",
+  "prompt": "Workforce managers must calculate maximum concurrent staffing levels from employee shift start and end times to ensure warehouse safety limits are never breached.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: peak_concurrent_workers.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE staff_shifts (\n                shift_id INT,\n                worker_id INT,\n                start_time TIMESTAMP,\n                end_time TIMESTAMP\n            );\n            INSERT INTO staff_shifts VALUES\n                (1, 101, '2026-03-01 08:00:00', '2026-03-01 12:00:00'),\n                (2, 102, '2026-03-01 09:00:00', '2026-03-01 13:00:00'),\n                (3, 103, '2026-03-01 10:00:00', '2026-03-01 11:30:00');",
+  "golden_sql": "-- Transform start/end intervals into delta events and compute peak concurrent staffing\n            WITH shift_events AS (\n                SELECT start_time AS event_time, 1 AS delta FROM staff_shifts\n                UNION ALL\n                SELECT end_time AS event_time, -1 AS delta FROM staff_shifts\n            ),\n            running_occupancy AS (\n                SELECT \n                    event_time,\n                    SUM(delta) OVER (ORDER BY event_time, delta DESC) AS concurrent_workers\n                FROM shift_events\n            )\n            SELECT \n                MAX(concurrent_workers) AS peak_concurrent_workers\n            FROM running_occupancy;",
+  "ordered": true,
+  "expected_columns": [
+    "peak_concurrent_workers"
+  ],
+  "why_it_fails": "Pairwise self-joins between overlapping shifts blow up to O(N^2) complexity."
+}

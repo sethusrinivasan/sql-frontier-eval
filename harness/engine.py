@@ -22,6 +22,10 @@ class SQLEvalEngine:
                 pass
         self.con = duckdb.connect(database=":memory:")
         self.con.execute(f"PRAGMA threads={self.threads};")
+        try:
+            self.con.execute("INSTALL fts; LOAD fts;")
+        except Exception:
+            pass
 
     def load_seed_data(self, setup_sql: str) -> Optional[str]:
         """

@@ -1,0 +1,18 @@
+{
+  "id": "task_017_Q17_retention_cohort_survival",
+  "name": "Dynamic User Retention Cohort Matrix by Weekly Milestones",
+  "category": "Temporal & Time-Series",
+  "description": "SaaS analytics track weekly retention curves (Day 0, Day 7, Day 14, Day 30) based on user signup week.",
+  "prompt": "SaaS analytics track weekly retention curves (Day 0, Day 7, Day 14, Day 30) based on user signup week.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: cohort_week, cohort_size, day_0_active, day_7_active, day_14_active.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE app_users (\n                user_id INT,\n                signup_date DATE\n            );\n            CREATE TABLE activity_log (\n                user_id INT,\n                activity_date DATE\n            );\n            INSERT INTO app_users VALUES\n                (1, '2026-02-01'), (2, '2026-02-01'), (3, '2026-02-08');\n            INSERT INTO activity_log VALUES\n                (1, '2026-02-01'), (1, '2026-02-08'), (1, '2026-02-15'),\n                (2, '2026-02-01'), (2, '2026-02-08'),\n                (3, '2026-02-08');",
+  "golden_sql": "-- Generate dynamic cohort retention matrix\n            SELECT \n                date_trunc('week', u.signup_date) AS cohort_week,\n                COUNT(DISTINCT u.user_id) AS cohort_size,\n                COUNT(DISTINCT CASE WHEN a.activity_date = u.signup_date THEN u.user_id END) AS day_0_active,\n                COUNT(DISTINCT CASE WHEN a.activity_date >= u.signup_date + 7 AND a.activity_date < u.signup_date + 14 THEN u.user_id END) AS day_7_active,\n                COUNT(DISTINCT CASE WHEN a.activity_date >= u.signup_date + 14 AND a.activity_date < u.signup_date + 21 THEN u.user_id END) AS day_14_active\n            FROM app_users u\n            LEFT JOIN activity_log a ON u.user_id = a.user_id\n            GROUP BY cohort_week\n            ORDER BY cohort_week;",
+  "ordered": true,
+  "expected_columns": [
+    "cohort_week",
+    "cohort_size",
+    "day_0_active",
+    "day_7_active",
+    "day_14_active"
+  ],
+  "why_it_fails": "Calculating retention without dynamic date grouping produces rigid, fragile queries requiring manual updates every week."
+}

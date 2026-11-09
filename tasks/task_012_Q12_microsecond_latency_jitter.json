@@ -1,0 +1,17 @@
+{
+  "id": "task_012_Q12_microsecond_latency_jitter",
+  "name": "Inter-Packet Network Arrival Jitter at Nanosecond Resolution",
+  "category": "Temporal & Time-Series",
+  "description": "High-speed network telemetry measures packet arrival jitter (variance in inter-packet delay). Jitter spikes indicate network congestion or buffer bloat.",
+  "prompt": "High-speed network telemetry measures packet arrival jitter (variance in inter-packet delay). Jitter spikes indicate network congestion or buffer bloat.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: packet_id, captured_at, delta_microseconds, rolling_jitter_stddev.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE packet_stream (\n                packet_id INT,\n                captured_at TIMESTAMP\n            );\n            INSERT INTO packet_stream VALUES\n                (1, '2026-03-01 12:00:00.000100'),\n                (2, '2026-03-01 12:00:00.000150'), -- +50us\n                (3, '2026-03-01 12:00:00.000300'), -- +150us (jitter spike)\n                (4, '2026-03-01 12:00:00.000350');",
+  "golden_sql": "-- Compute inter-packet arrival delta in microseconds and identify variance\n            WITH deltas AS (\n                SELECT \n                    packet_id,\n                    captured_at,\n                    date_diff('microsecond', \n                        LAG(captured_at) OVER (ORDER BY captured_at), \n                        captured_at\n                    ) AS delta_microseconds\n                FROM packet_stream\n            )\n            SELECT \n                packet_id,\n                captured_at,\n                delta_microseconds,\n                -- Measure moving jitter variance over last 3 packets\n                ROUND(STDDEV(delta_microseconds) OVER (\n                    ORDER BY captured_at \n                    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\n                ), 2) AS rolling_jitter_stddev\n            FROM deltas\n            ORDER BY captured_at;",
+  "ordered": true,
+  "expected_columns": [
+    "packet_id",
+    "captured_at",
+    "delta_microseconds",
+    "rolling_jitter_stddev"
+  ],
+  "why_it_fails": "Standard SQL datetime arithmetic truncates to milliseconds or seconds, losing high-frequency microsecond microbursts."
+}

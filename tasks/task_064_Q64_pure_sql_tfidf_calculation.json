@@ -1,0 +1,19 @@
+{
+  "id": "task_064_Q64_pure_sql_tfidf_calculation",
+  "name": "TF-IDF (Term Frequency - Inverse Document Frequency) in Pure SQL",
+  "category": "Search & Retrieval",
+  "description": "TF-IDF is the foundational algorithm of information retrieval. Calculating it directly in SQL provides deep insight into term uniqueness across a corpus without requiring Python.",
+  "prompt": "TF-IDF is the foundational algorithm of information retrieval. Calculating it directly in SQL provides deep insight into term uniqueness across a corpus without requiring Python.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: doc_id, term, term_count, tf, idf, tfidf_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE doc_words (\n                doc_id INT,\n                term VARCHAR,\n                term_count INT\n            );\n            INSERT INTO doc_words VALUES\n                (1, 'database', 10), (1, 'columnar', 5),\n                (2, 'database', 8),  (2, 'relational', 7),\n                (3, 'columnar', 4);",
+  "golden_sql": "-- Calculate TF-IDF for term 'columnar' across 3 documents\n            -- TF = term_count / total_terms_in_doc, IDF = LN(Total_Docs / Docs_With_Term)\n            WITH doc_lengths AS (\n                SELECT doc_id, SUM(term_count) AS doc_len\n                FROM doc_words\n                GROUP BY doc_id\n            ),\n            corpus_stats AS (\n                SELECT COUNT(DISTINCT doc_id) AS total_docs FROM doc_words\n            ),\n            term_docs AS (\n                SELECT term, COUNT(DISTINCT doc_id) AS docs_with_term\n                FROM doc_words\n                GROUP BY term\n            )\n            SELECT \n                w.doc_id,\n                w.term,\n                w.term_count,\n                ROUND(w.term_count * 1.0 / l.doc_len, 4) AS tf,\n                ROUND(LN(c.total_docs * 1.0 / td.docs_with_term), 4) AS idf,\n                ROUND((w.term_count * 1.0 / l.doc_len) * LN(c.total_docs * 1.0 / td.docs_with_term), 4) AS tfidf_score\n            FROM doc_words w\n            JOIN doc_lengths l ON w.doc_id = l.doc_id\n            JOIN term_docs td ON w.term = td.term\n            CROSS JOIN corpus_stats c\n            WHERE w.term = 'columnar'\n            ORDER BY tfidf_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "doc_id",
+    "term",
+    "term_count",
+    "tf",
+    "idf",
+    "tfidf_score"
+  ],
+  "why_it_fails": "Calculating document frequency across millions of documents requires careful window partitioning to avoid Cartesian explosions."
+}

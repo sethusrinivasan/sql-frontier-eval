@@ -1,0 +1,20 @@
+{
+  "id": "task_115_rrf_hybrid_rank_fusion_isolation",
+  "name": "Reciprocal Rank Fusion (RRF) Hybrid Retrieval without Scale Collapse",
+  "category": "Search & Retrieval",
+  "description": "Fuses BM25 keyword rankings and vector cosine similarity rankings using rank-based Reciprocal Rank Fusion (k=60), preventing unbounded BM25 scores from dominating vector scores.",
+  "prompt": "Combine sparse BM25 lexical scores and dense vector similarity scores using Reciprocal Rank Fusion (RRF):\nRRF_Score = 1.0 / (60.0 + bm25_rank) + 1.0 / (60.0 + vector_rank)\n\nRequired output columns:\n- doc_id (INT)\n- title (VARCHAR)\n- bm25_rank (BIGINT)\n- vector_rank (BIGINT)\n- rrf_score (DOUBLE)\n\nOrder by rrf_score DESC, doc_id ASC.",
+  "setup_sql": "\nCREATE TABLE search_index (\n    doc_id INT,\n    title VARCHAR,\n    bm25_raw DOUBLE,\n    vec FLOAT[2]\n);\n-- Doc 1: Massive BM25 score, poor vector match\n-- Doc 2: Balanced high BM25 and high vector match\n-- Doc 3: Perfect vector match, moderate BM25\nINSERT INTO search_index VALUES\n  (1, 'PostgreSQL Manual', 450.0, [0.1, 0.9]::FLOAT[2]),\n  (2, 'DuckDB Architecture', 80.0, [0.95, 0.05]::FLOAT[2]),\n  (3, 'Vector Search Guide', 60.0, [0.99, 0.01]::FLOAT[2]);\n",
+  "golden_sql": "\nWITH ranked_bm25 AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (ORDER BY bm25_raw DESC, doc_id ASC) AS bm25_rank\n    FROM search_index\n),\nranked_vector AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (\n            ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC, doc_id ASC\n        ) AS vector_rank\n    FROM search_index\n)\nSELECT \n    b.doc_id,\n    b.title,\n    b.bm25_rank,\n    v.vector_rank,\n    ROUND((1.0 / (60.0 + b.bm25_rank)) + (1.0 / (60.0 + v.vector_rank)), 6) AS rrf_score\nFROM ranked_bm25 b\nJOIN ranked_vector v ON b.doc_id = v.doc_id\nORDER BY rrf_score DESC, b.doc_id ASC;\n",
+  "naive_llm_sql": "\nSELECT \n    doc_id,\n    title,\n    1::BIGINT AS bm25_rank,\n    1::BIGINT AS vector_rank,\n    ROUND(bm25_raw + array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 6) AS rrf_score\nFROM search_index\nORDER BY rrf_score DESC, doc_id ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "doc_id",
+    "title",
+    "bm25_rank",
+    "vector_rank",
+    "rrf_score"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Frontier models frequently confuse RRF rank fusion with raw score addition (bm25_score + vector_sim). Because BM25 scores can reach 400+ while cosine similarity is bounded between 0 and 1, adding raw scores allows BM25 to completely drown out semantic vector relevance."
+}

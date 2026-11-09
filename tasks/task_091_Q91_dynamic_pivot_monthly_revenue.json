@@ -1,0 +1,16 @@
+{
+  "id": "task_091_Q91_dynamic_pivot_monthly_revenue",
+  "name": "Dynamic PIVOT of Monthly Revenue by Product Category",
+  "category": "Warehouse & Statistical",
+  "description": "Financial reporting requires transforming normalized long-form transaction rows into cross-tabulated wide financial matrices (Months along the top, Categories down the side).",
+  "prompt": "Financial reporting requires transforming normalized long-form transaction rows into cross-tabulated wide financial matrices (Months along the top, Categories down the side).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: category, 2026-01, 2026-02.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE sales_facts (\n                category VARCHAR,\n                sale_month VARCHAR,\n                revenue DECIMAL(10,2)\n            );\n            INSERT INTO sales_facts VALUES\n                ('Electronics', '2026-01', 50000.00),\n                ('Electronics', '2026-02', 65000.00),\n                ('Apparel',     '2026-01', 30000.00),\n                ('Apparel',     '2026-02', 32000.00);",
+  "golden_sql": "-- Reshape monthly revenue into wide cross-tabulation using DuckDB PIVOT\n            PIVOT sales_facts\n            ON sale_month\n            USING SUM(revenue)\n            GROUP BY category\n            ORDER BY category;",
+  "ordered": true,
+  "expected_columns": [
+    "category",
+    "2026-01",
+    "2026-02"
+  ],
+  "why_it_fails": "Writing dozens of manual `CASE WHEN month = '2026-01' THEN amount ELSE 0 END` expressions is brittle and verbose."
+}

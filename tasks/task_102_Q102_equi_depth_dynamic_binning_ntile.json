@@ -1,0 +1,18 @@
+{
+  "id": "task_102_Q102_equi_depth_dynamic_binning_ntile",
+  "name": "Dynamic Equi-Depth Histogram Binning via NTILE in Pure SQL",
+  "category": "Warehouse & Statistical",
+  "description": "Creating balanced feature histograms for ML requires equal-depth binning (each bucket contains an equal number of records) rather than equal-width binning.",
+  "prompt": "Creating balanced feature histograms for ML requires equal-depth binning (each bucket contains an equal number of records) rather than equal-width binning.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: spend_quartile, customer_count, min_spend_in_bin, max_spend_in_bin, avg_spend_in_bin.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE customer_spend (\n                customer_id INT,\n                annual_spend DECIMAL(10,2)\n            );\n            INSERT INTO customer_spend VALUES\n                (1, 20.00), (2, 35.00), (3, 50.00), (4, 150.00),\n                (5, 300.00), (6, 500.00), (7, 1200.00), (8, 5000.00);",
+  "golden_sql": "-- Partition customers into 4 equal-depth spending quartiles (bins)\n            WITH binned AS (\n                SELECT \n                    customer_id,\n                    annual_spend,\n                    NTILE(4) OVER (ORDER BY annual_spend ASC) AS spend_quartile\n                FROM customer_spend\n            )\n            SELECT \n                spend_quartile,\n                COUNT(*) AS customer_count,\n                MIN(annual_spend) AS min_spend_in_bin,\n                MAX(annual_spend) AS max_spend_in_bin,\n                ROUND(AVG(annual_spend), 2) AS avg_spend_in_bin\n            FROM binned\n            GROUP BY spend_quartile\n            ORDER BY spend_quartile;",
+  "ordered": true,
+  "expected_columns": [
+    "spend_quartile",
+    "customer_count",
+    "min_spend_in_bin",
+    "max_spend_in_bin",
+    "avg_spend_in_bin"
+  ],
+  "why_it_fails": "Equal-width bins leave high-value tail bins completely empty on skewed power-law distributions."
+}

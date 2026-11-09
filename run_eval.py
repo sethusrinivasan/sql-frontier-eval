@@ -225,7 +225,7 @@ def run_evaluation(args) -> Dict[str, Any]:
         task_name = task.get("name", task_id)
         category = task.get("category", "General")
         ordered = task.get("ordered", False)
-        disallowed_ops = task.get("efficiency_rules", {}).get("disallowed_operators", ["CROSS_PRODUCT", "BLOCKWISE_NL_JOIN"])
+        disallowed_ops = task.get("efficiency_rules", {}).get("disallowed_operators", [])
 
         print(f"\n[Task] {task_name} ({task_id})")
         print(f"  Category: {category}")

@@ -1,0 +1,16 @@
+{
+  "id": "task_013_Q13_order_book_snapshot_reconstruction",
+  "name": "Point-in-Time Limit Order Book (LOB) State Reconstruction",
+  "category": "Temporal & Time-Series",
+  "description": "Market microstructure researchers need to reconstruct the exact bids and asks available at an arbitrary point in time from an append-only event stream of place, cancel, and fill orders.",
+  "prompt": "Market microstructure researchers need to reconstruct the exact bids and asks available at an arbitrary point in time from an append-only event stream of place, cancel, and fill orders.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: side, price, aggregate_depth.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE order_events (\n                event_id INT,\n                order_id INT,\n                event_type VARCHAR, -- 'INSERT', 'CANCEL', 'FILL'\n                side VARCHAR,       -- 'BID', 'ASK'\n                price DOUBLE,\n                quantity INT,\n                event_time TIMESTAMP\n            );\n            INSERT INTO order_events VALUES\n                (1, 101, 'INSERT', 'BID', 100.50, 10, '2026-03-01 09:30:01'),\n                (2, 102, 'INSERT', 'BID', 100.25, 20, '2026-03-01 09:30:02'),\n                (3, 101, 'CANCEL', 'BID', 100.50, 10, '2026-03-01 09:30:05'),\n                (4, 103, 'INSERT', 'BID', 100.60, 15, '2026-03-01 09:30:06');",
+  "golden_sql": "-- Reconstruct order book state at exactly 09:30:05\n            WITH snapshot_events AS (\n                SELECT *\n                FROM order_events\n                WHERE event_time <= TIMESTAMP '2026-03-01 09:30:05'\n            ),\n            active_orders AS (\n                SELECT \n                    order_id,\n                    side,\n                    price,\n                    -- Net quantity remaining after cancellations/fills\n                    SUM(CASE WHEN event_type = 'INSERT' THEN quantity ELSE -quantity END) AS remaining_qty\n                FROM snapshot_events\n                GROUP BY order_id, side, price\n                HAVING SUM(CASE WHEN event_type = 'INSERT' THEN quantity ELSE -quantity END) > 0\n            )\n            SELECT \n                side,\n                price,\n                SUM(remaining_qty) AS aggregate_depth\n            FROM active_orders\n            GROUP BY side, price\n            ORDER BY price DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "side",
+    "price",
+    "aggregate_depth"
+  ],
+  "why_it_fails": "Summing active orders without filtering out cancellations that occurred before the target time produces a phantom order book."
+}

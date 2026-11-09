@@ -1,0 +1,16 @@
+{
+  "id": "task_047_Q47_hierarchical_vector_coarse_fine",
+  "name": "Hierarchical Coarse-to-Fine Multi-Level Vector Filtering",
+  "category": "Vector & Embeddings",
+  "description": "In massive enterprise catalogs, searching 100 million items is accelerated by first matching high-level department embedding centroids, then searching specific item vectors inside matching departments.",
+  "prompt": "In massive enterprise catalogs, searching 100 million items is accelerated by first matching high-level department embedding centroids, then searching specific item vectors inside matching departments.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: item_id, item_name, fine_sim_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE departments (\n                dept_id INT,\n                dept_name VARCHAR,\n                dept_centroid FLOAT[2]\n            );\n            CREATE TABLE items (\n                item_id INT,\n                dept_id INT,\n                item_name VARCHAR,\n                item_vector FLOAT[2]\n            );\n            INSERT INTO departments VALUES\n                (1, 'Electronics', [0.9, 0.1]::FLOAT[2]),\n                (2, 'Gardening',   [0.1, 0.9]::FLOAT[2]);\n            INSERT INTO items VALUES\n                (101, 1, 'Noise-canceling earphones', [0.92, 0.08]::FLOAT[2]),\n                (102, 1, 'USB-C Cable',               [0.85, 0.15]::FLOAT[2]),\n                (201, 2, 'Lawn Mower',                [0.12, 0.88]::FLOAT[2]);",
+  "golden_sql": "-- Find best matching department, then retrieve top items strictly within that department\n            WITH top_dept AS (\n                SELECT dept_id\n                FROM departments\n                ORDER BY array_cosine_similarity(dept_centroid, [0.95, 0.05]::FLOAT[2]) DESC\n                LIMIT 1\n            )\n            SELECT \n                i.item_id,\n                i.item_name,\n                ROUND(array_cosine_similarity(i.item_vector, [0.95, 0.05]::FLOAT[2]), 4) AS fine_sim_score\n            FROM items i\n            JOIN top_dept d ON i.dept_id = d.dept_id\n            ORDER BY fine_sim_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "item_id",
+    "item_name",
+    "fine_sim_score"
+  ],
+  "why_it_fails": "Flat brute-force vector search over hundreds of millions of items consumes excessive compute."
+}

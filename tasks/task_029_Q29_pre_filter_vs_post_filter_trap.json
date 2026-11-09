@@ -1,0 +1,17 @@
+{
+  "id": "task_029_Q29_pre_filter_vs_post_filter_trap",
+  "name": "The Pre-Filtering Trap: Relational Predicates with Vector Top-K",
+  "category": "Vector & Embeddings",
+  "description": "A user searches for 'cheap mechanical keyboard under $50'. If you run vector search Top-K first and filter by price afterwards (post-filtering), you may return zero products because all top-5 matches were $150 keyboards.",
+  "prompt": "A user searches for 'cheap mechanical keyboard under $50'. If you run vector search Top-K first and filter by price afterwards (post-filtering), you may return zero products because all top-5 matches were $150 keyboards.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: item_id, name, price, similarity.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE inventory_items (\n                item_id INT,\n                name VARCHAR,\n                price DECIMAL(10,2),\n                in_stock BOOLEAN,\n                vector FLOAT[3]\n            );\n            INSERT INTO inventory_items VALUES\n                (1, 'Custom Mechanical Keyboard', 180.00, true,  [0.9, 0.1, 0.1]::FLOAT[3]),\n                (2, 'Budget Gaming Keyboard',       45.00, true,  [0.85, 0.15, 0.1]::FLOAT[3]),\n                (3, 'Cheap Office Keyboard',        25.00, true,  [0.8, 0.2, 0.1]::FLOAT[3]),\n                (4, 'Out of Stock Keyboard',        35.00, false, [0.92, 0.1, 0.1]::FLOAT[3]);",
+  "golden_sql": "-- Pre-filtered vector search: strictly in-stock and under $50 BEFORE ranking top 2\n            SELECT \n                item_id,\n                name,\n                price,\n                ROUND(array_cosine_similarity(vector, [0.9, 0.1, 0.1]::FLOAT[3]), 4) AS similarity\n            FROM inventory_items\n            WHERE in_stock = true\n              AND price <= 50.00\n            ORDER BY similarity DESC\n            LIMIT 2;",
+  "ordered": true,
+  "expected_columns": [
+    "item_id",
+    "name",
+    "price",
+    "similarity"
+  ],
+  "why_it_fails": "Post-filtering vector results breaks recall. Relational constraints (in-stock, price bounds, user tenant_id) must be evaluated as PRE-FILTERS before Top-K ranking."
+}

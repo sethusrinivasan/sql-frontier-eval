@@ -3,8 +3,16 @@
 > **Evaluating semantic correctness, mathematical KPI integrity, and plan efficiency on modern analytical engines.**  
 > Built for the [micro1 Eval Hackathon](https://www.hackerrank.com/event/micro1-eval-hackathon) on HackerRank Engage.
 
-[![Verification Suite](https://img.shields.io/badge/verification-12%20passed-3fb950.svg)](verify.sh)
-[![Gemini 3.8 Flash](https://img.shields.io/badge/Gemini%203.8%20Flash%20(Medium)-100%25%20(8%2F8)-success.svg)](results/eval_run_gemini-3.8-flash-medium_1794186799.json)
+[![CI](https://github.com/sethusrinivasan/sql-frontier-eval/actions/workflows/ci.yml/badge.svg)](https://github.com/sethusrinivasan/sql-frontier-eval/actions/workflows/ci.yml)
+[![Unit Tests](https://img.shields.io/badge/pytest-12%20passed-3fb950.svg?logo=pytest&logoColor=white)](tests/)
+[![Golden Baseline](https://img.shields.io/badge/golden%20suite-120%2F120%20(100%25)-3fb950.svg?logo=duckdb&logoColor=white)](results/eval_run_offline_1794210761.json)
+[![Zero-LLM CI](https://img.shields.io/badge/CI%20Dependency-Zero%20LLM%20Required-success.svg?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
+[![Engine: DuckDB 2.0](https://img.shields.io/badge/Engine-DuckDB%202.0-FFF000.svg?logo=duckdb&logoColor=black)](https://duckdb.org/)
+[![Python: 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Hackathon: micro1](https://img.shields.io/badge/micro1-Eval%20Hackathon-FF5722.svg?logo=hackerrank&logoColor=white)](https://www.hackerrank.com/event/micro1-eval-hackathon)
+[![Gemini 3.8 Flash](https://img.shields.io/badge/Gemini%203.8%20Flash-100%25%20(8%2F8)-4285F4.svg?logo=google&logoColor=white)](results/eval_run_gemini-3.8-flash-medium_1794186799.json)
+[![Claude Opus 4.6](https://img.shields.io/badge/Claude%20Opus%204.6-100%25%20(8%2F8)-D97757.svg?logo=anthropic&logoColor=white)](results/eval_run_agy_claude-opus-4-6-thinking_1794196279.json)
+[![GPT-OSS 120B](https://img.shields.io/badge/GPT--OSS%20120B-87.5%25%20(7%2F8)-10A37F.svg?logo=openai&logoColor=white)](results/eval_run_agy_gpt-oss-120b-medium_1794196331.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -27,10 +35,12 @@ Evaluated across the 8-category failure taxonomy using DuckDB 2.0:
 
 | Model / Evaluated Target | Pass Rate | Tasks Passed | Avg Generation Latency | Engine Exec Latency | Primary Failure Modes | Run Artifact Link |
 |---|:---:|:---:|:---:|:---:|---|:---:|
+| **Claude Opus 4.6 (Thinking)** | **100.0%** | **8 / 8** | 6.9s | **4.6 ms** | None (Zero failures across all 8 tasks) | [`eval_run_agy_claude-opus-4-6-thinking_1794196279.json`](results/eval_run_agy_claude-opus-4-6-thinking_1794196279.json) |
+| **Gemini 3.8 Flash (Low)** | **100.0%** | **8 / 8** | **4.6s** | **5.4 ms** | None (Zero failures across all 8 tasks, Fastest) | [`eval_run_agy_gemini-3.8-flash-low_1794195725.json`](results/eval_run_agy_gemini-3.8-flash-low_1794195725.json) |
 | **Gemini 3.8 Flash (Medium)** | **100.0%** | **8 / 8** | 27.6s | **4.5 ms** | None (Zero failures across all 8 tasks) | [`eval_run_gemini-3.8-flash-medium_1794186799.json`](results/eval_run_gemini-3.8-flash-medium_1794186799.json) |
-| **Claude Sonnet 4.6 (Thinking)** | **87.5%** | **7 / 8** | 6.8s | **4.8 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`eval_run_claude-sonnet-4-6_1794187183.json`](results/eval_run_claude-sonnet-4-6_1794187183.json) |
-| **GPT-OSS 120B (Medium)** | **87.5%** | **7 / 8** | 5.5s | **5.5 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`eval_run_gpt-oss-120b-medium_1794187234.json`](results/eval_run_gpt-oss-120b-medium_1794187234.json) |
-| **Gemini 3.8 Flash (Low)** | **87.5%** | **7 / 8** | **4.2s** | **5.4 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`eval_run_gemini-3.8-flash-low_1794186841.json`](results/eval_run_gemini-3.8-flash-low_1794186841.json) |
+| **Claude Sonnet 4.6 (Thinking)** | **87.5%** | **7 / 8** | 6.3s | **4.8 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`eval_run_agy_claude-sonnet-4-6_1794196223.json`](results/eval_run_agy_claude-sonnet-4-6_1794196223.json) |
+| **GPT-OSS 120B (Medium)** | **87.5%** | **7 / 8** | 6.5s | **5.5 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`eval_run_agy_gpt-oss-120b-medium_1794196331.json`](results/eval_run_agy_gpt-oss-120b-medium_1794196331.json) |
+| **Gemini 3.8 Flash (High)** | **75.0%** | **6 / 8** | 51.9s | **4.3 ms** | Tasks 01 & 06 timed out during deep reasoning | [`eval_run_agy_gemini-3.8-flash-high_1794196172.json`](results/eval_run_agy_gemini-3.8-flash-high_1794196172.json) |
 | **Golden Ground Truth** | **100.0%** | **8 / 8** | N/A | **3.8 ms** | Baseline Verification (0% False Negatives) | [`eval_run_offline_1794186318.json`](results/eval_run_offline_1794186318.json) |
 | **Offline Reference / Naive** | **0.0%** | **0 / 8** | N/A | **2.6 ms** | 100% Trap Detection (Metric skew, row loss, O(N²) joins) | [`eval_run_offline_1794186320.json`](results/eval_run_offline_1794186320.json) |
 
@@ -52,6 +62,26 @@ Evaluated across the 8-category failure taxonomy using DuckDB 2.0:
 | **06** | [`task_06_funnel_precedence.json`](tasks/task_06_funnel_precedence.json) | **Strict Funnel Precedence** | Multi-stage user onboarding conversion | Loses chronological ordering between sequential steps |
 | **07** | [`task_07_quadratic_self_join.json`](tasks/task_07_quadratic_self_join.json) | **Quadratic Self-Joins** | Rolling 7-day moving revenue | Substitutes window scans with O(N²) triangular self-joins |
 | **08** | [`task_08_sargable_pruning.json`](tasks/task_08_sargable_pruning.json) | **Non-SARGable Partition Pruning** | Event table date filtering | `BETWEEN` date boundary leaks into next month; wraps date in string functions |
+
+---
+
+## 🌐 Comprehensive 120-Task & 5-Domain Evaluation Suite
+
+In addition to the 8 core failure-mode traps, SQL-Frontier-Eval includes **102 modern analytical tasks** across five frontier analytical domains plus **10 hardened frontier trap challenges**:
+
+| Domain | Queries | DuckDB Engine Capabilities Evaluated | Real-World Scenario Focus |
+|---|:---:|---|---|
+| **1. Temporal & Time-Series** | `Q01` – `Q25` | `ASOF JOIN`, `generate_series`, `IGNORE NULLS` LOCF, `time_bucket` | Tick-level trade matching, point-in-time FX, sensor gap filling, bitemporal audit, multi-touch attribution |
+| **2. Vector & Embeddings** | `Q26` – `Q50` | `array_cosine_similarity`, `array_distance`, `array_inner_product`, `FLOAT[N]`, `QUALIFY` | RAG retrieval, ticket deduplication, ColBERT MaxSim in SQL, K-Means clustering, MMR diversity reranking |
+| **3. Search & Hybrid Retrieval** | `Q51` – `Q75` | `PRAGMA create_fts_index`, `match_bm25`, `levenshtein`, `jaro_winkler_similarity`, RRF | Reciprocal Rank Fusion (BM25 + Dense Vectors), fuzzy typo-tolerant matching, faceted JSON filters |
+| **4. Graph & Hierarchies** | `Q76` – `Q88` | `WITH RECURSIVE`, path tracking arrays, transitive closures | Multi-tier BOM cost rollups, reporting hierarchies, sybil fraud ring tracking, critical path scheduling |
+| **5. Warehouse & Statistical** | `Q89` – `Q102` | Pre-aggregated CTEs, `NOT EXISTS`, `PIVOT`, `UNPIVOT`, `list_transform`, `MAD`, `NTILE` | Chasm trap fan-out prevention, 3-valued null logic, robust outlier detection, Kaplan-Meier survival |
+| **6. Hardened Frontier Traps** | `111` – `120` | `ASOF` tolerance, array cycle guards, RRF rank fusion, normalized decay | Exposing hallucinated recursive syntax, array type errors, and revenue over-allocation |
+
+* **Full Golden Ground-Truth Baseline:** **120 / 120 Passed (100.0%)** ([`eval_run_offline_1794210761.json`](results/eval_run_offline_1794210761.json)).
+* **Hardened Trap Model Cracks:** GPT-OSS 120B passed 6/9 (66.7%), stumbling on circular CTE recursion (Task 112), array concat operator (Task 116), and unnormalized decay attribution (Task 119). Gemini 3.8 Flash achieved 9/9 (100.0%).
+* **Detailed Catalog Manifest:** [`catalog/analytical_queries_100.json`](catalog/analytical_queries_100.json) and [`catalog/queries/`](catalog/queries/).
+* **Automated CI/CD:** GitHub Actions workflow runs the 120-task golden suite, unit tests, and offline naive trap assertions with zero LLM requirements.
 
 ---
 

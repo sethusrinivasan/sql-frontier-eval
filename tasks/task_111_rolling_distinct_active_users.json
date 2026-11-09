@@ -1,0 +1,23 @@
+{
+  "id": "task_111_rolling_distinct_active_users",
+  "name": "Rolling 7-Day Distinct Active Users without Triangular Join Explosion",
+  "category": "Algorithmic Efficiency / Window Distinct",
+  "description": "Calculates rolling 7-day distinct active users per calendar day. SQL window functions forbid COUNT(DISTINCT) over range frames, causing frontier models to generate catastrophic O(N^2) triangular self-joins that blow up memory.",
+  "prompt": "Calculate the rolling 7-day distinct active user count for each active date.\nFor each date, count distinct users active on that date or within the preceding 6 days (total 7 calendar days).\n\nRequired output columns:\n- report_date (DATE)\n- rolling_7d_active_users (BIGINT)\n\nOrder results by report_date ASC.",
+  "setup_sql": "\nCREATE TABLE user_activity (user_id INT, activity_date DATE);\nINSERT INTO user_activity VALUES\n  (101, '2026-03-01'), (102, '2026-03-01'),\n  (101, '2026-03-02'), (103, '2026-03-02'),\n  (104, '2026-03-03'),\n  (101, '2026-03-05'),\n  (102, '2026-03-08'), (105, '2026-03-08');\n",
+  "golden_sql": "\nWITH daily_users AS (\n    SELECT activity_date, list(DISTINCT user_id) AS user_list\n    FROM user_activity\n    GROUP BY activity_date\n),\ndistinct_dates AS (\n    SELECT DISTINCT activity_date AS report_date FROM user_activity\n)\nSELECT \n    d.report_date,\n    (\n        SELECT COUNT(DISTINCT u)\n        FROM (\n            SELECT UNNEST(user_list) AS u\n            FROM daily_users sub\n            WHERE sub.activity_date BETWEEN d.report_date - INTERVAL 6 DAYS AND d.report_date\n        )\n    ) AS rolling_7d_active_users\nFROM distinct_dates d\nORDER BY d.report_date ASC;\n",
+  "naive_llm_sql": "\nSELECT \n    a.activity_date AS report_date,\n    COUNT(DISTINCT b.user_id) AS rolling_7d_active_users\nFROM user_activity a\nJOIN user_activity b \n  ON b.activity_date BETWEEN a.activity_date - INTERVAL 6 DAYS AND a.activity_date\nGROUP BY a.activity_date\nORDER BY a.activity_date ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "report_date",
+    "rolling_7d_active_users"
+  ],
+  "efficiency_rules": {
+    "disallowed_operators": [
+      "PIECEWISE_MERGE_JOIN",
+      "IE_JOIN",
+      "BLOCKWISE_NL_JOIN"
+    ]
+  },
+  "why_it_fails": "Joining user_activity directly to itself on an inequality date range produces an O(N^2) Cartesian row explosion. For 1M rows, an unaggregated triangular join emits over 7M intermediate rows and triggers an IE_JOIN or Nested Loop join, overflowing RAM. The optimal pattern aggregates users into daily sets first before evaluating rolling intervals."
+}

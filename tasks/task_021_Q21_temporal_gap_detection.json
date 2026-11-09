@@ -1,0 +1,17 @@
+{
+  "id": "task_021_Q21_temporal_gap_detection",
+  "name": "Continuous Asset Lease Unallocated Gap Discovery",
+  "category": "Temporal & Time-Series",
+  "description": "Fleet managers track commercial vehicles to find idle 'unrented' gaps between back-to-back rental contracts for fleet utilization auditing.",
+  "prompt": "Fleet managers track commercial vehicles to find idle 'unrented' gaps between back-to-back rental contracts for fleet utilization auditing.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: vehicle_id, gap_start, gap_end, idle_days.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE vehicle_leases (\n                vehicle_id INT,\n                lease_start DATE,\n                lease_end DATE\n            );\n            INSERT INTO vehicle_leases VALUES\n                (55, '2026-01-01', '2026-01-10'),\n                (55, '2026-01-15', '2026-01-20'), -- 5 day gap (Jan 10 - Jan 15)\n                (55, '2026-01-20', '2026-01-30'); -- contiguous",
+  "golden_sql": "-- Identify idle intervals between vehicle leases\n            WITH lease_boundaries AS (\n                SELECT \n                    vehicle_id,\n                    lease_end AS gap_start,\n                    LEAD(lease_start) OVER (PARTITION BY vehicle_id ORDER BY lease_start) AS gap_end\n                FROM vehicle_leases\n            )\n            SELECT \n                vehicle_id,\n                gap_start,\n                gap_end,\n                (gap_end - gap_start) AS idle_days\n            FROM lease_boundaries\n            WHERE gap_end IS NOT NULL \n              AND gap_end > gap_start\n            ORDER BY vehicle_id, gap_start;",
+  "ordered": true,
+  "expected_columns": [
+    "vehicle_id",
+    "gap_start",
+    "gap_end",
+    "idle_days"
+  ],
+  "why_it_fails": "Comparing each row with LEAD without filtering where next_start > current_end misses adjacent non-overlapping bookings."
+}

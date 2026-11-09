@@ -1,0 +1,18 @@
+{
+  "id": "task_019_Q19_intermittent_inactivity_anomaly",
+  "name": "Customer Churn Anomaly Detection vs Historical Purchase Rhythm",
+  "category": "Temporal & Time-Series",
+  "description": "A customer who normally buys every 3 days is at risk if they haven't bought in 10 days. But a customer who buys quarterly is not. Churn detection must be personalized to each user's cadence.",
+  "prompt": "A customer who normally buys every 3 days is at risk if they haven't bought in 10 days. But a customer who buys quarterly is not. Churn detection must be personalized to each user's cadence.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: customer_id, last_order_date, median_purchase_interval_days, days_since_last_order, churn_risk_status.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE orders_history (\n                customer_id INT,\n                order_date DATE\n            );\n            INSERT INTO orders_history VALUES\n                (1, '2026-01-01'), (1, '2026-01-04'), (1, '2026-01-07'), -- Rhythm: 3 days\n                (2, '2026-01-01'), (2, '2026-02-01'), (2, '2026-03-01'); -- Rhythm: 30 days",
+  "golden_sql": "-- Calculate median inter-purchase days and compare against days elapsed since latest order\n            WITH purchase_intervals AS (\n                SELECT \n                    customer_id,\n                    order_date,\n                    order_date - LAG(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS days_between\n                FROM orders_history\n            ),\n            user_cadence AS (\n                SELECT \n                    customer_id,\n                    MAX(order_date) AS last_order_date,\n                    MEDIAN(days_between) AS median_purchase_interval_days\n                FROM purchase_intervals\n                GROUP BY customer_id\n            )\n            SELECT \n                customer_id,\n                last_order_date,\n                median_purchase_interval_days,\n                (DATE '2026-03-10' - last_order_date) AS days_since_last_order,\n                CASE \n                    WHEN (DATE '2026-03-10' - last_order_date) > (2.5 * median_purchase_interval_days) \n                    THEN 'HIGH_CHURN_RISK' \n                    ELSE 'NORMAL' \n                END AS churn_risk_status\n            FROM user_cadence\n            ORDER BY customer_id;",
+  "ordered": true,
+  "expected_columns": [
+    "customer_id",
+    "last_order_date",
+    "median_purchase_interval_days",
+    "days_since_last_order",
+    "churn_risk_status"
+  ],
+  "why_it_fails": "Static 30-day churn thresholds misflag seasonal or low-frequency high-value customers."
+}

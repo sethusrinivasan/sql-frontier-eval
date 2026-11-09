@@ -1,0 +1,18 @@
+{
+  "id": "task_094_Q94_median_absolute_deviation_mad",
+  "name": "Median Absolute Deviation (MAD) Robust Statistical Outlier Detection",
+  "category": "Warehouse & Statistical",
+  "description": "Traditional standard deviation Z-scores fail in the presence of extreme outliers because the outliers themselves distort the mean and standard deviation. MAD is a robust statistical scale estimator.",
+  "prompt": "Traditional standard deviation Z-scores fail in the presence of extreme outliers because the outliers themselves distort the mean and standard deviation. MAD is a robust statistical scale estimator.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: tx_id, amount, overall_median, robust_mad_score, anomaly_flag.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE payment_volumes (\n                tx_id INT,\n                amount DOUBLE\n            );\n            INSERT INTO payment_volumes VALUES\n                (1, 10.0), (2, 12.0), (3, 11.0), (4, 13.0), (5, 12.0),\n                (6, 1000.0); -- Massive outlier",
+  "golden_sql": "-- Compute Median Absolute Deviation (MAD) and flag robust outliers\n            -- MAD = MEDIAN( |x - MEDIAN(x)| )\n            WITH med AS (\n                SELECT MEDIAN(amount) AS overall_median\n                FROM payment_volumes\n            ),\n            deviations AS (\n                SELECT \n                    p.tx_id,\n                    p.amount,\n                    m.overall_median,\n                    ABS(p.amount - m.overall_median) AS abs_deviation\n                FROM payment_volumes p\n                CROSS JOIN med m\n            ),\n            mad_val AS (\n                SELECT MEDIAN(abs_deviation) AS mad_score\n                FROM deviations\n            )\n            SELECT \n                d.tx_id,\n                d.amount,\n                d.overall_median,\n                ROUND(d.abs_deviation / NULLIF(v.mad_score, 0), 2) AS robust_mad_score,\n                CASE \n                    WHEN (d.abs_deviation / NULLIF(v.mad_score, 0)) > 3.0 \n                    THEN 'ROBUST_OUTLIER' \n                    ELSE 'NORMAL' \n                END AS anomaly_flag\n            FROM deviations d\n            CROSS JOIN mad_val v\n            ORDER BY robust_mad_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "tx_id",
+    "amount",
+    "overall_median",
+    "robust_mad_score",
+    "anomaly_flag"
+  ],
+  "why_it_fails": "Mean and standard deviation break down completely on fat-tailed or skewed data distributions."
+}

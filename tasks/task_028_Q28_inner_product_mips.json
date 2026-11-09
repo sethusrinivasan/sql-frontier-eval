@@ -1,0 +1,16 @@
+{
+  "id": "task_028_Q28_inner_product_mips",
+  "name": "Maximum Inner Product Search (MIPS) for Normalized Embeddings",
+  "category": "Vector & Embeddings",
+  "description": "For unit-normalized vectors (e.g. OpenAI text-embedding-3 or Cohere embeddings), cosine similarity is identical to the inner product (dot product), which executes even faster.",
+  "prompt": "For unit-normalized vectors (e.g. OpenAI text-embedding-3 or Cohere embeddings), cosine similarity is identical to the inner product (dot product), which executes even faster.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: product_id, product_name, dot_product_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE product_catalog_vectors (\n                product_id INT,\n                product_name VARCHAR,\n                norm_vector FLOAT[3]\n            );\n            INSERT INTO product_catalog_vectors VALUES\n                (1, 'Ultra Laptop', [0.8, 0.6, 0.0]::FLOAT[3]),\n                (2, 'Smart Phone',  [0.6, 0.8, 0.0]::FLOAT[3]),\n                (3, 'Coffee Maker', [0.0, 0.0, 1.0]::FLOAT[3]);",
+  "golden_sql": "-- MIPS search for normalized user query vector [0.85, 0.52, 0.0]\n            SELECT \n                product_id,\n                product_name,\n                ROUND(array_inner_product(norm_vector, [0.85, 0.52, 0.0]::FLOAT[3]), 4) AS dot_product_score\n            FROM product_catalog_vectors\n            ORDER BY dot_product_score DESC\n            LIMIT 2;",
+  "ordered": true,
+  "expected_columns": [
+    "product_id",
+    "product_name",
+    "dot_product_score"
+  ],
+  "why_it_fails": "Re-normalizing vectors in every query wastes compute when embeddings are pre-normalized upon insertion."
+}

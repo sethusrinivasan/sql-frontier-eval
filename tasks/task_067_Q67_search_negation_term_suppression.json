@@ -1,0 +1,16 @@
+{
+  "id": "task_067_Q67_search_negation_term_suppression",
+  "name": "Dynamic Negative Keyword Exclusion in E-Commerce Filters",
+  "category": "Search & Retrieval",
+  "description": "A user searches 'monitor -curved' to find flat computer monitors. The engine must extract positive search terms and suppress any record containing the negative terms.",
+  "prompt": "A user searches 'monitor -curved' to find flat computer monitors. The engine must extract positive search terms and suppress any record containing the negative terms.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: item_id, title, description.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE display_items (\n                item_id INT,\n                title VARCHAR,\n                description VARCHAR\n            );\n            INSERT INTO display_items VALUES\n                (1, 'Dell UltraSharp 27', 'Flat IPS 4K computer monitor with USB-C hub'),\n                (2, 'Samsung Odyssey G9', 'Ultra-wide 49 inch curved gaming monitor'),\n                (3, 'LG UltraFine 32',   'Flat panel OLED professional display');",
+  "golden_sql": "-- Positive term: 'monitor', Negative term: 'curved'\n            SELECT \n                item_id,\n                title,\n                description\n            FROM display_items\n            WHERE (title ILIKE '%monitor%' OR description ILIKE '%monitor%')\n              AND NOT (title ILIKE '%curved%' OR description ILIKE '%curved%')\n            ORDER BY item_id;",
+  "ordered": true,
+  "expected_columns": [
+    "item_id",
+    "title",
+    "description"
+  ],
+  "why_it_fails": "Negative keywords must not exclude items where the negative term appears with negation qualifiers (e.g. 'not curved')."
+}

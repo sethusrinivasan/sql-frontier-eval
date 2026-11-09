@@ -1,0 +1,18 @@
+{
+  "id": "task_096_Q96_window_frame_range_vs_rows_ties",
+  "name": "Financial Ledger Running Total: ROWS vs. RANGE Semantic Contrast",
+  "category": "Warehouse & Statistical",
+  "description": "In financial auditing, understanding the exact behavioral difference between `ROWS BETWEEN` and `RANGE BETWEEN` prevents duplicate-timestamp errors from failing regulatory ledger reconciliations.",
+  "prompt": "In financial auditing, understanding the exact behavioral difference between `ROWS BETWEEN` and `RANGE BETWEEN` prevents duplicate-timestamp errors from failing regulatory ledger reconciliations.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: tx_id, val_date, amount, bunched_range_total, strict_rows_total.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE audit_ledger (\n                tx_id INT,\n                val_date DATE,\n                amount DECIMAL(10,2)\n            );\n            INSERT INTO audit_ledger VALUES\n                (1, '2026-03-01', 100.00),\n                (2, '2026-03-01', 50.00),  -- Same date!\n                (3, '2026-03-02', 20.00);",
+  "golden_sql": "-- Compare the difference between default RANGE (peer bunching) vs ROWS (strict sequential)\n            SELECT \n                tx_id,\n                val_date,\n                amount,\n                -- Default RANGE behavior: bunches tied dates together ($150 on row 1 and 2)\n                SUM(amount) OVER (\n                    ORDER BY val_date\n                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                ) AS bunched_range_total,\n                -- Explicit ROWS behavior: increments strictly row by row ($100 then $150)\n                SUM(amount) OVER (\n                    ORDER BY val_date, tx_id\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                ) AS strict_rows_total\n            FROM audit_ledger\n            ORDER BY val_date, tx_id;",
+  "ordered": true,
+  "expected_columns": [
+    "tx_id",
+    "val_date",
+    "amount",
+    "bunched_range_total",
+    "strict_rows_total"
+  ],
+  "why_it_fails": "The ANSI SQL default for window frames with ORDER BY is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, which aggregates identical peers together into one lump sum."
+}

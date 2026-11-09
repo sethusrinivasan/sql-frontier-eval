@@ -1,0 +1,209 @@
+{
+  "timestamp": "2026-11-09T07:50:23.939930+00:00",
+  "model": "agy/gemini-3.8-flash-low",
+  "is_golden_test": false,
+  "total_tasks": 9,
+  "passed": 9,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_111_rolling_distinct_active_users",
+      "name": "Rolling 7-Day Distinct Active Users without Triangular Join Explosion",
+      "category": "Algorithmic Efficiency / Window Distinct",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH distinct_daily_activity AS (\n    SELECT DISTINCT\n        user_id,\n        activity_date\n    FROM user_activity\n),\nactive_dates AS (\n    SELECT DISTINCT\n        activity_date AS report_date\n    FROM user_activity\n)\nSELECT\n    d.report_date,\n    COUNT(DISTINCT a.user_id) AS rolling_7d_active_users\nFROM active_dates d\nJOIN distinct_daily_activity a\n  ON a.activity_date BETWEEN d.report_date - INTERVAL 6 DAY AND d.report_date\nGROUP BY\n    d.report_date\nORDER BY\n    d.report_date ASC;",
+      "golden_sql": "\nWITH daily_users AS (\n    SELECT activity_date, list(DISTINCT user_id) AS user_list\n    FROM user_activity\n    GROUP BY activity_date\n),\ndistinct_dates AS (\n    SELECT DISTINCT activity_date AS report_date FROM user_activity\n)\nSELECT \n    d.report_date,\n    (\n        SELECT COUNT(DISTINCT u)\n        FROM (\n            SELECT UNNEST(user_list) AS u\n            FROM daily_users sub\n            WHERE sub.activity_date BETWEEN d.report_date - INTERVAL 6 DAYS AND d.report_date\n        )\n    ) AS rolling_7d_active_users\nFROM distinct_dates d\nORDER BY d.report_date ASC;\n",
+      "execution_time_ms": 4.392367001855746,
+      "golden_time_ms": 10.337672996683978,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 5
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4383.666955000081,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH distinct_daily_activity AS (\n    SELECT DISTINCT\n        user_id,\n        activity_date\n    FROM user_activity\n),\nactive_dates AS (\n    SELECT DISTINCT\n        activity_date AS report_date\n    FROM user_activity\n)\nSELECT\n    d.report_date,\n    COUNT(DISTINCT a.user_id) AS rolling_7d_active_users\nFROM active_dates d\nJOIN distinct_daily_activity a\n  ON a.activity_date BETWEEN d.report_date - INTERVAL 6 DAY AND d.report_date\nGROUP BY\n    d.report_date\nORDER BY\n    d.report_date ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_112_dual_constraint_sessionization",
+      "name": "Dual-Constraint Sessionization: 30-min Inactivity AND 4-Hour Absolute Hard Cap",
+      "category": "Sessionization (Gaps & Islands)",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH RECURSIVE ordered_events AS (\n    SELECT \n        user_id, \n        event_time, \n        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY event_time ASC) AS rn\n    FROM clickstream_events\n),\nsessionized AS (\n    SELECT \n        user_id,\n        event_time,\n        rn,\n        event_time AS session_start_time,\n        event_time AS prev_event_time,\n        1::BIGINT AS session_seq\n    FROM ordered_events\n    WHERE rn = 1\n\n    UNION ALL\n\n    SELECT \n        e.user_id,\n        e.event_time,\n        e.rn,\n        CASE \n            WHEN e.event_time - s.prev_event_time > INTERVAL '30 minutes'\n              OR e.event_time - s.session_start_time > INTERVAL '4 hours'\n            THEN e.event_time\n            ELSE s.session_start_time\n        END AS session_start_time,\n        e.event_time AS prev_event_time,\n        CASE \n            WHEN e.event_time - s.prev_event_time > INTERVAL '30 minutes'\n              OR e.event_time - s.session_start_time > INTERVAL '4 hours'\n            THEN s.session_seq + 1\n            ELSE s.session_seq\n        END AS session_seq\n    FROM sessionized s\n    JOIN ordered_events e\n      ON s.user_id = e.user_id\n     AND s.rn + 1 = e.rn\n)\nSELECT \n    user_id,\n    event_time,\n    DENSE_RANK() OVER (ORDER BY user_id ASC, session_seq ASC)::BIGINT AS session_id\nFROM sessionized\nORDER BY \n    user_id ASC, \n    event_time ASC;",
+      "golden_sql": "\nWITH step_lags AS (\n    SELECT \n        user_id,\n        event_time,\n        LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time\n    FROM clickstream_events\n),\ninactivity_flags AS (\n    SELECT \n        user_id,\n        event_time,\n        CASE \n            WHEN prev_time IS NULL OR date_diff('second', prev_time, event_time) > 1800 THEN 1\n            ELSE 0\n        END AS is_inactivity_break\n    FROM step_lags\n),\nbase_sessions AS (\n    SELECT \n        user_id,\n        event_time,\n        SUM(is_inactivity_break) OVER (PARTITION BY user_id ORDER BY event_time) AS base_sess\n    FROM inactivity_flags\n),\ngenesis_diff AS (\n    SELECT \n        user_id,\n        event_time,\n        base_sess,\n        date_diff('second', FIRST_VALUE(event_time) OVER (PARTITION BY user_id, base_sess ORDER BY event_time), event_time) AS elapsed_from_start\n    FROM base_sessions\n)\nSELECT \n    user_id,\n    event_time,\n    (base_sess + (elapsed_from_start > 14400)::INT)::BIGINT AS session_id\nFROM genesis_diff\nORDER BY user_id ASC, event_time ASC;\n",
+      "execution_time_ms": 6.15246200322872,
+      "golden_time_ms": 4.391119997308124,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 10
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 16574.531794001814,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH RECURSIVE ordered_events AS (\n    SELECT \n        user_id, \n        event_time, \n        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY event_time ASC) AS rn\n    FROM clickstream_events\n),\nsessionized AS (\n    SELECT \n        user_id,\n        event_time,\n        rn,\n        event_time AS session_start_time,\n        event_time AS prev_event_time,\n        1::BIGINT AS session_seq\n    FROM ordered_events\n    WHERE rn = 1\n\n    UNION ALL\n\n    SELECT \n        e.user_id,\n        e.event_time,\n        e.rn,\n        CASE \n            WHEN e.event_time - s.prev_event_time > INTERVAL '30 minutes'\n              OR e.event_time - s.session_start_time > INTERVAL '4 hours'\n            THEN e.event_time\n            ELSE s.session_start_time\n        END AS session_start_time,\n        e.event_time AS prev_event_time,\n        CASE \n            WHEN e.event_time - s.prev_event_time > INTERVAL '30 minutes'\n              OR e.event_time - s.session_start_time > INTERVAL '4 hours'\n            THEN s.session_seq + 1\n            ELSE s.session_seq\n        END AS session_seq\n    FROM sessionized s\n    JOIN ordered_events e\n      ON s.user_id = e.user_id\n     AND s.rn + 1 = e.rn\n)\nSELECT \n    user_id,\n    event_time,\n    DENSE_RANK() OVER (ORDER BY user_id ASC, session_seq ASC)::BIGINT AS session_id\nFROM sessionized\nORDER BY \n    user_id ASC, \n    event_time ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_113_vector_prefilter_recall_drop",
+      "name": "Vector Nearest Neighbors: The Post-Filtering Empty Set Trap",
+      "category": "Vector & Retrieval",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    item_id,\n    price,\n    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2])::DOUBLE AS similarity\nFROM products_search\nWHERE category = 'electronics'\n  AND price <= 50.00\n  AND in_stock = true\nORDER BY similarity DESC, item_id ASC\nLIMIT 2;",
+      "golden_sql": "\nSELECT \n    item_id,\n    price,\n    ROUND(array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 4) AS similarity\nFROM products_search\nWHERE category = 'electronics' \n  AND price <= 50.00 \n  AND in_stock = true\nORDER BY similarity DESC, item_id ASC\nLIMIT 2;\n",
+      "execution_time_ms": 4.022303000965621,
+      "golden_time_ms": 2.199358001234941,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 2
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 10631.245714001125,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    item_id,\n    price,\n    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2])::DOUBLE AS similarity\nFROM products_search\nWHERE category = 'electronics'\n  AND price <= 50.00\n  AND in_stock = true\nORDER BY similarity DESC, item_id ASC\nLIMIT 2;\n```"
+      }
+    },
+    {
+      "task_id": "task_114_asof_tolerance_expiry",
+      "name": "ASOF Point-in-Time Quote Matching with 500ms Expiry Tolerance",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    t.trade_id,\n    t.trade_time,\n    t.symbol,\n    CASE\n        WHEN t.trade_time - q.quote_time <= INTERVAL '500' MILLISECOND THEN q.ask\n        ELSE NULL\n    END AS prevailing_ask\nFROM market_trades t\nASOF LEFT JOIN market_quotes q\n    ON t.symbol = q.symbol\n   AND t.trade_time >= q.quote_time\nORDER BY t.trade_id ASC;",
+      "golden_sql": "\nSELECT \n    t.trade_id,\n    t.trade_time,\n    t.symbol,\n    CASE \n        WHEN date_diff('millisecond', q.quote_time, t.trade_time) <= 500 \n        THEN q.ask \n        ELSE NULL \n    END AS prevailing_ask\nFROM market_trades t\nASOF JOIN market_quotes q\n  ON t.symbol = q.symbol \n AND t.trade_time >= q.quote_time\nORDER BY t.trade_id ASC;\n",
+      "execution_time_ms": 3.870175001793541,
+      "golden_time_ms": 3.70247800310608,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 2
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 10384.582947997842,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    t.trade_id,\n    t.trade_time,\n    t.symbol,\n    CASE\n        WHEN t.trade_time - q.quote_time <= INTERVAL '500' MILLISECOND THEN q.ask\n        ELSE NULL\n    END AS prevailing_ask\nFROM market_trades t\nASOF LEFT JOIN market_quotes q\n    ON t.symbol = q.symbol\n   AND t.trade_time >= q.quote_time\nORDER BY t.trade_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_115_rrf_hybrid_rank_fusion_isolation",
+      "name": "Reciprocal Rank Fusion (RRF) Hybrid Retrieval without Scale Collapse",
+      "category": "Search & Retrieval",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH ranked_bm25 AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (ORDER BY bm25_raw DESC, doc_id ASC) AS bm25_rank\n    FROM search_index\n),\nranked_vector AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (\n            ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC, doc_id ASC\n        ) AS vector_rank\n    FROM search_index\n)\nSELECT \n    b.doc_id,\n    b.title,\n    b.bm25_rank,\n    v.vector_rank,\n    ROUND((1.0 / (60.0 + b.bm25_rank)) + (1.0 / (60.0 + v.vector_rank)), 6) AS rrf_score\nFROM ranked_bm25 b\nJOIN ranked_vector v ON b.doc_id = v.doc_id\nORDER BY rrf_score DESC, b.doc_id ASC;",
+      "golden_sql": "\nWITH ranked_bm25 AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (ORDER BY bm25_raw DESC, doc_id ASC) AS bm25_rank\n    FROM search_index\n),\nranked_vector AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (\n            ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC, doc_id ASC\n        ) AS vector_rank\n    FROM search_index\n)\nSELECT \n    b.doc_id,\n    b.title,\n    b.bm25_rank,\n    v.vector_rank,\n    ROUND((1.0 / (60.0 + b.bm25_rank)) + (1.0 / (60.0 + v.vector_rank)), 6) AS rrf_score\nFROM ranked_bm25 b\nJOIN ranked_vector v ON b.doc_id = v.doc_id\nORDER BY rrf_score DESC, b.doc_id ASC;\n",
+      "execution_time_ms": 6.544292999024037,
+      "golden_time_ms": 4.51543500093976,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 3
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 14174.684493998939,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH ranked_bm25 AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (ORDER BY bm25_raw DESC, doc_id ASC) AS bm25_rank\n    FROM search_index\n),\nranked_vector AS (\n    SELECT \n        doc_id,\n        title,\n        ROW_NUMBER() OVER (\n            ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC, doc_id ASC\n        ) AS vector_rank\n    FROM search_index\n)\nSELECT \n    b.doc_id,\n    b.title,\n    b.bm25_rank,\n    v.vector_rank,\n    ROUND((1.0 / (60.0 + b.bm25_rank)) + (1.0 / (60.0 + v.vector_rank)), 6) AS rrf_score\nFROM ranked_bm25 b\nJOIN ranked_vector v ON b.doc_id = v.doc_id\nORDER BY rrf_score DESC, b.doc_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_116_graph_cycle_visited_protection",
+      "name": "Directed Dependency Graph Cycle Protection via Visited Array Path",
+      "category": "Graph & Hierarchy",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH RECURSIVE downstream AS (\n    SELECT \n        child_task AS task_id, \n        1 AS depth, \n        ['BUILD_CORE', child_task] AS visited\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n\n    UNION ALL\n\n    SELECT \n        e.child_task AS task_id, \n        d.depth + 1 AS depth, \n        list_append(d.visited, e.child_task) AS visited\n    FROM downstream d\n    JOIN task_edges e ON d.task_id = e.parent_task\n    WHERE NOT list_contains(d.visited, e.child_task)\n)\nSELECT \n    task_id, \n    CAST(MIN(depth) AS INT) AS min_depth\nFROM downstream\nGROUP BY task_id\nORDER BY min_depth ASC, task_id ASC;",
+      "golden_sql": "\nWITH RECURSIVE downstream_graph AS (\n    SELECT \n        child_task AS task_id,\n        1 AS depth,\n        ['BUILD_CORE', child_task] AS path_nodes\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n    \n    UNION ALL\n    \n    SELECT \n        e.child_task,\n        g.depth + 1,\n        list_append(g.path_nodes, e.child_task)\n    FROM downstream_graph g\n    JOIN task_edges e ON g.task_id = e.parent_task\n    WHERE NOT list_contains(g.path_nodes, e.child_task)\n      AND g.depth < 10\n)\nSELECT \n    task_id,\n    MIN(depth) AS min_depth\nFROM downstream_graph\nGROUP BY task_id\nORDER BY min_depth ASC, task_id ASC;\n",
+      "execution_time_ms": 4.073970994795673,
+      "golden_time_ms": 3.6905629967805,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 3
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 10025.357133999933,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH RECURSIVE downstream AS (\n    SELECT \n        child_task AS task_id, \n        1 AS depth, \n        ['BUILD_CORE', child_task] AS visited\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n\n    UNION ALL\n\n    SELECT \n        e.child_task AS task_id, \n        d.depth + 1 AS depth, \n        list_append(d.visited, e.child_task) AS visited\n    FROM downstream d\n    JOIN task_edges e ON d.task_id = e.parent_task\n    WHERE NOT list_contains(d.visited, e.child_task)\n)\nSELECT \n    task_id, \n    CAST(MIN(depth) AS INT) AS min_depth\nFROM downstream\nGROUP BY task_id\nORDER BY min_depth ASC, task_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_117_bitemporal_retroactive_audit",
+      "name": "Bitemporal Auditing: Retroactive Policy Revision Point-in-Time State",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    customer_id,\n    deductible AS active_deductible\nFROM insurance_policy_bitemporal\nWHERE customer_id = 501\n  -- Effective as of business date: 2026-04-10\n  AND DATE '2026-04-10' >= valid_from\n  AND DATE '2026-04-10' <= valid_to\n  -- As known by the system on system audit date: 2026-04-15\n  AND TIMESTAMP '2026-04-15 00:00:00' >= system_from\n  AND TIMESTAMP '2026-04-15 00:00:00' < system_to\nORDER BY customer_id ASC;",
+      "golden_sql": "\nSELECT \n    customer_id,\n    deductible AS active_deductible\nFROM insurance_policy_bitemporal\nWHERE customer_id = 501\n  -- Business valid time: 2026-04-10\n  AND DATE '2026-04-10' >= valid_from \n  AND DATE '2026-04-10' < valid_to\n  -- System knowledge time: 2026-04-15\n  AND TIMESTAMP '2026-04-15 00:00:00' >= system_from \n  AND TIMESTAMP '2026-04-15 00:00:00' < system_to\nORDER BY customer_id ASC;\n",
+      "execution_time_ms": 3.244190003897529,
+      "golden_time_ms": 2.6239269936922938,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 1
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4672.303398001532,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    customer_id,\n    deductible AS active_deductible\nFROM insurance_policy_bitemporal\nWHERE customer_id = 501\n  -- Effective as of business date: 2026-04-10\n  AND DATE '2026-04-10' >= valid_from\n  AND DATE '2026-04-10' <= valid_to\n  -- As known by the system on system audit date: 2026-04-15\n  AND TIMESTAMP '2026-04-15 00:00:00' >= system_from\n  AND TIMESTAMP '2026-04-15 00:00:00' < system_to\nORDER BY customer_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_118_reversal_interleaved_ledger",
+      "name": "Financial Ledger Running Total with Transaction Reversal Nullification",
+      "category": "Warehouse & Statistical",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH excluded_entries AS (\n    SELECT entry_id\n    FROM financial_ledger\n    WHERE action = 'REVERSAL'\n    UNION ALL\n    SELECT reverses_entry_id\n    FROM financial_ledger\n    WHERE reverses_entry_id IS NOT NULL\n)\nSELECT\n    entry_id,\n    account_id,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_id ASC\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS net_running_balance\nFROM financial_ledger\nWHERE entry_id NOT IN (SELECT entry_id FROM excluded_entries)\nORDER BY entry_id ASC;",
+      "golden_sql": "\nWITH reversed_ids AS (\n    SELECT reverses_entry_id AS void_id\n    FROM financial_ledger\n    WHERE action = 'REVERSAL' AND reverses_entry_id IS NOT NULL\n    UNION\n    SELECT entry_id AS void_id\n    FROM financial_ledger\n    WHERE action = 'REVERSAL'\n),\nactive_entries AS (\n    SELECT \n        l.entry_id,\n        l.account_id,\n        l.amount\n    FROM financial_ledger l\n    WHERE l.entry_id NOT IN (SELECT void_id FROM reversed_ids)\n)\nSELECT \n    entry_id,\n    account_id,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id \n        ORDER BY entry_id \n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS net_running_balance\nFROM active_entries\nORDER BY entry_id ASC;\n",
+      "execution_time_ms": 4.67085399577627,
+      "golden_time_ms": 4.566595998767298,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 2
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4494.3958450021455,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH excluded_entries AS (\n    SELECT entry_id\n    FROM financial_ledger\n    WHERE action = 'REVERSAL'\n    UNION ALL\n    SELECT reverses_entry_id\n    FROM financial_ledger\n    WHERE reverses_entry_id IS NOT NULL\n)\nSELECT\n    entry_id,\n    account_id,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_id ASC\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS net_running_balance\nFROM financial_ledger\nWHERE entry_id NOT IN (SELECT entry_id FROM excluded_entries)\nORDER BY entry_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_119_multitouch_decay_attribution",
+      "name": "Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH eligible_touchpoints AS (\n    SELECT\n        t.touch_id,\n        t.channel,\n        pc.order_revenue,\n        POW(0.5, date_diff('second', t.click_time, pc.conversion_time) / (7.0 * 86400.0)) AS raw_weight\n    FROM purchase_conversions pc\n    JOIN touchpoints t\n      ON pc.user_id = t.user_id\n     AND t.click_time <= pc.conversion_time\n     AND t.click_time >= pc.conversion_time - INTERVAL '30 days'\n),\nweighted_touchpoints AS (\n    SELECT\n        touch_id,\n        channel,\n        order_revenue * (raw_weight / SUM(raw_weight) OVER ()) AS attributed_revenue\n    FROM eligible_touchpoints\n)\nSELECT\n    touch_id,\n    channel,\n    ROUND(attributed_revenue, 2)::DECIMAL(10,2) AS attributed_revenue\nFROM weighted_touchpoints\nORDER BY touch_id ASC;",
+      "golden_sql": "\nWITH weighted_touches AS (\n    SELECT \n        t.touch_id,\n        t.channel,\n        c.order_revenue,\n        POW(0.5, date_diff('second', t.click_time, c.conversion_time) / (7.0 * 86400.0)) AS raw_weight\n    FROM purchase_conversions c\n    JOIN touchpoints t \n      ON c.user_id = t.user_id \n     AND t.click_time <= c.conversion_time\n     AND t.click_time >= c.conversion_time - INTERVAL 30 DAYS\n),\ntotal_weight AS (\n    SELECT \n        *,\n        SUM(raw_weight) OVER () AS sum_weights\n    FROM weighted_touches\n)\nSELECT \n    touch_id,\n    channel,\n    ROUND(order_revenue * (raw_weight / sum_weights), 2) AS attributed_revenue\nFROM total_weight\nORDER BY touch_id ASC;\n",
+      "execution_time_ms": 6.84908899711445,
+      "golden_time_ms": 3.406735006137751,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 3
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 7495.113509998191,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH eligible_touchpoints AS (\n    SELECT\n        t.touch_id,\n        t.channel,\n        pc.order_revenue,\n        POW(0.5, date_diff('second', t.click_time, pc.conversion_time) / (7.0 * 86400.0)) AS raw_weight\n    FROM purchase_conversions pc\n    JOIN touchpoints t\n      ON pc.user_id = t.user_id\n     AND t.click_time <= pc.conversion_time\n     AND t.click_time >= pc.conversion_time - INTERVAL '30 days'\n),\nweighted_touchpoints AS (\n    SELECT\n        touch_id,\n        channel,\n        order_revenue * (raw_weight / SUM(raw_weight) OVER ()) AS attributed_revenue\n    FROM eligible_touchpoints\n)\nSELECT\n    touch_id,\n    channel,\n    ROUND(attributed_revenue, 2)::DECIMAL(10,2) AS attributed_revenue\nFROM weighted_touchpoints\nORDER BY touch_id ASC;\n```"
+      }
+    }
+  ]
+}

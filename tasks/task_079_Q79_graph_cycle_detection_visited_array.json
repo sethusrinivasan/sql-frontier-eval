@@ -1,0 +1,17 @@
+{
+  "id": "task_079_Q79_graph_cycle_detection_visited_array",
+  "name": "Cycle Detection in Directed Dependency Graphs with Visited Array",
+  "category": "Graph & Hierarchy",
+  "description": "In build systems (e.g. Webpack, Bazel) or task scheduling, circular dependencies (Task A -> Task B -> Task A) cause deadlocks. The engine must detect cycles and abort gracefully.",
+  "prompt": "In build systems (e.g. Webpack, Bazel) or task scheduling, circular dependencies (Task A -> Task B -> Task A) cause deadlocks. The engine must detect cycles and abort gracefully.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: task_id, depends_on, visited_path, has_cycle.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE task_dependencies (\n                task_id VARCHAR,\n                depends_on VARCHAR\n            );\n            INSERT INTO task_dependencies VALUES\n                ('compile', 'codegen'),\n                ('codegen', 'lint'),\n                ('lint', 'compile'); -- Circular cycle!",
+  "golden_sql": "-- Detect circular loops using array path tracking\n            WITH RECURSIVE path_finder AS (\n                SELECT \n                    task_id,\n                    depends_on,\n                    [task_id] AS visited_path,\n                    false AS has_cycle\n                FROM task_dependencies\n                \n                UNION ALL\n                \n                SELECT \n                    p.task_id,\n                    d.depends_on,\n                    list_append(p.visited_path, d.task_id),\n                    list_contains(p.visited_path, d.depends_on) AS has_cycle\n                FROM path_finder p\n                JOIN task_dependencies d ON p.depends_on = d.task_id\n                WHERE NOT p.has_cycle AND array_length(p.visited_path) < 10\n            )\n            SELECT \n                task_id,\n                depends_on,\n                visited_path,\n                has_cycle\n            FROM path_finder\n            WHERE has_cycle = true\n            LIMIT 1;",
+  "ordered": false,
+  "expected_columns": [
+    "task_id",
+    "depends_on",
+    "visited_path",
+    "has_cycle"
+  ],
+  "why_it_fails": "Standard recursive CTEs without cycle tracking loop infinitely until the database crashes with out-of-memory errors."
+}

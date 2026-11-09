@@ -1,0 +1,16 @@
+{
+  "id": "task_055_Q55_jaro_winkler_brand_search",
+  "name": "Brand & Name Fuzzy Search via Jaro-Winkler Prefix Similarity",
+  "category": "Search & Retrieval",
+  "description": "In e-commerce, users often mistype the suffixes of brand names ('Samsumg' vs 'Samsung'). Jaro-Winkler gives higher weight to prefix matches, making it ideal for proper names.",
+  "prompt": "In e-commerce, users often mistype the suffixes of brand names ('Samsumg' vs 'Samsung'). Jaro-Winkler gives higher weight to prefix matches, making it ideal for proper names.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: brand_id, brand_name, jaro_similarity.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE brands (\n                brand_id INT,\n                brand_name VARCHAR\n            );\n            INSERT INTO brands VALUES\n                (1, 'Samsung'),\n                (2, 'Samsonite'),\n                (3, 'Apple'),\n                (4, 'Sony');",
+  "golden_sql": "-- Match brand query 'Samsun' with threshold >= 0.85\n            SELECT \n                brand_id,\n                brand_name,\n                ROUND(jaro_winkler_similarity(brand_name, 'Samsun'), 4) AS jaro_similarity\n            FROM brands\n            WHERE jaro_winkler_similarity(brand_name, 'Samsun') >= 0.85\n            ORDER BY jaro_similarity DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "brand_id",
+    "brand_name",
+    "jaro_similarity"
+  ],
+  "why_it_fails": "Standard Levenshtein treats mistakes at the start of a word the same as at the end."
+}

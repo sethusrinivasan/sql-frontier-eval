@@ -1,0 +1,18 @@
+{
+  "id": "task_119_multitouch_decay_attribution",
+  "name": "Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%",
+  "category": "Temporal & Time-Series",
+  "description": "Calculates exponential time-decay attribution across previous marketing touches (7-day half-life: w = 2^(-delta_t / 7)), strictly normalizing touchpoint weights so attributed revenue sums to exactly 100% of conversion value.",
+  "prompt": "Attribute conversion revenue ($300.00) across touchpoints occurring within 30 days prior to purchase.\nUse exponential time-decay weighting with a 7-day half-life:\nraw_weight = POW(0.5, date_diff('second', click_time, conversion_time) / (7.0 * 86400.0))\nCRITICAL: Attributed revenue MUST be normalized across touches so the sum of attributed revenue exactly equals the $300.00 conversion revenue.\n\nRequired output columns:\n- touch_id (INT)\n- channel (VARCHAR)\n- attributed_revenue (DECIMAL)\n\nOrder by touch_id ASC.",
+  "setup_sql": "\nCREATE TABLE touchpoints (\n    touch_id INT,\n    user_id INT,\n    channel VARCHAR,\n    click_time TIMESTAMP\n);\nCREATE TABLE purchase_conversions (\n    order_id INT,\n    user_id INT,\n    order_revenue DECIMAL(10,2),\n    conversion_time TIMESTAMP\n);\nINSERT INTO touchpoints VALUES\n  (1, 42, 'Google Search', '2026-03-01 12:00:00'), -- 14 days before (weight = 0.25)\n  (2, 42, 'Facebook Ad',   '2026-03-08 12:00:00'), -- 7 days before  (weight = 0.50)\n  (3, 42, 'Email Promo',   '2026-03-15 12:00:00'); -- 0 days before  (weight = 1.00)\n\nINSERT INTO purchase_conversions VALUES\n  (101, 42, 350.00, '2026-03-15 12:00:00');\n",
+  "golden_sql": "\nWITH weighted_touches AS (\n    SELECT \n        t.touch_id,\n        t.channel,\n        c.order_revenue,\n        POW(0.5, date_diff('second', t.click_time, c.conversion_time) / (7.0 * 86400.0)) AS raw_weight\n    FROM purchase_conversions c\n    JOIN touchpoints t \n      ON c.user_id = t.user_id \n     AND t.click_time <= c.conversion_time\n     AND t.click_time >= c.conversion_time - INTERVAL 30 DAYS\n),\ntotal_weight AS (\n    SELECT \n        *,\n        SUM(raw_weight) OVER () AS sum_weights\n    FROM weighted_touches\n)\nSELECT \n    touch_id,\n    channel,\n    ROUND(order_revenue * (raw_weight / sum_weights), 2) AS attributed_revenue\nFROM total_weight\nORDER BY touch_id ASC;\n",
+  "naive_llm_sql": "\nSELECT \n    t.touch_id,\n    t.channel,\n    ROUND(c.order_revenue * POW(0.5, date_diff('second', t.click_time, c.conversion_time) / (7.0 * 86400.0)), 2) AS attributed_revenue\nFROM purchase_conversions c\nJOIN touchpoints t ON c.user_id = t.user_id\nORDER BY t.touch_id ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "touch_id",
+    "channel",
+    "attributed_revenue"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Naive queries multiply raw exponential decay directly by order revenue without dividing by the sum of weights. In our scenario (raw weights sum to 1.75), naive attribution distributes 175% ($612.50) of the actual $350.00 revenue, severely corrupting marketing ROI calculations."
+}

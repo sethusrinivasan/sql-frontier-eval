@@ -1,0 +1,17 @@
+{
+  "id": "task_049_Q49_prototype_intent_classification",
+  "name": "Zero-Shot Query Intent Classification via Prototype Vector Distance",
+  "category": "Vector & Embeddings",
+  "description": "Instead of training a BERT classifier, user query vectors are compared against pre-computed 'intent prototype vectors' (e.g. Navigational, Transactional, Informational). The closest prototype labels the query intent.",
+  "prompt": "Instead of training a BERT classifier, user query vectors are compared against pre-computed 'intent prototype vectors' (e.g. Navigational, Transactional, Informational). The closest prototype labels the query intent.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: query_id, query_text, predicted_intent, confidence.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE intent_prototypes (\n                intent_name VARCHAR,\n                prototype_vector FLOAT[2]\n            );\n            CREATE TABLE inbound_queries (\n                query_id INT,\n                query_text VARCHAR,\n                query_vector FLOAT[2]\n            );\n            INSERT INTO intent_prototypes VALUES\n                ('TRANSACTIONAL_BUY', [0.9, 0.1]::FLOAT[2]),\n                ('INFORMATIONAL_FAQ', [0.1, 0.9]::FLOAT[2]);\n            INSERT INTO inbound_queries VALUES\n                (1, 'where to purchase macbook pro', [0.88, 0.15]::FLOAT[2]),\n                (2, 'how does duckdb storage work',   [0.15, 0.85]::FLOAT[2]);",
+  "golden_sql": "-- Classify each query to its closest intent prototype\n            WITH ranked_intents AS (\n                SELECT \n                    q.query_id,\n                    q.query_text,\n                    p.intent_name,\n                    array_cosine_similarity(q.query_vector, p.prototype_vector) AS intent_similarity,\n                    ROW_NUMBER() OVER (\n                        PARTITION BY q.query_id \n                        ORDER BY array_cosine_similarity(q.query_vector, p.prototype_vector) DESC\n                    ) AS rank_match\n                FROM inbound_queries q\n                CROSS JOIN intent_prototypes p\n            )\n            SELECT \n                query_id,\n                query_text,\n                intent_name AS predicted_intent,\n                ROUND(intent_similarity, 4) AS confidence\n            FROM ranked_intents\n            WHERE rank_match = 1\n            ORDER BY query_id;",
+  "ordered": true,
+  "expected_columns": [
+    "query_id",
+    "query_text",
+    "predicted_intent",
+    "confidence"
+  ],
+  "why_it_fails": "Maintaining external classifier microservices adds 50ms latency to query planning."
+}

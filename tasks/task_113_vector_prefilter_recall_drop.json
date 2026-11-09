@@ -1,0 +1,18 @@
+{
+  "id": "task_113_vector_prefilter_recall_drop",
+  "name": "Vector Nearest Neighbors: The Post-Filtering Empty Set Trap",
+  "category": "Vector & Retrieval",
+  "description": "Demonstrates the classic vector database failure mode where applying relational metadata filters AFTER Top-K vector retrieval discards valid results, returning an empty result set.",
+  "prompt": "Retrieve the top 2 most semantically relevant products matching query vector [1.0, 0.0]::FLOAT[2] satisfying:\n- category = 'electronics'\n- price <= 50.00\n- in_stock = true\n\nRequired output columns:\n- item_id (INT)\n- price (DECIMAL)\n- similarity (DOUBLE)\n\nOrder by similarity DESC, item_id ASC. Limit to 2 results.",
+  "setup_sql": "\nCREATE TABLE products_search (\n    item_id INT,\n    category VARCHAR,\n    price DECIMAL(10,2),\n    in_stock BOOLEAN,\n    vec FLOAT[2]\n);\n-- Top 3 highest similarity vectors globally fail the filters (too expensive or out of stock)\nINSERT INTO products_search VALUES\n  (1, 'electronics', 150.00, true,  [0.99, 0.01]::FLOAT[2]),\n  (2, 'clothing',     20.00, true,  [0.98, 0.02]::FLOAT[2]),\n  (3, 'electronics',  45.00, false, [0.95, 0.05]::FLOAT[2]),\n  -- Truly qualifying products (lower global cosine similarity, but fully satisfy constraints)\n  (4, 'electronics',  35.00, true,  [0.70, 0.30]::FLOAT[2]),\n  (5, 'electronics',  25.00, true,  [0.65, 0.35]::FLOAT[2]);\n",
+  "golden_sql": "\nSELECT \n    item_id,\n    price,\n    ROUND(array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 4) AS similarity\nFROM products_search\nWHERE category = 'electronics' \n  AND price <= 50.00 \n  AND in_stock = true\nORDER BY similarity DESC, item_id ASC\nLIMIT 2;\n",
+  "naive_llm_sql": "\nSELECT \n    item_id,\n    price,\n    ROUND(similarity, 4) AS similarity\nFROM (\n    SELECT \n        item_id, \n        category, \n        price, \n        in_stock, \n        array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) AS similarity\n    FROM products_search\n    ORDER BY similarity DESC\n    LIMIT 2\n) sub\nWHERE category = 'electronics' \n  AND price <= 50.00 \n  AND in_stock = true\nORDER BY similarity DESC, item_id ASC;\n",
+  "ordered": true,
+  "expected_columns": [
+    "item_id",
+    "price",
+    "similarity"
+  ],
+  "efficiency_rules": {},
+  "why_it_fails": "Post-filtering vector retrieval (LIMIT 2 inside a subquery before WHERE filters) selects the globally highest similarity items (item 1 and item 2). Because item 1 is $150 (exceeds $50) and item 2 is 'clothing', the outer WHERE filter discards both, returning 0 rows! Relational filters must be applied as PRE-FILTERS."
+}

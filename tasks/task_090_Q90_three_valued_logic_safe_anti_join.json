@@ -1,0 +1,15 @@
+{
+  "id": "task_090_Q90_three_valued_logic_safe_anti_join",
+  "name": "Three-Valued Logic Safe Anti-Join (Eliminating the NOT IN NULL Trap)",
+  "category": "Warehouse & Statistical",
+  "description": "Marketing queries to find active customers who have not churned often use `WHERE id NOT IN (SELECT customer_id FROM churned_users)`. If a single `NULL` exists in `churned_users`, SQL three-valued logic causes the entire query to return ZERO rows.",
+  "prompt": "Marketing queries to find active customers who have not churned often use `WHERE id NOT IN (SELECT customer_id FROM churned_users)`. If a single `NULL` exists in `churned_users`, SQL three-valued logic causes the entire query to return ZERO rows.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: customer_id, name.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE all_customers (customer_id INT, name VARCHAR);\n            CREATE TABLE churned_customers (customer_id INT);\n            INSERT INTO all_customers VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie');\n            -- Note the presence of a NULL record in the churned table!\n            INSERT INTO churned_customers VALUES (2), (NULL);",
+  "golden_sql": "-- Robust anti-join that is immune to NULL records in the subquery\n            SELECT \n                c.customer_id,\n                c.name\n            FROM all_customers c\n            WHERE NOT EXISTS (\n                SELECT 1 \n                FROM churned_customers ch \n                WHERE ch.customer_id = c.customer_id\n            )\n            ORDER BY c.customer_id;",
+  "ordered": true,
+  "expected_columns": [
+    "customer_id",
+    "name"
+  ],
+  "why_it_fails": "In SQL, `val NOT IN (1, NULL)` evaluates to `UNKNOWN`, which evaluates to `FALSE` in WHERE clauses, silently discarding every single record."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "task_009_Q09_ledger_balance_duplicate_timestamps",
+  "name": "Financial Ledger Cumulative Balance with Duplicate Timestamp Ties",
+  "category": "Temporal & Time-Series",
+  "description": "Ledger entries can occur at the exact same millisecond. Financial ledgers must preserve strict incremental balances rather than bunching peer rows.",
+  "prompt": "Ledger entries can occur at the exact same millisecond. Financial ledgers must preserve strict incremental balances rather than bunching peer rows.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: entry_id, account_id, posted_time, amount, running_balance.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE ledger (\n                entry_id INT,\n                account_id INT,\n                posted_time TIMESTAMP,\n                amount DECIMAL(10,2)\n            );\n            INSERT INTO ledger VALUES\n                (1, 7001, '2026-03-01 14:00:00', 500.00),\n                (2, 7001, '2026-03-01 14:00:00', -150.00), -- Duplicate timestamp\n                (3, 7001, '2026-03-01 14:05:00', 200.00);",
+  "golden_sql": "-- Calculate strict running ledger balance using ROWS frame to prevent peer bunching\n            SELECT \n                entry_id,\n                account_id,\n                posted_time,\n                amount,\n                -- ROWS frame evaluates row-by-row even when posted_time is identical\n                SUM(amount) OVER (\n                    PARTITION BY account_id\n                    ORDER BY posted_time, entry_id\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                ) AS running_balance\n            FROM ledger\n            ORDER BY posted_time, entry_id;",
+  "ordered": true,
+  "expected_columns": [
+    "entry_id",
+    "account_id",
+    "posted_time",
+    "amount",
+    "running_balance"
+  ],
+  "why_it_fails": "SQL window functions default to `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, which aggregates identical timestamps together into the same running total."
+}

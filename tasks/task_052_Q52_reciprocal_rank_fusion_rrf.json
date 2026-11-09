@@ -1,0 +1,18 @@
+{
+  "id": "task_052_Q52_reciprocal_rank_fusion_rrf",
+  "name": "Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)",
+  "category": "Search & Retrieval",
+  "description": "Hybrid search combines sparse keyword search (great for exact names and acronyms) with dense vector search (great for synonyms and concepts). RRF merges both rank lists using: RRF_score = 1/(60 + rank_bm25) + 1/(60 + rank_vec).",
+  "prompt": "Hybrid search combines sparse keyword search (great for exact names and acronyms) with dense vector search (great for synonyms and concepts). RRF merges both rank lists using: RRF_score = 1/(60 + rank_bm25) + 1/(60 + rank_vec).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: doc_id, title, rank_lexical, rank_vector, rrf_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE corpus_docs (\n                doc_id INT,\n                title VARCHAR,\n                lexical_score DOUBLE,\n                vec FLOAT[2]\n            );\n            INSERT INTO corpus_docs VALUES\n                (1, 'DuckDB Vector Search Guide', 12.5, [0.95, 0.05]::FLOAT[2]),\n                (2, 'Postgres HNSW Extension',     14.2, [0.70, 0.30]::FLOAT[2]),\n                (3, 'Deep Learning Embeddings',    2.1,  [0.92, 0.10]::FLOAT[2]);",
+  "golden_sql": "-- Hybrid RRF rank fusion between BM25 lexical score and dense vector cosine similarity\n            WITH ranked_lexical AS (\n                SELECT \n                    doc_id,\n                    title,\n                    ROW_NUMBER() OVER (ORDER BY lexical_score DESC) AS rank_lexical\n                FROM corpus_docs\n            ),\n            ranked_vector AS (\n                SELECT \n                    doc_id,\n                    title,\n                    ROW_NUMBER() OVER (\n                        ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC\n                    ) AS rank_vector\n                FROM corpus_docs\n            )\n            SELECT \n                l.doc_id,\n                l.title,\n                l.rank_lexical,\n                v.rank_vector,\n                -- Standard RRF formula with k = 60\n                ROUND((1.0 / (60.0 + l.rank_lexical)) + (1.0 / (60.0 + v.rank_vector)), 6) AS rrf_score\n            FROM ranked_lexical l\n            JOIN ranked_vector v ON l.doc_id = v.doc_id\n            ORDER BY rrf_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "doc_id",
+    "title",
+    "rank_lexical",
+    "rank_vector",
+    "rrf_score"
+  ],
+  "why_it_fails": "Adding raw BM25 scores (range 0 to 50+) directly to cosine similarity scores (range 0 to 1) allows BM25 to completely drown out vector relevance."
+}

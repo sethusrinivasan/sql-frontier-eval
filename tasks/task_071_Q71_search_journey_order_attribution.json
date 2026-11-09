@@ -1,0 +1,19 @@
+{
+  "id": "task_071_Q71_search_journey_order_attribution",
+  "name": "Customer Search-to-Purchase Path Attribution (Session Query Lift)",
+  "category": "Search & Retrieval",
+  "description": "E-commerce search product managers need to know which search queries drove actual revenue. We link search queries to checkout events within the same 30-minute session.",
+  "prompt": "E-commerce search product managers need to know which search queries drove actual revenue. We link search queries to checkout events within the same 30-minute session.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: order_id, user_id, order_total, attributing_search_query, searched_at, ordered_at.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE user_search_queries (\n                user_id INT,\n                query_term VARCHAR,\n                searched_at TIMESTAMP\n            );\n            CREATE TABLE completed_orders (\n                order_id INT,\n                user_id INT,\n                order_total DECIMAL(10,2),\n                ordered_at TIMESTAMP\n            );\n            INSERT INTO user_search_queries VALUES\n                (50, 'noise canceling headphones', '2026-03-01 14:10:00'),\n                (50, 'sony xm5 sale',              '2026-03-01 14:15:00');\n            INSERT INTO completed_orders VALUES\n                (1001, 50, 349.99, '2026-03-01 14:25:00');",
+  "golden_sql": "-- Attribute purchase to the most recent search query prior to order\n            SELECT \n                o.order_id,\n                o.user_id,\n                o.order_total,\n                s.query_term AS attributing_search_query,\n                s.searched_at,\n                o.ordered_at\n            FROM completed_orders o\n            ASOF JOIN user_search_queries s\n              ON o.user_id = s.user_id\n             AND o.ordered_at >= s.searched_at\n            ORDER BY o.order_id;",
+  "ordered": true,
+  "expected_columns": [
+    "order_id",
+    "user_id",
+    "order_total",
+    "attributing_search_query",
+    "searched_at",
+    "ordered_at"
+  ],
+  "why_it_fails": "Attributing purchases to search queries that occurred after the purchase order was placed."
+}

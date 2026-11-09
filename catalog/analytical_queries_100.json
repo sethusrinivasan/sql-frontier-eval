@@ -1,0 +1,1022 @@
+[
+  {
+    "id": "Q01_asof_trade_quote_matching",
+    "title": "Tick-Level Trade Execution Matching via Native ASOF JOIN",
+    "domain": "Temporal & Time-Series",
+    "human_context": "In algorithmic trading, every buy or sell order must be evaluated against the most recent prevailing market quote. Standard relational equality joins fail because quotes and trades happen at irregular microsecond intervals.",
+    "hidden_trap": "LLMs typically write quadratic triangular self-joins (WHERE q.ts <= t.ts) or window functions with LAG/LAST_VALUE, which create massive memory spikes on high-frequency streams.",
+    "duckdb_advantage": "DuckDB native `ASOF JOIN` performs an O(N log M) binary search scan directly across partitioned timestamp indices without sorting intermediate cross products.",
+    "setup_sql": "\n            CREATE TABLE quotes (\n                quote_time TIMESTAMP,\n                symbol VARCHAR,\n                bid_price DOUBLE,\n                ask_price DOUBLE\n            );\n            CREATE TABLE trades (\n                trade_time TIMESTAMP,\n                symbol VARCHAR,\n                trade_id INT,\n                executed_price DOUBLE,\n                shares INT\n            );\n            INSERT INTO quotes VALUES\n                ('2026-03-01 09:30:00.100', 'NVDA', 850.10, 850.25),\n                ('2026-03-01 09:30:00.250', 'NVDA', 850.15, 850.30),\n                ('2026-03-01 09:30:00.400', 'NVDA', 850.20, 850.35);\n            INSERT INTO trades VALUES\n                ('2026-03-01 09:30:00.150', 'NVDA', 101, 850.25, 100),\n                ('2026-03-01 09:30:00.300', 'NVDA', 102, 850.30, 200),\n                ('2026-03-01 09:30:00.450', 'NVDA', 103, 850.32, 150);\n        ",
+    "sql": "\n            -- Match each executed trade with the latest market quote effective at that exact microsecond\n            SELECT \n                t.trade_id,\n                t.symbol,\n                t.trade_time,\n                t.executed_price,\n                t.shares,\n                q.quote_time AS prevailing_quote_time,\n                q.bid_price,\n                q.ask_price,\n                -- Effective slippage calculation (difference between ask and executed price)\n                ROUND(t.executed_price - q.ask_price, 4) AS slippage\n            FROM trades t\n            ASOF JOIN quotes q\n              ON t.symbol = q.symbol\n             AND t.trade_time >= q.quote_time\n            ORDER BY t.trade_time;\n        "
+  },
+  {
+    "id": "Q02_dynamic_point_in_time_fx",
+    "title": "Multi-Currency Point-in-Time FX Conversion via ASOF JOIN",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Global payments systems record transactions in local currencies (EUR, JPY, GBP) that must be converted to USD using the prevailing exchange rate at the exact transaction millisecond.",
+    "hidden_trap": "Joining to a daily FX table using DATE(ts) loses intraday volatility and causes currency conversion discrepancies of up to 1-2% during volatile market events.",
+    "duckdb_advantage": "DuckDB's ASOF JOIN enables continuous real-time currency conversion with millisecond granularity.",
+    "setup_sql": "\n            CREATE TABLE fx_rates (\n                rate_time TIMESTAMP,\n                currency VARCHAR,\n                rate_to_usd DOUBLE\n            );\n            CREATE TABLE payments (\n                payment_id INT,\n                payment_time TIMESTAMP,\n                currency VARCHAR,\n                amount_local DOUBLE\n            );\n            INSERT INTO fx_rates VALUES\n                ('2026-03-01 12:00:00', 'EUR', 1.0820),\n                ('2026-03-01 12:15:00', 'EUR', 1.0845),\n                ('2026-03-01 12:30:00', 'EUR', 1.0810);\n            INSERT INTO payments VALUES\n                (1, '2026-03-01 12:05:00', 'EUR', 5000.00),\n                (2, '2026-03-01 12:20:00', 'EUR', 12000.00),\n                (3, '2026-03-01 12:45:00', 'EUR', 7500.00);\n        ",
+    "sql": "\n            -- Convert international payments to USD using the most recent point-in-time exchange rate\n            SELECT \n                p.payment_id,\n                p.payment_time,\n                p.currency,\n                p.amount_local,\n                fx.rate_to_usd,\n                ROUND(p.amount_local * fx.rate_to_usd, 2) AS amount_usd,\n                fx.rate_time AS fx_snapshot_time\n            FROM payments p\n            ASOF JOIN fx_rates fx\n              ON p.currency = fx.currency\n             AND p.payment_time >= fx.rate_time\n            ORDER BY p.payment_id;\n        "
+  },
+  {
+    "id": "Q03_clickstream_sessionization_gaps",
+    "title": "Clickstream Sessionization with Inactivity Timeouts (Gaps & Islands)",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Digital analytics platforms group raw user pageviews into 'sessions'. If a user is inactive for more than 30 minutes, the next click begins a brand-new session.",
+    "hidden_trap": "Models mistakenly partition by user_id and take ROW_NUMBER(), which fails to segment sessions by time gaps, or use self-joins which scale quadratically.",
+    "duckdb_advantage": "Window functions (LAG) combined with cumulative conditional sums (SUM(is_new_session) OVER) produce linear O(N) streaming session identifiers.",
+    "setup_sql": "\n            CREATE TABLE user_events (\n                user_id INT,\n                event_time TIMESTAMP,\n                page_url VARCHAR\n            );\n            INSERT INTO user_events VALUES\n                (101, '2026-03-01 10:00:00', '/home'),\n                (101, '2026-03-01 10:05:00', '/products'),\n                (101, '2026-03-01 10:45:00', '/checkout'), -- 40m gap -> New session\n                (101, '2026-03-01 10:50:00', '/confirmation');\n        ",
+    "sql": "\n            -- Detect session breaks (>30 min inactivity) and assign deterministic session UUIDs\n            WITH event_lags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Compare against preceding event timestamp for this user\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_event_time\n                FROM user_events\n            ),\n            session_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Mark 1 if first event or gap exceeds 30 minutes, else 0\n                    CASE \n                        WHEN prev_event_time IS NULL THEN 1\n                        WHEN date_diff('second', prev_event_time, event_time) > 1800 THEN 1 \n                        ELSE 0 \n                    END AS is_new_session\n                FROM event_lags\n            )\n            SELECT \n                user_id,\n                event_time,\n                page_url,\n                -- Cumulative sum over flags establishes monotonically increasing session ID\n                SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY event_time) AS session_id\n            FROM session_flags\n            ORDER BY user_id, event_time;\n        "
+  },
+  {
+    "id": "Q04_dual_bound_session_capping",
+    "title": "Sliding Sessionization with Absolute Maximum Duration Cap",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Real-world web sessions often need dual constraints: a 30-minute inactivity timeout AND a strict maximum 4-hour absolute session duration to prevent bots from maintaining endless sessions.",
+    "hidden_trap": "A simple inactivity check keeps sessions alive indefinitely if events happen every 10 minutes. Tracking session origin requires window frames with state.",
+    "duckdb_advantage": "DuckDB can evaluate nested window stages seamlessly with zero intermediate disk spill.",
+    "setup_sql": "\n            CREATE TABLE bot_events (\n                user_id INT,\n                event_time TIMESTAMP,\n                action VARCHAR\n            );\n            INSERT INTO bot_events VALUES\n                (1, '2026-03-01 00:00:00', 'ping'),\n                (1, '2026-03-01 02:00:00', 'ping'), -- +2 hrs\n                (1, '2026-03-01 04:30:00', 'ping'), -- +4.5 hrs (exceeds 4h cap)\n                (1, '2026-03-01 04:45:00', 'ping');\n        ",
+    "sql": "\n            -- Partition sessions by inactivity (>30m) OR exceeding 4 hours from session start\n            WITH ranked_events AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    action,\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time\n                FROM bot_events\n            ),\n            step_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    action,\n                    CASE \n                        WHEN prev_time IS NULL THEN 1\n                        WHEN date_diff('minute', prev_time, event_time) > 30 THEN 1\n                        ELSE 0\n                    END AS gap_split\n                FROM ranked_events\n            ),\n            base_sessions AS (\n                SELECT \n                    *,\n                    SUM(gap_split) OVER (PARTITION BY user_id ORDER BY event_time) AS raw_session_id\n                FROM step_flags\n            )\n            SELECT \n                user_id,\n                event_time,\n                action,\n                raw_session_id,\n                -- Measure elapsed minutes from session genesis\n                date_diff('minute', \n                    FIRST_VALUE(event_time) OVER (PARTITION BY user_id, raw_session_id ORDER BY event_time),\n                    event_time\n                ) AS minutes_since_session_start\n            FROM base_sessions\n            ORDER BY user_id, event_time;\n        "
+  },
+  {
+    "id": "Q05_iot_sensor_gap_fill_locf",
+    "title": "IoT Sensor Telemetry Gap-Filling via generate_series and LOCF",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Industrial IoT sensors emit readings intermittently to save bandwidth. Downstream machine learning models require strict continuous 1-minute time grids with Last Observation Carried Forward (LOCF).",
+    "hidden_trap": "Using OUTER JOIN without dynamic range generation leaves temporal voids, leading to missing periods in downstream feature stores.",
+    "duckdb_advantage": "DuckDB `generate_series` produces virtual timestamp arrays directly joined with windowed `IGNORE NULLS` forward-fills.",
+    "setup_sql": "\n            CREATE TABLE sensor_telemetry (\n                device_id INT,\n                recorded_at TIMESTAMP,\n                temperature DOUBLE\n            );\n            INSERT INTO sensor_telemetry VALUES\n                (42, '2026-03-01 08:00:00', 21.5),\n                (42, '2026-03-01 08:02:00', 22.0),\n                (42, '2026-03-01 08:05:00', 22.8);\n        ",
+    "sql": "\n            -- Resample sparse telemetry into continuous 1-minute intervals with Last Observation Carried Forward\n            WITH time_grid AS (\n                SELECT UNNEST(generate_series(\n                    TIMESTAMP '2026-03-01 08:00:00',\n                    TIMESTAMP '2026-03-01 08:05:00',\n                    INTERVAL '1 minute'\n                )) AS bucket_time\n            ),\n            aligned_readings AS (\n                SELECT \n                    grid.bucket_time,\n                    42 AS device_id,\n                    st.temperature\n                FROM time_grid grid\n                LEFT JOIN sensor_telemetry st\n                  ON grid.bucket_time = st.recorded_at\n                 AND st.device_id = 42\n            )\n            SELECT \n                bucket_time,\n                device_id,\n                temperature AS raw_reading,\n                -- Forward fill the most recent non-null temperature\n                COALESCE(\n                    temperature,\n                    LAST_VALUE(temperature IGNORE NULLS) OVER (\n                        PARTITION BY device_id \n                        ORDER BY bucket_time \n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    )\n                ) AS filled_temperature\n            FROM aligned_readings\n            ORDER BY bucket_time;\n        "
+  },
+  {
+    "id": "Q06_bitemporal_state_reconstruction",
+    "title": "Bitemporal Auditing: Valid-Time vs. Transaction-Time Alignment",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Financial compliance requires knowing: 'What did we believe customer Alice's credit limit was on May 15th, based on what was entered into our database as of June 1st?' (Bitemporal query).",
+    "hidden_trap": "Relying on a single timestamp column confuses retroactive corrections with real-world effective dates, causing compliance audit failures.",
+    "duckdb_advantage": "DuckDB can evaluate dual closed-open temporal intervals (`[valid_from, valid_to)` and `[system_from, system_to)`) with high-speed range predicates.",
+    "setup_sql": "\n            CREATE TABLE credit_limits_audit (\n                customer_id INT,\n                credit_limit DECIMAL(10,2),\n                valid_from DATE,\n                valid_to DATE,\n                system_from TIMESTAMP,\n                system_to TIMESTAMP\n            );\n            INSERT INTO credit_limits_audit VALUES\n                -- Original belief entered on May 1st\n                (501, 5000.00, '2026-05-01', '2026-12-31', '2026-05-01 09:00:00', '2026-06-01 10:00:00'),\n                -- Retroactive correction entered on June 1st backdating Alice's limit to $8,000 effective May 15th\n                (501, 8000.00, '2026-05-15', '2026-12-31', '2026-06-01 10:00:00', '9999-12-31 23:59:59');\n        ",
+    "sql": "\n            -- Query credit limit effective on 2026-05-20 as known to the system on 2026-05-25 (before retroactive update)\n            SELECT \n                customer_id,\n                credit_limit AS limit_as_known_then,\n                valid_from,\n                valid_to,\n                system_from,\n                system_to\n            FROM credit_limits_audit\n            WHERE customer_id = 501\n              -- As-of Business Date: 2026-05-20\n              AND DATE '2026-05-20' >= valid_from \n              AND DATE '2026-05-20' < valid_to\n              -- As-of System State: 2026-05-25\n              AND TIMESTAMP '2026-05-25 00:00:00' >= system_from \n              AND TIMESTAMP '2026-05-25 00:00:00' < system_to;\n        "
+  },
+  {
+    "id": "Q07_scd2_open_ended_intervals",
+    "title": "Slowly Changing Dimension Type 2 Join with Open-Ended Future",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Customers change addresses or account tiers over time. Joining historical orders to customer profile dimensions requires matching the order date to the active validity interval.",
+    "hidden_trap": "Current active records typically have `valid_to IS NULL`. A simple `order_date BETWEEN valid_from AND valid_to` drops all current active records.",
+    "duckdb_advantage": "DuckDB optimizes COALESCE null bounds directly into range filter pushdown.",
+    "setup_sql": "\n            CREATE TABLE dim_customer_scd (\n                customer_id INT,\n                tier VARCHAR,\n                valid_from DATE,\n                valid_to DATE\n            );\n            CREATE TABLE fact_orders (\n                order_id INT,\n                customer_id INT,\n                order_date DATE,\n                amount DECIMAL(10,2)\n            );\n            INSERT INTO dim_customer_scd VALUES\n                (88, 'Silver', '2026-01-01', '2026-02-01'),\n                (88, 'Gold',   '2026-02-01', NULL);\n            INSERT INTO fact_orders VALUES\n                (1, 88, '2026-01-15', 100.00),\n                (2, 88, '2026-02-20', 250.00);\n        ",
+    "sql": "\n            -- Join fact orders to historical customer dimension without dropping active records\n            SELECT \n                o.order_id,\n                o.customer_id,\n                o.order_date,\n                o.amount,\n                c.tier AS customer_tier_at_purchase\n            FROM fact_orders o\n            JOIN dim_customer_scd c\n              ON o.customer_id = c.customer_id\n             AND o.order_date >= c.valid_from\n             AND o.order_date < COALESCE(c.valid_to, DATE '9999-12-31')\n            ORDER BY o.order_id;\n        "
+  },
+  {
+    "id": "Q08_hopping_sliding_time_buckets",
+    "title": "Hopping / Overlapping Window Aggregations via time_bucket",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Real-time surveillance monitors rolling 15-minute average latency stepped forward every 5 minutes (a hopping window).",
+    "hidden_trap": "Standard GROUP BY time_bucket only produces non-overlapping tumbling windows, missing cross-boundary bursts.",
+    "duckdb_advantage": "DuckDB can evaluate multi-frequency time_bucket queries combined with generate_series hops in memory.",
+    "setup_sql": "\n            CREATE TABLE server_metrics (\n                server_id VARCHAR,\n                metric_time TIMESTAMP,\n                cpu_utilization DOUBLE\n            );\n            INSERT INTO server_metrics VALUES\n                ('web-01', '2026-03-01 10:02:00', 45.0),\n                ('web-01', '2026-03-01 10:07:00', 78.0),\n                ('web-01', '2026-03-01 10:12:00', 92.0),\n                ('web-01', '2026-03-01 10:17:00', 60.0);\n        ",
+    "sql": "\n            -- Generate 15-minute sliding windows stepped every 5 minutes (hopping window)\n            WITH window_steps AS (\n                SELECT UNNEST(generate_series(\n                    TIMESTAMP '2026-03-01 10:00:00',\n                    TIMESTAMP '2026-03-01 10:15:00',\n                    INTERVAL '5 minutes'\n                )) AS window_start\n            )\n            SELECT \n                w.window_start,\n                w.window_start + INTERVAL '15 minutes' AS window_end,\n                m.server_id,\n                COUNT(m.cpu_utilization) AS sample_count,\n                ROUND(AVG(m.cpu_utilization), 2) AS avg_cpu,\n                MAX(m.cpu_utilization) AS peak_cpu\n            FROM window_steps w\n            JOIN server_metrics m\n              ON m.metric_time >= w.window_start\n             AND m.metric_time < w.window_start + INTERVAL '15 minutes'\n            GROUP BY w.window_start, m.server_id\n            ORDER BY w.window_start;\n        "
+  },
+  {
+    "id": "Q09_ledger_balance_duplicate_timestamps",
+    "title": "Financial Ledger Cumulative Balance with Duplicate Timestamp Ties",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Ledger entries can occur at the exact same millisecond. Financial ledgers must preserve strict incremental balances rather than bunching peer rows.",
+    "hidden_trap": "SQL window functions default to `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, which aggregates identical timestamps together into the same running total.",
+    "duckdb_advantage": "Explicit `ROWS BETWEEN` frames guarantee deterministic transaction-by-transaction cumulative balances.",
+    "setup_sql": "\n            CREATE TABLE ledger (\n                entry_id INT,\n                account_id INT,\n                posted_time TIMESTAMP,\n                amount DECIMAL(10,2)\n            );\n            INSERT INTO ledger VALUES\n                (1, 7001, '2026-03-01 14:00:00', 500.00),\n                (2, 7001, '2026-03-01 14:00:00', -150.00), -- Duplicate timestamp\n                (3, 7001, '2026-03-01 14:05:00', 200.00);\n        ",
+    "sql": "\n            -- Calculate strict running ledger balance using ROWS frame to prevent peer bunching\n            SELECT \n                entry_id,\n                account_id,\n                posted_time,\n                amount,\n                -- ROWS frame evaluates row-by-row even when posted_time is identical\n                SUM(amount) OVER (\n                    PARTITION BY account_id\n                    ORDER BY posted_time, entry_id\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                ) AS running_balance\n            FROM ledger\n            ORDER BY posted_time, entry_id;\n        "
+  },
+  {
+    "id": "Q10_peer_exclusion_moving_average",
+    "title": "Window Frame Exclusion: Peer Period Average via EXCLUDE CURRENT ROW",
+    "domain": "Temporal & Time-Series",
+    "human_context": "To detect anomalous spikes, analysts compare a metric against the average of neighboring days, strictly excluding the current day's value to avoid skewing the baseline.",
+    "hidden_trap": "Computing rolling averages without excluding the current row inflates the baseline during the spike itself, hiding the anomaly.",
+    "duckdb_advantage": "DuckDB supports standard SQL:2011 window frame exclusion clauses: `EXCLUDE CURRENT ROW`.",
+    "setup_sql": "\n            CREATE TABLE daily_api_calls (\n                service_id VARCHAR,\n                call_date DATE,\n                total_calls INT\n            );\n            INSERT INTO daily_api_calls VALUES\n                ('auth-svc', '2026-03-01', 1000),\n                ('auth-svc', '2026-03-02', 1050),\n                ('auth-svc', '2026-03-03', 9500), -- Major spike\n                ('auth-svc', '2026-03-04', 1020),\n                ('auth-svc', '2026-03-05', 1010);\n        ",
+    "sql": "\n            -- Calculate 5-day baseline average strictly excluding current row\n            SELECT \n                service_id,\n                call_date,\n                total_calls,\n                -- 2 days before and 2 days after, excluding current day\n                ROUND(AVG(total_calls) OVER (\n                    PARTITION BY service_id\n                    ORDER BY call_date\n                    ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING\n                    EXCLUDE CURRENT ROW\n                ), 2) AS peer_baseline_avg,\n                -- Spikiness ratio\n                ROUND(total_calls / AVG(total_calls) OVER (\n                    PARTITION BY service_id\n                    ORDER BY call_date\n                    ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING\n                    EXCLUDE CURRENT ROW\n                ), 2) AS spike_factor\n            FROM daily_api_calls\n            ORDER BY call_date;\n        "
+  },
+  {
+    "id": "Q11_exclude_ties_ranking",
+    "title": "Excluding Ties in Percentile Ranks via EXCLUDE TIES",
+    "domain": "Temporal & Time-Series",
+    "human_context": "When evaluating employee sales performance, ties should not inflate the percentile score against colleagues who achieved the exact same result.",
+    "hidden_trap": "Using standard RANK() causes tied individuals to push each other's percentiles higher or lower inconsistently.",
+    "duckdb_advantage": "DuckDB's `EXCLUDE TIES` window frame syntax accurately handles identical duplicate metrics.",
+    "setup_sql": "\n            CREATE TABLE rep_sales (\n                rep_id INT,\n                sales_quota_achieved DECIMAL(5,2)\n            );\n            INSERT INTO rep_sales VALUES\n                (1, 120.00),\n                (2, 115.00),\n                (3, 115.00), -- Tie\n                (4, 95.00);\n        ",
+    "sql": "\n            -- Compute cumulative sales sum excluding tied peers in current row calculation\n            SELECT \n                rep_id,\n                sales_quota_achieved,\n                SUM(sales_quota_achieved) OVER (\n                    ORDER BY sales_quota_achieved DESC\n                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    EXCLUDE TIES\n                ) AS cumulative_sales_exclusive_of_ties\n            FROM rep_sales\n            ORDER BY sales_quota_achieved DESC, rep_id;\n        "
+  },
+  {
+    "id": "Q12_microsecond_latency_jitter",
+    "title": "Inter-Packet Network Arrival Jitter at Nanosecond Resolution",
+    "domain": "Temporal & Time-Series",
+    "human_context": "High-speed network telemetry measures packet arrival jitter (variance in inter-packet delay). Jitter spikes indicate network congestion or buffer bloat.",
+    "hidden_trap": "Standard SQL datetime arithmetic truncates to milliseconds or seconds, losing high-frequency microsecond microbursts.",
+    "duckdb_advantage": "DuckDB natively supports `epoch_ns` and TIMESTAMP with microsecond/nanosecond fidelity.",
+    "setup_sql": "\n            CREATE TABLE packet_stream (\n                packet_id INT,\n                captured_at TIMESTAMP\n            );\n            INSERT INTO packet_stream VALUES\n                (1, '2026-03-01 12:00:00.000100'),\n                (2, '2026-03-01 12:00:00.000150'), -- +50us\n                (3, '2026-03-01 12:00:00.000300'), -- +150us (jitter spike)\n                (4, '2026-03-01 12:00:00.000350');\n        ",
+    "sql": "\n            -- Compute inter-packet arrival delta in microseconds and identify variance\n            WITH deltas AS (\n                SELECT \n                    packet_id,\n                    captured_at,\n                    date_diff('microsecond', \n                        LAG(captured_at) OVER (ORDER BY captured_at), \n                        captured_at\n                    ) AS delta_microseconds\n                FROM packet_stream\n            )\n            SELECT \n                packet_id,\n                captured_at,\n                delta_microseconds,\n                -- Measure moving jitter variance over last 3 packets\n                ROUND(STDDEV(delta_microseconds) OVER (\n                    ORDER BY captured_at \n                    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\n                ), 2) AS rolling_jitter_stddev\n            FROM deltas\n            ORDER BY captured_at;\n        "
+  },
+  {
+    "id": "Q13_order_book_snapshot_reconstruction",
+    "title": "Point-in-Time Limit Order Book (LOB) State Reconstruction",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Market microstructure researchers need to reconstruct the exact bids and asks available at an arbitrary point in time from an append-only event stream of place, cancel, and fill orders.",
+    "hidden_trap": "Summing active orders without filtering out cancellations that occurred before the target time produces a phantom order book.",
+    "duckdb_advantage": "DuckDB can evaluate event lifespans and aggregate active depth efficiently in a single scan.",
+    "setup_sql": "\n            CREATE TABLE order_events (\n                event_id INT,\n                order_id INT,\n                event_type VARCHAR, -- 'INSERT', 'CANCEL', 'FILL'\n                side VARCHAR,       -- 'BID', 'ASK'\n                price DOUBLE,\n                quantity INT,\n                event_time TIMESTAMP\n            );\n            INSERT INTO order_events VALUES\n                (1, 101, 'INSERT', 'BID', 100.50, 10, '2026-03-01 09:30:01'),\n                (2, 102, 'INSERT', 'BID', 100.25, 20, '2026-03-01 09:30:02'),\n                (3, 101, 'CANCEL', 'BID', 100.50, 10, '2026-03-01 09:30:05'),\n                (4, 103, 'INSERT', 'BID', 100.60, 15, '2026-03-01 09:30:06');\n        ",
+    "sql": "\n            -- Reconstruct order book state at exactly 09:30:05\n            WITH snapshot_events AS (\n                SELECT *\n                FROM order_events\n                WHERE event_time <= TIMESTAMP '2026-03-01 09:30:05'\n            ),\n            active_orders AS (\n                SELECT \n                    order_id,\n                    side,\n                    price,\n                    -- Net quantity remaining after cancellations/fills\n                    SUM(CASE WHEN event_type = 'INSERT' THEN quantity ELSE -quantity END) AS remaining_qty\n                FROM snapshot_events\n                GROUP BY order_id, side, price\n                HAVING SUM(CASE WHEN event_type = 'INSERT' THEN quantity ELSE -quantity END) > 0\n            )\n            SELECT \n                side,\n                price,\n                SUM(remaining_qty) AS aggregate_depth\n            FROM active_orders\n            GROUP BY side, price\n            ORDER BY price DESC;\n        "
+  },
+  {
+    "id": "Q14_time_weighted_average_price_twap",
+    "title": "Time-Weighted Average Price (TWAP) with Variable Interval Weights",
+    "domain": "Temporal & Time-Series",
+    "human_context": "TWAP measures the average price of an asset weighted by the duration of time that each price level was sustained, preventing brief price spikes from distorting valuation.",
+    "hidden_trap": "Taking simple AVG(price) biases the result towards periods with frequent tick updates rather than sustained duration.",
+    "duckdb_advantage": "DuckDB LEAD functions cleanly calculate elapsed durations between price revisions.",
+    "setup_sql": "\n            CREATE TABLE price_ticks (\n                tick_time TIMESTAMP,\n                symbol VARCHAR,\n                price DOUBLE\n            );\n            INSERT INTO price_ticks VALUES\n                ('2026-03-01 10:00:00', 'ETH', 3000.00), -- lasted 10 min\n                ('2026-03-01 10:10:00', 'ETH', 3050.00), -- lasted 20 min\n                ('2026-03-01 10:30:00', 'ETH', 3010.00), -- lasted 30 min\n                ('2026-03-01 11:00:00', 'ETH', 3010.00); -- window end\n        ",
+    "sql": "\n            -- Calculate 1-hour TWAP from 10:00 to 11:00\n            WITH tick_durations AS (\n                SELECT \n                    symbol,\n                    tick_time,\n                    price,\n                    date_diff('second', tick_time, \n                        LEAD(tick_time, 1, TIMESTAMP '2026-03-01 11:00:00') OVER (PARTITION BY symbol ORDER BY tick_time)\n                    ) AS duration_seconds\n                FROM price_ticks\n                WHERE tick_time < TIMESTAMP '2026-03-01 11:00:00'\n            )\n            SELECT \n                symbol,\n                ROUND(SUM(price * duration_seconds) / SUM(duration_seconds), 2) AS twap_price,\n                SUM(duration_seconds) AS total_duration_seconds\n            FROM tick_durations\n            GROUP BY symbol;\n        "
+  },
+  {
+    "id": "Q15_volume_weighted_average_price_vwap",
+    "title": "Intraday Volume-Weighted Average Price (VWAP) Resetting Daily",
+    "domain": "Temporal & Time-Series",
+    "human_context": "VWAP provides institutional traders the definitive benchmark price weighted by traded volume, resetting to zero at the start of every trading day.",
+    "hidden_trap": "Failing to partition by trading date mixes multi-day volume into the intraday numerator and denominator.",
+    "duckdb_advantage": "DuckDB calculates cumulative sums in a single pass without subqueries.",
+    "setup_sql": "\n            CREATE TABLE market_trades (\n                symbol VARCHAR,\n                trade_time TIMESTAMP,\n                price DOUBLE,\n                volume INT\n            );\n            INSERT INTO market_trades VALUES\n                ('AAPL', '2026-03-01 09:35:00', 180.00, 1000),\n                ('AAPL', '2026-03-01 09:40:00', 181.00, 2000),\n                ('AAPL', '2026-03-02 09:35:00', 182.00, 500); -- Next day reset\n        ",
+    "sql": "\n            -- Intraday continuous VWAP calculation\n            SELECT \n                symbol,\n                trade_time,\n                price,\n                volume,\n                ROUND(\n                    SUM(price * volume) OVER (\n                        PARTITION BY symbol, CAST(trade_time AS DATE)\n                        ORDER BY trade_time\n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    ) / \n                    SUM(volume) OVER (\n                        PARTITION BY symbol, CAST(trade_time AS DATE)\n                        ORDER BY trade_time\n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    ), 2\n                ) AS intraday_vwap\n            FROM market_trades\n            ORDER BY symbol, trade_time;\n        "
+  },
+  {
+    "id": "Q16_sequential_funnel_precedence",
+    "title": "Chronological Multi-Stage Conversion Funnel with Time Boundaries",
+    "domain": "Temporal & Time-Series",
+    "human_context": "In product funnels (Signup -> Verify -> Purchase), events must occur in exact chronological order, with each step completed within 24 hours of the previous.",
+    "hidden_trap": "Models join events without checking timestamp ordering (e.g., verifying after purchase), artificially inflating funnel conversion.",
+    "duckdb_advantage": "DuckDB QUALIFY and chained CTEs preserve strict chronological order with pushdown predicates.",
+    "setup_sql": "\n            CREATE TABLE user_actions (\n                user_id INT,\n                stage VARCHAR,\n                action_time TIMESTAMP\n            );\n            INSERT INTO user_actions VALUES\n                (1, 'signup',   '2026-03-01 10:00:00'),\n                (1, 'verify',   '2026-03-01 11:00:00'),\n                (1, 'purchase', '2026-03-01 15:00:00'),\n                (2, 'signup',   '2026-03-01 10:00:00'),\n                (2, 'purchase', '2026-03-01 10:30:00'); -- Skipped verify\n        ",
+    "sql": "\n            -- Enforce Signup -> Verify -> Purchase chronological order\n            WITH step1 AS (\n                SELECT user_id, action_time AS signup_time\n                FROM user_actions\n                WHERE stage = 'signup'\n            ),\n            step2 AS (\n                SELECT s1.user_id, s1.signup_time, MIN(a.action_time) AS verify_time\n                FROM step1 s1\n                JOIN user_actions a \n                  ON s1.user_id = a.user_id \n                 AND a.stage = 'verify'\n                 AND a.action_time >= s1.signup_time\n                 AND a.action_time <= s1.signup_time + INTERVAL '24 hours'\n                GROUP BY s1.user_id, s1.signup_time\n            ),\n            step3 AS (\n                SELECT s2.user_id, s2.signup_time, s2.verify_time, MIN(a.action_time) AS purchase_time\n                FROM step2 s2\n                JOIN user_actions a \n                  ON s2.user_id = a.user_id \n                 AND a.stage = 'purchase'\n                 AND a.action_time >= s2.verify_time\n                 AND a.action_time <= s2.verify_time + INTERVAL '24 hours'\n                GROUP BY s2.user_id, s2.signup_time, s2.verify_time\n            )\n            SELECT \n                COUNT(s1.user_id) AS total_signups,\n                COUNT(s2.user_id) AS verified_users,\n                COUNT(s3.user_id) AS completed_purchasers,\n                ROUND(COUNT(s3.user_id) * 100.0 / COUNT(s1.user_id), 1) AS end_to_end_conversion_pct\n            FROM step1 s1\n            LEFT JOIN step2 s2 ON s1.user_id = s2.user_id\n            LEFT JOIN step3 s3 ON s1.user_id = s3.user_id;\n        "
+  },
+  {
+    "id": "Q17_retention_cohort_survival",
+    "title": "Dynamic User Retention Cohort Matrix by Weekly Milestones",
+    "domain": "Temporal & Time-Series",
+    "human_context": "SaaS analytics track weekly retention curves (Day 0, Day 7, Day 14, Day 30) based on user signup week.",
+    "hidden_trap": "Calculating retention without dynamic date grouping produces rigid, fragile queries requiring manual updates every week.",
+    "duckdb_advantage": "DuckDB date_trunc and conditional aggregation build clean dynamic cohort tables.",
+    "setup_sql": "\n            CREATE TABLE app_users (\n                user_id INT,\n                signup_date DATE\n            );\n            CREATE TABLE activity_log (\n                user_id INT,\n                activity_date DATE\n            );\n            INSERT INTO app_users VALUES\n                (1, '2026-02-01'), (2, '2026-02-01'), (3, '2026-02-08');\n            INSERT INTO activity_log VALUES\n                (1, '2026-02-01'), (1, '2026-02-08'), (1, '2026-02-15'),\n                (2, '2026-02-01'), (2, '2026-02-08'),\n                (3, '2026-02-08');\n        ",
+    "sql": "\n            -- Generate dynamic cohort retention matrix\n            SELECT \n                date_trunc('week', u.signup_date) AS cohort_week,\n                COUNT(DISTINCT u.user_id) AS cohort_size,\n                COUNT(DISTINCT CASE WHEN a.activity_date = u.signup_date THEN u.user_id END) AS day_0_active,\n                COUNT(DISTINCT CASE WHEN a.activity_date >= u.signup_date + 7 AND a.activity_date < u.signup_date + 14 THEN u.user_id END) AS day_7_active,\n                COUNT(DISTINCT CASE WHEN a.activity_date >= u.signup_date + 14 AND a.activity_date < u.signup_date + 21 THEN u.user_id END) AS day_14_active\n            FROM app_users u\n            LEFT JOIN activity_log a ON u.user_id = a.user_id\n            GROUP BY cohort_week\n            ORDER BY cohort_week;\n        "
+  },
+  {
+    "id": "Q18_time_decay_user_affinity",
+    "title": "Exponential Time-Decayed User Affinity Scoring",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Recommendation systems score user interest where recent clicks count significantly more than clicks from 30 days ago, modeled via exponential decay: score * e^(-lambda * delta_days).",
+    "hidden_trap": "Equal-weight counts overemphasize obsolete user interests from months ago.",
+    "duckdb_advantage": "DuckDB vector math supports mathematical functions (`EXP`, `POW`) directly in aggregation pipelines.",
+    "setup_sql": "\n            CREATE TABLE item_clicks (\n                user_id INT,\n                category VARCHAR,\n                click_time TIMESTAMP\n            );\n            INSERT INTO item_clicks VALUES\n                (99, 'laptops', '2026-03-01 10:00:00'), -- Today\n                (99, 'laptops', '2026-02-20 10:00:00'), -- 9 days ago\n                (99, 'shoes',   '2026-01-01 10:00:00'); -- 60 days ago\n        ",
+    "sql": "\n            -- Exponential decay affinity score with 7-day half-life (lambda = ln(2)/7 = ~0.099)\n            SELECT \n                user_id,\n                category,\n                ROUND(SUM(\n                    EXP(-0.099 * date_diff('day', click_time, TIMESTAMP '2026-03-01 12:00:00'))\n                ), 3) AS decayed_affinity_score\n            FROM item_clicks\n            GROUP BY user_id, category\n            ORDER BY decayed_affinity_score DESC;\n        "
+  },
+  {
+    "id": "Q19_intermittent_inactivity_anomaly",
+    "title": "Customer Churn Anomaly Detection vs Historical Purchase Rhythm",
+    "domain": "Temporal & Time-Series",
+    "human_context": "A customer who normally buys every 3 days is at risk if they haven't bought in 10 days. But a customer who buys quarterly is not. Churn detection must be personalized to each user's cadence.",
+    "hidden_trap": "Static 30-day churn thresholds misflag seasonal or low-frequency high-value customers.",
+    "duckdb_advantage": "DuckDB window functions compute user-specific median purchase intervals.",
+    "setup_sql": "\n            CREATE TABLE orders_history (\n                customer_id INT,\n                order_date DATE\n            );\n            INSERT INTO orders_history VALUES\n                (1, '2026-01-01'), (1, '2026-01-04'), (1, '2026-01-07'), -- Rhythm: 3 days\n                (2, '2026-01-01'), (2, '2026-02-01'), (2, '2026-03-01'); -- Rhythm: 30 days\n        ",
+    "sql": "\n            -- Calculate median inter-purchase days and compare against days elapsed since latest order\n            WITH purchase_intervals AS (\n                SELECT \n                    customer_id,\n                    order_date,\n                    order_date - LAG(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS days_between\n                FROM orders_history\n            ),\n            user_cadence AS (\n                SELECT \n                    customer_id,\n                    MAX(order_date) AS last_order_date,\n                    MEDIAN(days_between) AS median_purchase_interval_days\n                FROM purchase_intervals\n                GROUP BY customer_id\n            )\n            SELECT \n                customer_id,\n                last_order_date,\n                median_purchase_interval_days,\n                (DATE '2026-03-10' - last_order_date) AS days_since_last_order,\n                CASE \n                    WHEN (DATE '2026-03-10' - last_order_date) > (2.5 * median_purchase_interval_days) \n                    THEN 'HIGH_CHURN_RISK' \n                    ELSE 'NORMAL' \n                END AS churn_risk_status\n            FROM user_cadence\n            ORDER BY customer_id;\n        "
+  },
+  {
+    "id": "Q20_interval_overlap_concurrency",
+    "title": "Peak Concurrent Workforce Capacity via Interval Overlap Scan",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Workforce managers must calculate maximum concurrent staffing levels from employee shift start and end times to ensure warehouse safety limits are never breached.",
+    "hidden_trap": "Pairwise self-joins between overlapping shifts blow up to O(N^2) complexity.",
+    "duckdb_advantage": "Transforming shifts into discrete (+1 start, -1 end) point events reduces peak concurrency calculation to a single O(N log N) streaming pass.",
+    "setup_sql": "\n            CREATE TABLE staff_shifts (\n                shift_id INT,\n                worker_id INT,\n                start_time TIMESTAMP,\n                end_time TIMESTAMP\n            );\n            INSERT INTO staff_shifts VALUES\n                (1, 101, '2026-03-01 08:00:00', '2026-03-01 12:00:00'),\n                (2, 102, '2026-03-01 09:00:00', '2026-03-01 13:00:00'),\n                (3, 103, '2026-03-01 10:00:00', '2026-03-01 11:30:00');\n        ",
+    "sql": "\n            -- Transform start/end intervals into delta events and compute peak concurrent staffing\n            WITH shift_events AS (\n                SELECT start_time AS event_time, 1 AS delta FROM staff_shifts\n                UNION ALL\n                SELECT end_time AS event_time, -1 AS delta FROM staff_shifts\n            ),\n            running_occupancy AS (\n                SELECT \n                    event_time,\n                    SUM(delta) OVER (ORDER BY event_time, delta DESC) AS concurrent_workers\n                FROM shift_events\n            )\n            SELECT \n                MAX(concurrent_workers) AS peak_concurrent_workers\n            FROM running_occupancy;\n        "
+  },
+  {
+    "id": "Q21_temporal_gap_detection",
+    "title": "Continuous Asset Lease Unallocated Gap Discovery",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Fleet managers track commercial vehicles to find idle 'unrented' gaps between back-to-back rental contracts for fleet utilization auditing.",
+    "hidden_trap": "Comparing each row with LEAD without filtering where next_start > current_end misses adjacent non-overlapping bookings.",
+    "duckdb_advantage": "DuckDB window functions compute discrete idle intervals in a single scan.",
+    "setup_sql": "\n            CREATE TABLE vehicle_leases (\n                vehicle_id INT,\n                lease_start DATE,\n                lease_end DATE\n            );\n            INSERT INTO vehicle_leases VALUES\n                (55, '2026-01-01', '2026-01-10'),\n                (55, '2026-01-15', '2026-01-20'), -- 5 day gap (Jan 10 - Jan 15)\n                (55, '2026-01-20', '2026-01-30'); -- contiguous\n        ",
+    "sql": "\n            -- Identify idle intervals between vehicle leases\n            WITH lease_boundaries AS (\n                SELECT \n                    vehicle_id,\n                    lease_end AS gap_start,\n                    LEAD(lease_start) OVER (PARTITION BY vehicle_id ORDER BY lease_start) AS gap_end\n                FROM vehicle_leases\n            )\n            SELECT \n                vehicle_id,\n                gap_start,\n                gap_end,\n                (gap_end - gap_start) AS idle_days\n            FROM lease_boundaries\n            WHERE gap_end IS NOT NULL \n              AND gap_end > gap_start\n            ORDER BY vehicle_id, gap_start;\n        "
+  },
+  {
+    "id": "Q22_linear_interpolation_missing_points",
+    "title": "Bi-directional Linear Value Interpolation between Observations",
+    "domain": "Temporal & Time-Series",
+    "human_context": "When a sensor drops offline for 30 minutes, data scientists prefer linear interpolation between the last known reading and the next recovered reading rather than flat zero-filling.",
+    "hidden_trap": "Requires simultaneous look-behind (LAG) and look-ahead (LEAD) across varying time distances.",
+    "duckdb_advantage": "DuckDB calculates multi-point interpolation in a single query.",
+    "setup_sql": "\n            CREATE TABLE pressure_readings (\n                ts TIMESTAMP,\n                psi DOUBLE\n            );\n            INSERT INTO pressure_readings VALUES\n                ('2026-03-01 10:00:00', 100.0),\n                ('2026-03-01 10:01:00', NULL),\n                ('2026-03-01 10:02:00', NULL),\n                ('2026-03-01 10:03:00', 130.0);\n        ",
+    "sql": "\n            -- Linearly interpolate missing PSI values based on preceding and following known points\n            WITH bounds AS (\n                SELECT \n                    ts,\n                    psi,\n                    LAST_VALUE(psi IGNORE NULLS) OVER (ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS prev_psi,\n                    LAST_VALUE(ts IGNORE NULLS) OVER (ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS prev_ts,\n                    FIRST_VALUE(psi IGNORE NULLS) OVER (ORDER BY ts ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS next_psi,\n                    FIRST_VALUE(ts IGNORE NULLS) OVER (ORDER BY ts ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS next_ts\n                FROM pressure_readings\n            )\n            SELECT \n                ts,\n                psi AS raw_psi,\n                CASE \n                    WHEN psi IS NOT NULL THEN psi\n                    ELSE ROUND(\n                        prev_psi + (next_psi - prev_psi) * \n                        (date_diff('second', prev_ts, ts) * 1.0 / date_diff('second', prev_ts, next_ts)), 2\n                    )\n                END AS interpolated_psi\n            FROM bounds\n            ORDER BY ts;\n        "
+  },
+  {
+    "id": "Q23_trimmed_mean_rolling_window",
+    "title": "Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Financial risk models compute a 7-day rolling average excluding the highest and lowest single observations in each 7-day window to eliminate transient flash crashes.",
+    "hidden_trap": "Writing self-joins with sub-aggregations to filter min/max results in huge query execution trees.",
+    "duckdb_advantage": "DuckDB window functions compute rolling sum, min, and max in parallel O(1) passes.",
+    "setup_sql": "\n            CREATE TABLE daily_settlement (\n                trade_date DATE,\n                settlement_amount DOUBLE\n            );\n            INSERT INTO daily_settlement VALUES\n                ('2026-03-01', 50.0),\n                ('2026-03-02', 52.0),\n                ('2026-03-03', 500.0), -- Flash spike outlier\n                ('2026-03-04', 51.0),\n                ('2026-03-05', 49.0);\n        ",
+    "sql": "\n            -- Calculate trimmed rolling mean excluding min and max values within a 5-day window\n            WITH windowed_stats AS (\n                SELECT \n                    trade_date,\n                    settlement_amount,\n                    COUNT(*) OVER w AS win_count,\n                    SUM(settlement_amount) OVER w AS win_sum,\n                    MIN(settlement_amount) OVER w AS win_min,\n                    MAX(settlement_amount) OVER w AS win_max\n                FROM daily_settlement\n                WINDOW w AS (ORDER BY trade_date ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING)\n            )\n            SELECT \n                trade_date,\n                settlement_amount,\n                -- Subtract min and max from sum and divide by (count - 2)\n                CASE \n                    WHEN win_count > 2 THEN ROUND((win_sum - win_min - win_max) / (win_count - 2), 2)\n                    ELSE settlement_amount\n                END AS trimmed_mean_5d\n            FROM windowed_stats\n            ORDER BY trade_date;\n        "
+  },
+  {
+    "id": "Q24_sargable_fiscal_partition_prune",
+    "title": "SARGable Fiscal Year Date Range Partition Pruning",
+    "domain": "Temporal & Time-Series",
+    "human_context": "Data warehouses partition petabyte event tables by date. Wrapping date columns in functions (e.g. `WHERE strftime('%Y', event_time) = '2026'`) breaks partition pruning, forcing a full table scan.",
+    "hidden_trap": "Non-SARGable functions force DuckDB/Snowflake to scan every Parquet row group.",
+    "duckdb_advantage": "Direct boundary comparison (`>= '2026-01-01' AND < '2027-01-01'`) allows DuckDB to prune Parquet files via metadata statistics.",
+    "setup_sql": "\n            CREATE TABLE telemetry_partitions (\n                event_id INT,\n                event_timestamp TIMESTAMP,\n                payload VARCHAR\n            );\n            INSERT INTO telemetry_partitions VALUES\n                (1, '2025-12-31 23:59:59', 'old'),\n                (2, '2026-01-01 00:00:00', 'target_start'),\n                (3, '2026-06-15 12:00:00', 'target_mid'),\n                (4, '2027-01-01 00:00:00', 'out_of_bounds');\n        ",
+    "sql": "\n            -- Exact SARGable half-open date boundary pruning\n            SELECT \n                event_id,\n                event_timestamp,\n                payload\n            FROM telemetry_partitions\n            WHERE event_timestamp >= TIMESTAMP '2026-01-01 00:00:00'\n              AND event_timestamp <  TIMESTAMP '2027-01-01 00:00:00'\n            ORDER BY event_timestamp;\n        "
+  },
+  {
+    "id": "Q25_multi_touch_marketing_attribution",
+    "title": "Multi-Touch Marketing Attribution Comparison in a Single Pass",
+    "domain": "Temporal & Time-Series",
+    "human_context": "CMOs need to compare 3 attribution models (First-Touch, Last-Touch, and Uniform Linear) for touchpoints occurring within 30 days prior to conversion.",
+    "hidden_trap": "Running three separate join queries triples warehouse compute costs and risks data inconsistency.",
+    "duckdb_advantage": "DuckDB window functions compute First-Touch, Last-Touch, and touchpoint counts simultaneously in one query.",
+    "setup_sql": "\n            CREATE TABLE ad_clicks (\n                user_id INT,\n                channel VARCHAR,\n                click_time TIMESTAMP\n            );\n            CREATE TABLE conversions (\n                user_id INT,\n                conversion_time TIMESTAMP,\n                revenue DECIMAL(10,2)\n            );\n            INSERT INTO ad_clicks VALUES\n                (10, 'Google Search', '2026-03-01 09:00:00'),\n                (10, 'Facebook Ad',   '2026-03-05 14:00:00'),\n                (10, 'Email Promo',   '2026-03-10 18:00:00');\n            INSERT INTO conversions VALUES\n                (10, '2026-03-11 10:00:00', 300.00);\n        ",
+    "sql": "\n            -- Multi-touch attribution comparison (First-touch, Last-touch, Linear)\n            WITH eligible_touches AS (\n                SELECT \n                    c.user_id,\n                    c.revenue,\n                    a.channel,\n                    a.click_time,\n                    ROW_NUMBER() OVER (PARTITION BY c.user_id ORDER BY a.click_time ASC) AS touch_asc,\n                    ROW_NUMBER() OVER (PARTITION BY c.user_id ORDER BY a.click_time DESC) AS touch_desc,\n                    COUNT(*) OVER (PARTITION BY c.user_id) AS total_touches\n                FROM conversions c\n                JOIN ad_clicks a \n                  ON c.user_id = a.user_id \n                 AND a.click_time >= c.conversion_time - INTERVAL '30 days'\n                 AND a.click_time <= c.conversion_time\n            )\n            SELECT \n                channel,\n                -- First Touch: 100% credit if first\n                SUM(CASE WHEN touch_asc = 1 THEN revenue ELSE 0 END) AS first_touch_revenue,\n                -- Last Touch: 100% credit if last\n                SUM(CASE WHEN touch_desc = 1 THEN revenue ELSE 0 END) AS last_touch_revenue,\n                -- Linear: Equal credit across all touchpoints\n                ROUND(SUM(revenue / total_touches), 2) AS linear_touch_revenue\n            FROM eligible_touches\n            GROUP BY channel\n            ORDER BY channel;\n        "
+  },
+  {
+    "id": "Q26_cosine_similarity_top_k",
+    "title": "Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)",
+    "domain": "Vector & Embeddings",
+    "human_context": "When a user asks a question in an AI assistant, the query is embedded into a dense vector (e.g. 4-dimensional here for illustration, or 384/1536 in prod). We retrieve the top most semantically relevant documentation chunks.",
+    "hidden_trap": "Models frequently try to calculate cosine similarity manually using dot product divided by norms in SQL, which is slow, verbose, and numerically unstable with zero vectors.",
+    "duckdb_advantage": "DuckDB has high-performance native SIMD-accelerated `array_cosine_similarity(a, b)` over fixed-size arrays `FLOAT[N]`.",
+    "setup_sql": "\n            CREATE TABLE doc_embeddings (\n                doc_id INT,\n                title VARCHAR,\n                embedding FLOAT[4]\n            );\n            INSERT INTO doc_embeddings VALUES\n                (1, 'DuckDB Architecture Overview', [0.9, 0.1, 0.2, 0.0]::FLOAT[4]),\n                (2, 'PostgreSQL Vacuum Internals',  [0.1, 0.8, 0.3, 0.1]::FLOAT[4]),\n                (3, 'Vector Search & Embeddings',   [0.85, 0.15, 0.3, 0.05]::FLOAT[4]),\n                (4, 'Kafka Event Streaming Guide',  [0.0, 0.2, 0.9, 0.4]::FLOAT[4]);\n        ",
+    "sql": "\n            -- Find the top 2 documents closest to the query embedding [0.9, 0.1, 0.25, 0.0]\n            WITH scored_docs AS (\n                SELECT \n                    doc_id,\n                    title,\n                    embedding,\n                    -- Native SIMD cosine similarity\n                    array_cosine_similarity(embedding, [0.9, 0.1, 0.25, 0.0]::FLOAT[4]) AS cosine_score\n                FROM doc_embeddings\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(cosine_score, 4) AS similarity_score\n            FROM scored_docs\n            ORDER BY cosine_score DESC\n            LIMIT 2;\n        "
+  },
+  {
+    "id": "Q27_euclidean_l2_nearest_neighbors",
+    "title": "L2 Euclidean Distance Nearest Neighbors Search via array_distance",
+    "domain": "Vector & Embeddings",
+    "human_context": "In computer vision feature retrieval (facial recognition, product image matching), feature vectors are compared using Euclidean (L2) distance where lower distance equals higher visual similarity.",
+    "hidden_trap": "LLMs often try to write SQRT(SUM(POW(a - b, 2))) which prevents vectorized hardware acceleration.",
+    "duckdb_advantage": "DuckDB provides native `array_distance(a, b)` for Euclidean L2 metric calculation.",
+    "setup_sql": "\n            CREATE TABLE image_features (\n                image_id INT,\n                label VARCHAR,\n                vector FLOAT[3]\n            );\n            INSERT INTO image_features VALUES\n                (101, 'Red Running Shoe',  [1.0, 2.0, 3.0]::FLOAT[3]),\n                (102, 'Crimson Sneaker',   [1.1, 2.1, 2.9]::FLOAT[3]),\n                (103, 'Blue Hiking Boot',  [5.0, 8.0, 9.0]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Find visual nearest neighbors to query image vector [1.05, 2.05, 3.0]\n            SELECT \n                image_id,\n                label,\n                ROUND(array_distance(vector, [1.05, 2.05, 3.0]::FLOAT[3]), 4) AS l2_distance\n            FROM image_features\n            ORDER BY l2_distance ASC\n            LIMIT 2;\n        "
+  },
+  {
+    "id": "Q28_inner_product_mips",
+    "title": "Maximum Inner Product Search (MIPS) for Normalized Embeddings",
+    "domain": "Vector & Embeddings",
+    "human_context": "For unit-normalized vectors (e.g. OpenAI text-embedding-3 or Cohere embeddings), cosine similarity is identical to the inner product (dot product), which executes even faster.",
+    "hidden_trap": "Re-normalizing vectors in every query wastes compute when embeddings are pre-normalized upon insertion.",
+    "duckdb_advantage": "DuckDB native `array_inner_product(a, b)` provides the fastest dot-product vector scoring path.",
+    "setup_sql": "\n            CREATE TABLE product_catalog_vectors (\n                product_id INT,\n                product_name VARCHAR,\n                norm_vector FLOAT[3]\n            );\n            INSERT INTO product_catalog_vectors VALUES\n                (1, 'Ultra Laptop', [0.8, 0.6, 0.0]::FLOAT[3]),\n                (2, 'Smart Phone',  [0.6, 0.8, 0.0]::FLOAT[3]),\n                (3, 'Coffee Maker', [0.0, 0.0, 1.0]::FLOAT[3]);\n        ",
+    "sql": "\n            -- MIPS search for normalized user query vector [0.85, 0.52, 0.0]\n            SELECT \n                product_id,\n                product_name,\n                ROUND(array_inner_product(norm_vector, [0.85, 0.52, 0.0]::FLOAT[3]), 4) AS dot_product_score\n            FROM product_catalog_vectors\n            ORDER BY dot_product_score DESC\n            LIMIT 2;\n        "
+  },
+  {
+    "id": "Q29_pre_filter_vs_post_filter_trap",
+    "title": "The Pre-Filtering Trap: Relational Predicates with Vector Top-K",
+    "domain": "Vector & Embeddings",
+    "human_context": "A user searches for 'cheap mechanical keyboard under $50'. If you run vector search Top-K first and filter by price afterwards (post-filtering), you may return zero products because all top-5 matches were $150 keyboards.",
+    "hidden_trap": "Post-filtering vector results breaks recall. Relational constraints (in-stock, price bounds, user tenant_id) must be evaluated as PRE-FILTERS before Top-K ranking.",
+    "duckdb_advantage": "DuckDB seamlessly pushes relational filters directly into the scan before computing expensive vector distances.",
+    "setup_sql": "\n            CREATE TABLE inventory_items (\n                item_id INT,\n                name VARCHAR,\n                price DECIMAL(10,2),\n                in_stock BOOLEAN,\n                vector FLOAT[3]\n            );\n            INSERT INTO inventory_items VALUES\n                (1, 'Custom Mechanical Keyboard', 180.00, true,  [0.9, 0.1, 0.1]::FLOAT[3]),\n                (2, 'Budget Gaming Keyboard',       45.00, true,  [0.85, 0.15, 0.1]::FLOAT[3]),\n                (3, 'Cheap Office Keyboard',        25.00, true,  [0.8, 0.2, 0.1]::FLOAT[3]),\n                (4, 'Out of Stock Keyboard',        35.00, false, [0.92, 0.1, 0.1]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Pre-filtered vector search: strictly in-stock and under $50 BEFORE ranking top 2\n            SELECT \n                item_id,\n                name,\n                price,\n                ROUND(array_cosine_similarity(vector, [0.9, 0.1, 0.1]::FLOAT[3]), 4) AS similarity\n            FROM inventory_items\n            WHERE in_stock = true\n              AND price <= 50.00\n            ORDER BY similarity DESC\n            LIMIT 2;\n        "
+  },
+  {
+    "id": "Q30_adaptive_similarity_threshold",
+    "title": "Adaptive Similarity Thresholding with Fallback Top-K Guarantee",
+    "domain": "Vector & Embeddings",
+    "human_context": "RAG systems want high-confidence matches (similarity > 0.85) to avoid hallucinations, but if no document exceeds 0.85, they need a guaranteed top-1 fallback to provide at least some context.",
+    "hidden_trap": "A hard WHERE similarity > 0.85 yields empty sets, while a raw LIMIT 5 includes irrelevant noise.",
+    "duckdb_advantage": "DuckDB window functions and conditional filtering allow hybrid thresholding in a single query.",
+    "setup_sql": "\n            CREATE TABLE knowledge_base (\n                kb_id INT,\n                content VARCHAR,\n                vector FLOAT[3]\n            );\n            INSERT INTO knowledge_base VALUES\n                (1, 'DuckDB uses columnar storage', [0.4, 0.4, 0.1]::FLOAT[3]),\n                (2, 'DuckDB vector execution engine', [0.5, 0.3, 0.2]::FLOAT[3]),\n                (3, 'French cuisine recipes',        [0.0, 0.1, 0.9]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Score items, guarantee top 1 fallback even if below 0.85 threshold\n            WITH scored AS (\n                SELECT \n                    kb_id,\n                    content,\n                    array_cosine_similarity(vector, [0.9, 0.2, 0.1]::FLOAT[3]) AS sim_score,\n                    ROW_NUMBER() OVER (ORDER BY array_cosine_similarity(vector, [0.9, 0.2, 0.1]::FLOAT[3]) DESC) AS rank_pos\n                FROM knowledge_base\n            )\n            SELECT \n                kb_id,\n                content,\n                ROUND(sim_score, 4) AS sim_score,\n                rank_pos,\n                CASE WHEN sim_score >= 0.85 THEN 'CONFIDENT_MATCH' ELSE 'FALLBACK_TOP_MATCH' END AS match_type\n            FROM scored\n            WHERE sim_score >= 0.85 OR rank_pos = 1\n            ORDER BY rank_pos;\n        "
+  },
+  {
+    "id": "Q31_semantic_deduplication_support_tickets",
+    "title": "Semantic Deduplication of IT Incident Tickets via Vector Cosine Threshold",
+    "domain": "Vector & Embeddings",
+    "human_context": "During service outages, hundreds of users submit identically phrased IT support tickets ('login down', 'cannot access account'). Clustering tickets with vector similarity > 0.88 consolidates duplicates into a single incident.",
+    "hidden_trap": "Quadratic N x N self-joins without ordering check (`t1.id < t2.id`) double compute and compare tickets to themselves.",
+    "duckdb_advantage": "Triangle inequality pruning and symmetric self-join filtering in DuckDB.",
+    "setup_sql": "\n            CREATE TABLE support_tickets (\n                ticket_id INT,\n                subject VARCHAR,\n                vector FLOAT[3]\n            );\n            INSERT INTO support_tickets VALUES\n                (1, 'Cannot log into customer portal',  [0.9, 0.1, 0.0]::FLOAT[3]),\n                (2, 'Portal login failing with 500 error', [0.89, 0.12, 0.01]::FLOAT[3]),\n                (3, 'Billing address invoice update',   [0.1, 0.8, 0.2]::FLOAT[3]),\n                (4, 'Unable to authenticate on website', [0.91, 0.09, 0.02]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Detect duplicate ticket pairs with cosine similarity >= 0.88\n            SELECT \n                t1.ticket_id AS primary_ticket_id,\n                t1.subject AS primary_subject,\n                t2.ticket_id AS duplicate_ticket_id,\n                t2.subject AS duplicate_subject,\n                ROUND(array_cosine_similarity(t1.vector, t2.vector), 4) AS similarity\n            FROM support_tickets t1\n            JOIN support_tickets t2 \n              ON t1.ticket_id < t2.ticket_id -- strictly upper triangle to avoid duplicates and self-matching\n             AND array_cosine_similarity(t1.vector, t2.vector) >= 0.88\n            ORDER BY similarity DESC;\n        "
+  },
+  {
+    "id": "Q32_near_duplicate_product_catalog",
+    "title": "Multi-Merchant Near-Duplicate Catalog Resolution with Price Consistency",
+    "domain": "Vector & Embeddings",
+    "human_context": "Marketplaces aggregate catalogs from thousands of sellers. Matching identical items requires high semantic vector similarity AND compatible price bounds (e.g. price within 20%).",
+    "hidden_trap": "Vector similarity alone matches accessories to main products; price filtering alone matches unrelated items.",
+    "duckdb_advantage": "DuckDB combines vector math and arithmetic bounds in a single joint execution predicate.",
+    "setup_sql": "\n            CREATE TABLE merchant_catalog (\n                sku_id INT,\n                merchant VARCHAR,\n                title VARCHAR,\n                price DECIMAL(10,2),\n                vector FLOAT[3]\n            );\n            INSERT INTO merchant_catalog VALUES\n                (1, 'Merchant A', 'Sony WH-1000XM5 Noise-Cancelling Headphones', 349.99, [0.95, 0.1, 0.05]::FLOAT[3]),\n                (2, 'Merchant B', 'Sony WH1000XM5 Wireless Headset - Black',     339.00, [0.94, 0.12, 0.04]::FLOAT[3]),\n                (3, 'Merchant C', 'Sony Headphone Replacement Ear Cushions',       29.99, [0.88, 0.2, 0.1]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Match identical product listings across merchants (high similarity + price within 20%)\n            SELECT \n                a.sku_id AS sku_a,\n                a.merchant AS merchant_a,\n                a.title AS title_a,\n                b.sku_id AS sku_b,\n                b.merchant AS merchant_b,\n                b.title AS title_b,\n                ROUND(array_cosine_similarity(a.vector, b.vector), 4) AS similarity,\n                ROUND(ABS(a.price - b.price) / a.price * 100, 1) AS price_difference_pct\n            FROM merchant_catalog a\n            JOIN merchant_catalog b\n              ON a.sku_id < b.sku_id\n             AND a.merchant != b.merchant\n             AND array_cosine_similarity(a.vector, b.vector) >= 0.90\n             AND ABS(a.price - b.price) <= (0.20 * a.price)\n            ORDER BY similarity DESC;\n        "
+  },
+  {
+    "id": "Q33_colbert_late_interaction_maxsim",
+    "title": "ColBERT Multi-Vector Late Interaction (MaxSim) in Pure SQL",
+    "domain": "Vector & Embeddings",
+    "human_context": "Advanced retrieval models (ColBERT / Sanity) represent queries and documents as collections of token vectors. Scoring computes MaxSim: for each query token, take the maximum cosine similarity across all document tokens, then sum.",
+    "hidden_trap": "Implementing late interaction typically requires specialized Python tensor pipelines.",
+    "duckdb_advantage": "DuckDB can compute multi-vector token interactions, grouping by query token and document ID in vectorized SQL.",
+    "setup_sql": "\n            CREATE TABLE query_tokens (\n                q_token_id INT,\n                token_text VARCHAR,\n                vec FLOAT[2]\n            );\n            CREATE TABLE doc_token_embeddings (\n                doc_id INT,\n                d_token_id INT,\n                token_text VARCHAR,\n                vec FLOAT[2]\n            );\n            -- Query: \"fast database\"\n            INSERT INTO query_tokens VALUES\n                (1, 'fast',     [1.0, 0.0]::FLOAT[2]),\n                (2, 'database', [0.0, 1.0]::FLOAT[2]);\n            -- Document 10: \"quick relational store\"\n            INSERT INTO doc_token_embeddings VALUES\n                (10, 1, 'quick',      [0.9, 0.1]::FLOAT[2]),\n                (10, 2, 'relational', [0.1, 0.85]::FLOAT[2]),\n                (10, 3, 'store',      [0.2, 0.7]::FLOAT[2]);\n        ",
+    "sql": "\n            -- ColBERT MaxSim calculation: SUM_q( MAX_d( sim(q, d) ) )\n            WITH token_sims AS (\n                SELECT \n                    q.q_token_id,\n                    q.token_text AS q_token,\n                    d.doc_id,\n                    d.token_text AS d_token,\n                    array_cosine_similarity(q.vec, d.vec) AS sim\n                FROM query_tokens q\n                CROSS JOIN doc_token_embeddings d\n            ),\n            max_sim_per_query_token AS (\n                SELECT \n                    doc_id,\n                    q_token_id,\n                    MAX(sim) AS max_token_sim\n                FROM token_sims\n                GROUP BY doc_id, q_token_id\n            )\n            SELECT \n                doc_id,\n                ROUND(SUM(max_token_sim), 4) AS colbert_maxsim_score\n            FROM max_sim_per_query_token\n            GROUP BY doc_id\n            ORDER BY colbert_maxsim_score DESC;\n        "
+  },
+  {
+    "id": "Q34_user_profile_embedding_centroid",
+    "title": "User Profile Preference Vector Centroid Aggregation",
+    "domain": "Vector & Embeddings",
+    "human_context": "To personalize feeds, recommendation engines compute a dynamic user preference vector by calculating the average centroid of the embeddings of products the user clicked in the last 7 days.",
+    "hidden_trap": "SQL standard lacks native array averaging; unnesting arrays without proper positional indexes scrambles vector dimensions.",
+    "duckdb_advantage": "DuckDB array indexing and UNNEST WITH ORDINALITY allow dimension-wise vector averaging.",
+    "setup_sql": "\n            CREATE TABLE user_clicks_vectors (\n                user_id INT,\n                item_id INT,\n                item_vector FLOAT[3]\n            );\n            INSERT INTO user_clicks_vectors VALUES\n                (42, 1, [0.8, 0.2, 0.1]::FLOAT[3]),\n                (42, 2, [0.6, 0.4, 0.2]::FLOAT[3]),\n                (42, 3, [0.7, 0.3, 0.3]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Calculate element-wise centroid vector for user 42\n            WITH unnested_dims AS (\n                SELECT \n                    user_id,\n                    item_id,\n                    UNNEST(item_vector) AS val,\n                    GENERATE_SUBSCRIPTS(item_vector, 1) AS dim_idx\n                FROM user_clicks_vectors\n            ),\n            avg_dims AS (\n                SELECT \n                    user_id,\n                    dim_idx,\n                    ROUND(AVG(val), 4) AS avg_dim_val\n                FROM unnested_dims\n                GROUP BY user_id, dim_idx\n                ORDER BY user_id, dim_idx\n            )\n            SELECT \n                user_id,\n                LIST(avg_dim_val)::FLOAT[3] AS user_preference_centroid\n            FROM avg_dims\n            GROUP BY user_id;\n        "
+  },
+  {
+    "id": "Q35_kmeans_cluster_assignment_step",
+    "title": "K-Means Clustering Assignment and Centroid Update in Pure SQL",
+    "domain": "Vector & Embeddings",
+    "human_context": "Unsupervised customer segmentation can be run directly inside DuckDB by assigning customer vectors to the nearest centroid and recomputing cluster means in a single query.",
+    "hidden_trap": "Running ML clustering outside the warehouse requires exporting millions of vectors over the network.",
+    "duckdb_advantage": "DuckDB computes distance matrices and partition centroids natively at memory bandwidth speeds.",
+    "setup_sql": "\n            CREATE TABLE cluster_centroids (\n                cluster_id INT,\n                center FLOAT[2]\n            );\n            CREATE TABLE data_points (\n                point_id INT,\n                coord FLOAT[2]\n            );\n            INSERT INTO cluster_centroids VALUES\n                (1, [1.0, 1.0]::FLOAT[2]),\n                (2, [8.0, 8.0]::FLOAT[2]);\n            INSERT INTO data_points VALUES\n                (101, [1.2, 0.9]::FLOAT[2]),\n                (102, [1.5, 1.1]::FLOAT[2]),\n                (103, [7.8, 8.2]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Step 1: Assign each point to the closest cluster centroid via array_distance\n            WITH point_distances AS (\n                SELECT \n                    p.point_id,\n                    p.coord,\n                    c.cluster_id,\n                    array_distance(p.coord, c.center) AS dist,\n                    ROW_NUMBER() OVER (PARTITION BY p.point_id ORDER BY array_distance(p.coord, c.center) ASC) AS rank_closest\n                FROM data_points p\n                CROSS JOIN cluster_centroids c\n            )\n            SELECT \n                point_id,\n                cluster_id AS assigned_cluster,\n                ROUND(dist, 4) AS distance_to_center\n            FROM point_distances\n            WHERE rank_closest = 1\n            ORDER BY point_id;\n        "
+  },
+  {
+    "id": "Q36_knn_vector_anomaly_detection",
+    "title": "Vector Anomaly Detection via Average K-Nearest Neighbor Distance",
+    "domain": "Vector & Embeddings",
+    "human_context": "Anomalous sensor readings or fraudulent transaction vectors reside in sparse regions of the embedding space. Measuring the average distance to a vector's 3 nearest neighbors flags outliers.",
+    "hidden_trap": "Setting a global static distance threshold fails when data clusters have variable local densities.",
+    "duckdb_advantage": "DuckDB window functions compute localized k-NN distances per entity without external libraries.",
+    "setup_sql": "\n            CREATE TABLE transaction_embeddings (\n                tx_id INT,\n                vec FLOAT[2]\n            );\n            -- Normal cluster around (0,0); tx_id 4 is an outlier at (10, 10)\n            INSERT INTO transaction_embeddings VALUES\n                (1, [0.05, 0.02]::FLOAT[2]),\n                (2, [0.01, 0.04]::FLOAT[2]),\n                (3, [0.03, 0.01]::FLOAT[2]),\n                (4, [10.0, 10.0]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Calculate average distance to 2 nearest neighbors to score anomaly level\n            WITH pairwise_distances AS (\n                SELECT \n                    a.tx_id,\n                    b.tx_id AS neighbor_id,\n                    array_distance(a.vec, b.vec) AS dist,\n                    ROW_NUMBER() OVER (PARTITION BY a.tx_id ORDER BY array_distance(a.vec, b.vec) ASC) AS k_rank\n                FROM transaction_embeddings a\n                JOIN transaction_embeddings b ON a.tx_id != b.tx_id\n            ),\n            knn_avg AS (\n                SELECT \n                    tx_id,\n                    AVG(dist) AS mean_2nn_distance\n                FROM pairwise_distances\n                WHERE k_rank <= 2\n                GROUP BY tx_id\n            )\n            SELECT \n                tx_id,\n                ROUND(mean_2nn_distance, 4) AS outlier_score,\n                CASE WHEN mean_2nn_distance > 5.0 THEN 'ANOMALOUS_OUTLIER' ELSE 'NORMAL' END AS classification\n            FROM knn_avg\n            ORDER BY outlier_score DESC;\n        "
+  },
+  {
+    "id": "Q37_hybrid_relational_vector_cohort_join",
+    "title": "Cohort-Constrained Vector Match with Geographical Regionality",
+    "domain": "Vector & Embeddings",
+    "human_context": "Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personality/skill compatibility joined with strict relational geographic and category boundaries.",
+    "hidden_trap": "Matching vectors globally without partitioning by region produces candidates located 3,000 miles away.",
+    "duckdb_advantage": "DuckDB joins relational partitions (region = 'NA-WEST') directly with vector distance.",
+    "setup_sql": "\n            CREATE TABLE candidates (\n                candidate_id INT,\n                region VARCHAR,\n                skills_vec FLOAT[3]\n            );\n            CREATE TABLE job_openings (\n                job_id INT,\n                region VARCHAR,\n                required_vec FLOAT[3]\n            );\n            INSERT INTO candidates VALUES\n                (1, 'US-WEST', [0.8, 0.5, 0.2]::FLOAT[3]),\n                (2, 'EU-CENTRAL', [0.85, 0.5, 0.2]::FLOAT[3]);\n            INSERT INTO job_openings VALUES\n                (101, 'US-WEST', [0.82, 0.48, 0.18]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Match jobs to candidates strictly within matching geographical region ordered by skill compatibility\n            SELECT \n                j.job_id,\n                j.region,\n                c.candidate_id,\n                ROUND(array_cosine_similarity(c.skills_vec, j.required_vec), 4) AS skill_fit_score\n            FROM job_openings j\n            JOIN candidates c\n              ON j.region = c.region\n            ORDER BY skill_fit_score DESC;\n        "
+  },
+  {
+    "id": "Q38_multimodal_image_text_fusion",
+    "title": "Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)",
+    "domain": "Vector & Embeddings",
+    "human_context": "In e-commerce search, users submit a photo and a text clarification (e.g. photo of dress + 'in floral silk'). We compute a weighted combination of image-vector and text-vector similarity.",
+    "hidden_trap": "Treating text and image vectors as independent queries yields conflicting rank lists.",
+    "duckdb_advantage": "DuckDB can evaluate multiple vector distance functions in a single projection pass.",
+    "setup_sql": "\n            CREATE TABLE fashion_items (\n                item_id INT,\n                title VARCHAR,\n                img_vec FLOAT[2],\n                txt_vec FLOAT[2]\n            );\n            INSERT INTO fashion_items VALUES\n                (1, 'Silk Floral Summer Dress', [0.8, 0.2]::FLOAT[2], [0.9, 0.1]::FLOAT[2]),\n                (2, 'Cotton Floral Blouse',    [0.75, 0.25]::FLOAT[2], [0.6, 0.4]::FLOAT[2]),\n                (3, 'Leather Biker Jacket',    [0.1, 0.9]::FLOAT[2], [0.0, 1.0]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Joint multi-modal score: 60% image vector similarity + 40% text vector similarity\n            SELECT \n                item_id,\n                title,\n                ROUND(array_cosine_similarity(img_vec, [0.82, 0.18]::FLOAT[2]), 4) AS img_sim,\n                ROUND(array_cosine_similarity(txt_vec, [0.92, 0.08]::FLOAT[2]), 4) AS txt_sim,\n                ROUND(\n                    0.60 * array_cosine_similarity(img_vec, [0.82, 0.18]::FLOAT[2]) +\n                    0.40 * array_cosine_similarity(txt_vec, [0.92, 0.08]::FLOAT[2]), 4\n                ) AS joint_multimodal_score\n            FROM fashion_items\n            ORDER BY joint_multimodal_score DESC;\n        "
+  },
+  {
+    "id": "Q39_maximal_marginal_relevance_mmr",
+    "title": "Maximal Marginal Relevance (MMR) Diversity Reranking in SQL",
+    "domain": "Vector & Embeddings",
+    "human_context": "Standard vector retrieval often returns 5 virtually identical articles. MMR penalizes redundancy by selecting documents that are similar to the query but dissimilar to already-selected documents.",
+    "hidden_trap": "Pure relevance search creates echo-chamber search results with zero content diversity.",
+    "duckdb_advantage": "DuckDB can compute inter-candidate similarity matrix in memory to penalize redundancy.",
+    "setup_sql": "\n            CREATE TABLE news_articles (\n                article_id INT,\n                headline VARCHAR,\n                vec FLOAT[2]\n            );\n            INSERT INTO news_articles VALUES\n                (1, 'Fed cuts interest rates by 25 bps',      [0.99, 0.05]::FLOAT[2]),\n                (2, 'Central bank lowers benchmark 25 bps',   [0.98, 0.06]::FLOAT[2]), -- Redundant clone\n                (3, 'Tech stock rally follows monetary shift', [0.80, 0.45]::FLOAT[2]); -- Diverse relevant\n        ",
+    "sql": "\n            -- First candidate is highest query similarity; score subsequent candidates by query sim minus similarity to article 1\n            WITH ranked_candidates AS (\n                SELECT \n                    article_id,\n                    headline,\n                    vec,\n                    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) AS query_sim\n                FROM news_articles\n            )\n            SELECT \n                c.article_id,\n                c.headline,\n                ROUND(c.query_sim, 4) AS query_relevance,\n                ROUND(array_cosine_similarity(c.vec, top1.vec), 4) AS redundancy_with_top1,\n                -- MMR formula: 0.7 * Sim(doc, query) - 0.3 * Sim(doc, top1)\n                ROUND(0.7 * c.query_sim - 0.3 * array_cosine_similarity(c.vec, top1.vec), 4) AS mmr_score\n            FROM ranked_candidates c\n            CROSS JOIN (SELECT vec FROM ranked_candidates ORDER BY query_sim DESC LIMIT 1) top1\n            ORDER BY mmr_score DESC;\n        "
+  },
+  {
+    "id": "Q40_cosine_matrix_cluster_pruning",
+    "title": "Pairwise Vector Similarity Self-Join with Coarse Cluster Pruning",
+    "domain": "Vector & Embeddings",
+    "human_context": "Finding all similar document pairs across 100,000 docs is O(N^2) (10 billion checks). Partitioning into coarse category buckets first reduces search to O(N * (N/K)).",
+    "hidden_trap": "Unpartitioned cross joins cause out-of-memory crashes on analytical engines.",
+    "duckdb_advantage": "DuckDB evaluates equi-join partition keys before computing array_cosine_similarity.",
+    "setup_sql": "\n            CREATE TABLE corpus (\n                doc_id INT,\n                bucket_id INT,\n                vector FLOAT[2]\n            );\n            INSERT INTO corpus VALUES\n                (1, 10, [0.9, 0.1]::FLOAT[2]),\n                (2, 10, [0.88, 0.12]::FLOAT[2]),\n                (3, 20, [0.1, 0.9]::FLOAT[2]),\n                (4, 20, [0.12, 0.88]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Pairwise similarity evaluated ONLY within shared bucket partitions\n            SELECT \n                a.doc_id AS doc_a,\n                b.doc_id AS doc_b,\n                a.bucket_id,\n                ROUND(array_cosine_similarity(a.vector, b.vector), 4) AS similarity\n            FROM corpus a\n            JOIN corpus b\n              ON a.bucket_id = b.bucket_id\n             AND a.doc_id < b.doc_id\n            WHERE array_cosine_similarity(a.vector, b.vector) >= 0.85\n            ORDER BY similarity DESC;\n        "
+  },
+  {
+    "id": "Q41_collaborative_filtering_latent_dot",
+    "title": "Latent Factor Matrix Factorization Dot Product Recommendation",
+    "domain": "Vector & Embeddings",
+    "human_context": "Matrix factorization (SVD / ALS) maps users and movies to latent factor vectors. Predicted rating is dot product of user vector and movie vector plus user and movie bias terms.",
+    "hidden_trap": "Omitting bias terms causes popular movies to be underrated and niche items to be overrated.",
+    "duckdb_advantage": "DuckDB can evaluate latent factor dot products combined with additive scalar bias terms.",
+    "setup_sql": "\n            CREATE TABLE user_latent (\n                user_id INT,\n                user_bias DOUBLE,\n                u_vec FLOAT[3]\n            );\n            CREATE TABLE item_latent (\n                movie_id INT,\n                title VARCHAR,\n                movie_bias DOUBLE,\n                m_vec FLOAT[3]\n            );\n            INSERT INTO user_latent VALUES\n                (1, 0.2, [0.5, 0.3, 0.1]::FLOAT[3]);\n            INSERT INTO item_latent VALUES\n                (101, 'Sci-Fi Odyssey', 0.5, [0.6, 0.2, 0.1]::FLOAT[3]),\n                (102, 'Romantic Comedy', -0.1, [0.1, 0.7, 0.2]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Predict user rating: baseline (3.5) + u_bias + m_bias + (u_vec . m_vec)\n            SELECT \n                u.user_id,\n                m.movie_id,\n                m.title,\n                ROUND(\n                    3.5 + u.user_bias + m.movie_bias + array_inner_product(u.u_vec, m.m_vec), 2\n                ) AS predicted_rating\n            FROM user_latent u\n            CROSS JOIN item_latent m\n            WHERE u.user_id = 1\n            ORDER BY predicted_rating DESC;\n        "
+  },
+  {
+    "id": "Q42_negative_prompting_vector_repulsion",
+    "title": "Vector Repulsion Scoring (Positive vs Negative Query Guidance)",
+    "domain": "Vector & Embeddings",
+    "human_context": "In image generation and semantic search, users supply positive and negative prompts (e.g. 'cyberpunk city' NOT 'blurry / low quality'). The score boosts positive similarity and penalizes negative similarity.",
+    "hidden_trap": "Filtering out negatives with boolean NOT drops items that have even slight overlap with negative words.",
+    "duckdb_advantage": "DuckDB computes continuous vector repulsion formulas in standard SQL expressions.",
+    "setup_sql": "\n            CREATE TABLE generative_assets (\n                asset_id INT,\n                name VARCHAR,\n                vec FLOAT[2]\n            );\n            INSERT INTO generative_assets VALUES\n                (1, 'Sharp Neon Skyline',      [0.9, 0.1]::FLOAT[2]),\n                (2, 'Blurry Neon Streetscape', [0.8, 0.7]::FLOAT[2]),\n                (3, 'Rustic Wooden Cabin',     [0.0, 0.9]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Positive query: [1.0, 0.0] (cyberpunk neon), Negative query: [0.0, 1.0] (blurry/rustic)\n            -- Net Score = Cosine(vec, pos) - (0.5 * Cosine(vec, neg))\n            SELECT \n                asset_id,\n                name,\n                ROUND(array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 4) AS pos_sim,\n                ROUND(array_cosine_similarity(vec, [0.0, 1.0]::FLOAT[2]), 4) AS neg_sim,\n                ROUND(\n                    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) - \n                    (0.50 * array_cosine_similarity(vec, [0.0, 1.0]::FLOAT[2])), 4\n                ) AS net_guided_score\n            FROM generative_assets\n            ORDER BY net_guided_score DESC;\n        "
+  },
+  {
+    "id": "Q43_best_chunk_pooling_retrieval",
+    "title": "Document-Level Aggregation with Best-Chunk Pooling in RAG",
+    "domain": "Vector & Embeddings",
+    "human_context": "Long PDF manuals are split into 50 chunks each. To avoid returning 5 chunks from the exact same PDF manual, we retrieve the best chunk per document and aggregate at the document level.",
+    "hidden_trap": "Returning raw chunk Top-K dominates the context window with duplicates from a single document.",
+    "duckdb_advantage": "DuckDB QUALIFY clause filters for the top chunk per document without nested CTEs.",
+    "setup_sql": "\n            CREATE TABLE document_chunks (\n                chunk_id INT,\n                doc_id INT,\n                doc_title VARCHAR,\n                chunk_text VARCHAR,\n                vec FLOAT[2]\n            );\n            INSERT INTO document_chunks VALUES\n                (101, 1, 'Manual A', 'Setup guide section 1', [0.95, 0.1]::FLOAT[2]),\n                (102, 1, 'Manual A', 'Setup guide section 2', [0.92, 0.15]::FLOAT[2]),\n                (103, 2, 'Manual B', 'Troubleshooting section 1', [0.88, 0.2]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Retrieve the single highest-scoring chunk per document using QUALIFY\n            SELECT \n                doc_id,\n                doc_title,\n                chunk_id,\n                chunk_text,\n                ROUND(array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 4) AS chunk_score\n            FROM document_chunks\n            QUALIFY ROW_NUMBER() OVER (\n                PARTITION BY doc_id \n                ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC\n            ) = 1\n            ORDER BY chunk_score DESC;\n        "
+  },
+  {
+    "id": "Q44_token_budget_context_truncation",
+    "title": "Dynamic Context Window Token Budget Packing for LLM RAG",
+    "domain": "Vector & Embeddings",
+    "human_context": "When assembling retrieved chunks for an LLM prompt, you have a strict token limit (e.g. 1,000 tokens). You must greedily pick highest-similarity chunks until the cumulative token sum would exceed the budget.",
+    "hidden_trap": "Picking a fixed LIMIT 10 can overflow LLM token limits or waste available prompt capacity.",
+    "duckdb_advantage": "DuckDB cumulative window sums (`SUM(token_count) OVER (...)`) cleanly enforce strict budgets.",
+    "setup_sql": "\n            CREATE TABLE rag_candidate_chunks (\n                chunk_id INT,\n                token_count INT,\n                vec FLOAT[2]\n            );\n            INSERT INTO rag_candidate_chunks VALUES\n                (1, 400, [0.95, 0.05]::FLOAT[2]),\n                (2, 350, [0.90, 0.10]::FLOAT[2]),\n                (3, 400, [0.85, 0.15]::FLOAT[2]); -- Exceeds 1000 total budget\n        ",
+    "sql": "\n            -- Greedily pack chunks ordered by similarity up to strict 1,000 token budget\n            WITH ranked_chunks AS (\n                SELECT \n                    chunk_id,\n                    token_count,\n                    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) AS score,\n                    SUM(token_count) OVER (\n                        ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC\n                    ) AS cumulative_tokens\n                FROM rag_candidate_chunks\n            )\n            SELECT \n                chunk_id,\n                token_count,\n                cumulative_tokens,\n                ROUND(score, 4) AS similarity_score\n            FROM ranked_chunks\n            WHERE cumulative_tokens <= 1000\n            ORDER BY similarity_score DESC;\n        "
+  },
+  {
+    "id": "Q45_cross_encoder_candidate_generation",
+    "title": "Two-Stage Retrieval: Bi-Encoder Candidate Generation for Re-ranking",
+    "domain": "Vector & Embeddings",
+    "human_context": "Modern enterprise search uses a 2-stage pipeline: Fast bi-encoder vector search retrieves Top-50 candidates, which are then passed to a computationally heavy cross-encoder for final scoring.",
+    "hidden_trap": "Running heavy cross-encoder models across entire datasets is computationally impossible.",
+    "duckdb_advantage": "DuckDB can quickly filter millions of rows down to 50 candidates in milliseconds.",
+    "setup_sql": "\n            CREATE TABLE knowledge_articles (\n                article_id INT,\n                category VARCHAR,\n                vec FLOAT[2]\n            );\n            INSERT INTO knowledge_articles VALUES\n                (1, 'tech', [0.9, 0.1]::FLOAT[2]),\n                (2, 'tech', [0.8, 0.2]::FLOAT[2]),\n                (3, 'hr',   [0.1, 0.9]::FLOAT[2]);\n        ",
+    "sql": "\n            -- First-stage candidate extraction: Top candidates in relevant category\n            SELECT \n                article_id,\n                category,\n                ROUND(array_cosine_similarity(vec, [0.95, 0.05]::FLOAT[2]), 4) AS stage1_biencoder_score\n            FROM knowledge_articles\n            WHERE category = 'tech'\n            ORDER BY stage1_biencoder_score DESC\n            LIMIT 50;\n        "
+  },
+  {
+    "id": "Q46_temporal_embedding_drift",
+    "title": "Temporal Semantic Drift Tracking across Document Embedding Centroids",
+    "domain": "Vector & Embeddings",
+    "human_context": "As companies evolve, the meaning of terms like 'security' or 'remote work' shifts. Tracking the cosine distance between monthly embedding centroids reveals semantic concept drift.",
+    "hidden_trap": "Ignoring semantic drift causes older documentation to silently diverge from current employee search queries.",
+    "duckdb_advantage": "DuckDB calculates monthly vector centroids and inter-month drift using LAG.",
+    "setup_sql": "\n            CREATE TABLE monthly_centroids (\n                month_date DATE,\n                centroid FLOAT[2]\n            );\n            INSERT INTO monthly_centroids VALUES\n                ('2026-01-01', [0.90, 0.10]::FLOAT[2]),\n                ('2026-02-01', [0.88, 0.12]::FLOAT[2]),\n                ('2026-03-01', [0.70, 0.35]::FLOAT[2]); -- Significant semantic drift\n        ",
+    "sql": "\n            -- Track month-over-month semantic drift in concept centroids\n            SELECT \n                month_date,\n                centroid,\n                LAG(centroid) OVER (ORDER BY month_date) AS prev_month_centroid,\n                ROUND(\n                    1.0 - array_cosine_similarity(\n                        centroid, \n                        LAG(centroid) OVER (ORDER BY month_date)\n                    ), 4\n                ) AS drift_distance_from_prev_month\n            FROM monthly_centroids\n            ORDER BY month_date;\n        "
+  },
+  {
+    "id": "Q47_hierarchical_vector_coarse_fine",
+    "title": "Hierarchical Coarse-to-Fine Multi-Level Vector Filtering",
+    "domain": "Vector & Embeddings",
+    "human_context": "In massive enterprise catalogs, searching 100 million items is accelerated by first matching high-level department embedding centroids, then searching specific item vectors inside matching departments.",
+    "hidden_trap": "Flat brute-force vector search over hundreds of millions of items consumes excessive compute.",
+    "duckdb_advantage": "DuckDB joins coarse department vectors directly to fine item vectors in a single query.",
+    "setup_sql": "\n            CREATE TABLE departments (\n                dept_id INT,\n                dept_name VARCHAR,\n                dept_centroid FLOAT[2]\n            );\n            CREATE TABLE items (\n                item_id INT,\n                dept_id INT,\n                item_name VARCHAR,\n                item_vector FLOAT[2]\n            );\n            INSERT INTO departments VALUES\n                (1, 'Electronics', [0.9, 0.1]::FLOAT[2]),\n                (2, 'Gardening',   [0.1, 0.9]::FLOAT[2]);\n            INSERT INTO items VALUES\n                (101, 1, 'Noise-canceling earphones', [0.92, 0.08]::FLOAT[2]),\n                (102, 1, 'USB-C Cable',               [0.85, 0.15]::FLOAT[2]),\n                (201, 2, 'Lawn Mower',                [0.12, 0.88]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Find best matching department, then retrieve top items strictly within that department\n            WITH top_dept AS (\n                SELECT dept_id\n                FROM departments\n                ORDER BY array_cosine_similarity(dept_centroid, [0.95, 0.05]::FLOAT[2]) DESC\n                LIMIT 1\n            )\n            SELECT \n                i.item_id,\n                i.item_name,\n                ROUND(array_cosine_similarity(i.item_vector, [0.95, 0.05]::FLOAT[2]), 4) AS fine_sim_score\n            FROM items i\n            JOIN top_dept d ON i.dept_id = d.dept_id\n            ORDER BY fine_sim_score DESC;\n        "
+  },
+  {
+    "id": "Q48_vector_quantization_distortion",
+    "title": "Vector Quantization Precision Distortion & Reconstruction Error",
+    "domain": "Vector & Embeddings",
+    "human_context": "To compress embeddings from 32-bit floats to 8-bit integers, engineers evaluate the reconstruction error (distance between uncompressed and quantized vector) to measure fidelity loss.",
+    "hidden_trap": "Deploying quantized embeddings without evaluating distortion leads to silent degradation in search accuracy.",
+    "duckdb_advantage": "DuckDB can evaluate floating-point vector distances against quantized projections.",
+    "setup_sql": "\n            CREATE TABLE vector_compression_test (\n                vector_id INT,\n                fp32_vec FLOAT[3],\n                quantized_vec FLOAT[3]\n            );\n            INSERT INTO vector_compression_test VALUES\n                (1, [0.12345, 0.67891, 0.44332]::FLOAT[3], [0.12, 0.68, 0.44]::FLOAT[3]),\n                (2, [0.99123, 0.02111, 0.11005]::FLOAT[3], [0.99, 0.02, 0.11]::FLOAT[3]);\n        ",
+    "sql": "\n            -- Evaluate Euclidean distortion and cosine fidelity loss per vector\n            SELECT \n                vector_id,\n                ROUND(array_distance(fp32_vec, quantized_vec), 6) AS l2_quantization_error,\n                ROUND(1.0 - array_cosine_similarity(fp32_vec, quantized_vec), 6) AS cosine_distortion\n            FROM vector_compression_test\n            ORDER BY l2_quantization_error DESC;\n        "
+  },
+  {
+    "id": "Q49_prototype_intent_classification",
+    "title": "Zero-Shot Query Intent Classification via Prototype Vector Distance",
+    "domain": "Vector & Embeddings",
+    "human_context": "Instead of training a BERT classifier, user query vectors are compared against pre-computed 'intent prototype vectors' (e.g. Navigational, Transactional, Informational). The closest prototype labels the query intent.",
+    "hidden_trap": "Maintaining external classifier microservices adds 50ms latency to query planning.",
+    "duckdb_advantage": "DuckDB classifies intent in pure SQL with sub-millisecond execution.",
+    "setup_sql": "\n            CREATE TABLE intent_prototypes (\n                intent_name VARCHAR,\n                prototype_vector FLOAT[2]\n            );\n            CREATE TABLE inbound_queries (\n                query_id INT,\n                query_text VARCHAR,\n                query_vector FLOAT[2]\n            );\n            INSERT INTO intent_prototypes VALUES\n                ('TRANSACTIONAL_BUY', [0.9, 0.1]::FLOAT[2]),\n                ('INFORMATIONAL_FAQ', [0.1, 0.9]::FLOAT[2]);\n            INSERT INTO inbound_queries VALUES\n                (1, 'where to purchase macbook pro', [0.88, 0.15]::FLOAT[2]),\n                (2, 'how does duckdb storage work',   [0.15, 0.85]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Classify each query to its closest intent prototype\n            WITH ranked_intents AS (\n                SELECT \n                    q.query_id,\n                    q.query_text,\n                    p.intent_name,\n                    array_cosine_similarity(q.query_vector, p.prototype_vector) AS intent_similarity,\n                    ROW_NUMBER() OVER (\n                        PARTITION BY q.query_id \n                        ORDER BY array_cosine_similarity(q.query_vector, p.prototype_vector) DESC\n                    ) AS rank_match\n                FROM inbound_queries q\n                CROSS JOIN intent_prototypes p\n            )\n            SELECT \n                query_id,\n                query_text,\n                intent_name AS predicted_intent,\n                ROUND(intent_similarity, 4) AS confidence\n            FROM ranked_intents\n            WHERE rank_match = 1\n            ORDER BY query_id;\n        "
+  },
+  {
+    "id": "Q50_contrastive_triplet_loss_evaluation",
+    "title": "Contrastive Triplet Evaluation: Anchor-Positive-Negative Separation",
+    "domain": "Vector & Embeddings",
+    "human_context": "In embedding model evaluation, high-quality models satisfy the triplet condition: distance(anchor, positive) + margin < distance(anchor, negative). We evaluate model margin violations directly in SQL.",
+    "hidden_trap": "Validating embedding models often requires ad-hoc PyTorch scripts; SQL evaluation enables continuous monitoring in production.",
+    "duckdb_advantage": "DuckDB computes margin violations across millions of triplets in seconds.",
+    "setup_sql": "\n            CREATE TABLE eval_triplets (\n                triplet_id INT,\n                anchor_vec FLOAT[2],\n                positive_vec FLOAT[2],\n                negative_vec FLOAT[2]\n            );\n            INSERT INTO eval_triplets VALUES\n                -- Good triplet: pos is close, neg is far\n                (1, [1.0, 0.0]::FLOAT[2], [0.95, 0.05]::FLOAT[2], [0.1, 0.9]::FLOAT[2]),\n                -- Violated triplet: neg is closer than pos!\n                (2, [1.0, 0.0]::FLOAT[2], [0.5, 0.5]::FLOAT[2],   [0.9, 0.1]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Compute triplet margin violation with margin = 0.2\n            -- Violation = GREATEST(0, dist(a, p) - dist(a, n) + margin)\n            SELECT \n                triplet_id,\n                ROUND(array_distance(anchor_vec, positive_vec), 4) AS dist_pos,\n                ROUND(array_distance(anchor_vec, negative_vec), 4) AS dist_neg,\n                ROUND(\n                    GREATEST(0.0, array_distance(anchor_vec, positive_vec) - array_distance(anchor_vec, negative_vec) + 0.20), 4\n                ) AS triplet_margin_loss,\n                CASE \n                    WHEN (array_distance(anchor_vec, positive_vec) - array_distance(anchor_vec, negative_vec) + 0.20) > 0 \n                    THEN 'VIOLATION' \n                    ELSE 'SATISFIED' \n                END AS evaluation_status\n            FROM eval_triplets\n            ORDER BY triplet_id;\n        "
+  },
+  {
+    "id": "Q51_fts_bm25_lexical_search",
+    "title": "DuckDB Full-Text Search (FTS) BM25 Term Relevance Scoring",
+    "domain": "Search & Retrieval",
+    "human_context": "Traditional databases use simple `LIKE '%search%'` which treats 1 mention the same as 10 mentions and ignores document frequency. BM25 scores term saturation and document rarity.",
+    "hidden_trap": "ILIKE matches substrings blindly (e.g. 'cat' matches 'scattered' or 'certificate') with zero relevancy ranking.",
+    "duckdb_advantage": "DuckDB has native full-text indexing via the `fts` extension (`PRAGMA create_fts_index` and `match_bm25`).",
+    "setup_sql": "\n            INSTALL fts; LOAD fts;\n            CREATE TABLE articles (\n                doc_id INT,\n                title VARCHAR,\n                body VARCHAR\n            );\n            INSERT INTO articles VALUES\n                (1, 'Fast Columnar Databases', 'DuckDB is a vectorized analytical database designed for fast analytics.'),\n                (2, 'Postgres Tuning Guide',    'Relational database indexing and buffer pool optimization.'),\n                (3, 'Vector Search Frontiers', 'Combining dense vector embeddings with sparse BM25 indexing.');\n            PRAGMA create_fts_index('articles', 'doc_id', 'title', 'body');\n        ",
+    "sql": "\n            -- BM25 full-text search for 'analytical database'\n            WITH scored_articles AS (\n                SELECT \n                    doc_id,\n                    title,\n                    body,\n                    fts_main_articles.match_bm25(doc_id, 'analytical database') AS bm25_score\n                FROM articles\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(bm25_score, 4) AS bm25_score\n            FROM scored_articles\n            WHERE bm25_score IS NOT NULL\n            ORDER BY bm25_score DESC;\n        "
+  },
+  {
+    "id": "Q52_reciprocal_rank_fusion_rrf",
+    "title": "Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)",
+    "domain": "Search & Retrieval",
+    "human_context": "Hybrid search combines sparse keyword search (great for exact names and acronyms) with dense vector search (great for synonyms and concepts). RRF merges both rank lists using: RRF_score = 1/(60 + rank_bm25) + 1/(60 + rank_vec).",
+    "hidden_trap": "Adding raw BM25 scores (range 0 to 50+) directly to cosine similarity scores (range 0 to 1) allows BM25 to completely drown out vector relevance.",
+    "duckdb_advantage": "DuckDB window functions compute dense ranks across both retrieval channels and fuse them in a single query.",
+    "setup_sql": "\n            CREATE TABLE corpus_docs (\n                doc_id INT,\n                title VARCHAR,\n                lexical_score DOUBLE,\n                vec FLOAT[2]\n            );\n            INSERT INTO corpus_docs VALUES\n                (1, 'DuckDB Vector Search Guide', 12.5, [0.95, 0.05]::FLOAT[2]),\n                (2, 'Postgres HNSW Extension',     14.2, [0.70, 0.30]::FLOAT[2]),\n                (3, 'Deep Learning Embeddings',    2.1,  [0.92, 0.10]::FLOAT[2]);\n        ",
+    "sql": "\n            -- Hybrid RRF rank fusion between BM25 lexical score and dense vector cosine similarity\n            WITH ranked_lexical AS (\n                SELECT \n                    doc_id,\n                    title,\n                    ROW_NUMBER() OVER (ORDER BY lexical_score DESC) AS rank_lexical\n                FROM corpus_docs\n            ),\n            ranked_vector AS (\n                SELECT \n                    doc_id,\n                    title,\n                    ROW_NUMBER() OVER (\n                        ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC\n                    ) AS rank_vector\n                FROM corpus_docs\n            )\n            SELECT \n                l.doc_id,\n                l.title,\n                l.rank_lexical,\n                v.rank_vector,\n                -- Standard RRF formula with k = 60\n                ROUND((1.0 / (60.0 + l.rank_lexical)) + (1.0 / (60.0 + v.rank_vector)), 6) AS rrf_score\n            FROM ranked_lexical l\n            JOIN ranked_vector v ON l.doc_id = v.doc_id\n            ORDER BY rrf_score DESC;\n        "
+  },
+  {
+    "id": "Q53_min_max_convex_hybrid_search",
+    "title": "Min-Max Normalized Convex Combination Hybrid Search",
+    "domain": "Search & Retrieval",
+    "human_context": "An alternative to rank-based RRF is score-based fusion: min-max scale lexical scores to [0, 1] and vector scores to [0, 1], then take alpha * lexical + (1 - alpha) * vector.",
+    "hidden_trap": "Division by zero when all scores in a small result set are identical.",
+    "duckdb_advantage": "DuckDB NULLIF and window MIN/MAX cleanly handle degenerate score distributions.",
+    "setup_sql": "\n            CREATE TABLE search_candidates (\n                doc_id INT,\n                title VARCHAR,\n                raw_bm25 DOUBLE,\n                vector_sim DOUBLE\n            );\n            INSERT INTO search_candidates VALUES\n                (101, 'Data Warehousing Fundamentals', 25.0, 0.85),\n                (102, 'Columnar Storage Internals',    10.0, 0.92),\n                (103, 'SQL Query Optimization',         5.0, 0.70);\n        ",
+    "sql": "\n            -- Min-Max normalization and 50/50 convex combination\n            WITH bounds AS (\n                SELECT \n                    doc_id,\n                    title,\n                    raw_bm25,\n                    vector_sim,\n                    MIN(raw_bm25) OVER () AS min_bm25,\n                    MAX(raw_bm25) OVER () AS max_bm25,\n                    MIN(vector_sim) OVER () AS min_vec,\n                    MAX(vector_sim) OVER () AS max_vec\n                FROM search_candidates\n            ),\n            normalized AS (\n                SELECT \n                    doc_id,\n                    title,\n                    COALESCE((raw_bm25 - min_bm25) / NULLIF(max_bm25 - min_bm25, 0), 1.0) AS norm_bm25,\n                    COALESCE((vector_sim - min_vec) / NULLIF(max_vec - min_vec, 0), 1.0) AS norm_vec\n                FROM bounds\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(norm_bm25, 4) AS norm_bm25,\n                ROUND(norm_vec, 4) AS norm_vec,\n                ROUND(0.50 * norm_bm25 + 0.50 * norm_vec, 4) AS convex_hybrid_score\n            FROM normalized\n            ORDER BY convex_hybrid_score DESC;\n        "
+  },
+  {
+    "id": "Q54_fuzzy_levenshtein_length_pruning",
+    "title": "Typo-Tolerant Search with Levenshtein Edit Distance & Length Bounds",
+    "domain": "Search & Retrieval",
+    "human_context": "Users frequently misspell search terms (e.g. 'postgre' -> 'postgresql'). Levenshtein distance counts insertions, deletions, and substitutions.",
+    "hidden_trap": "Computing Levenshtein distance on every catalog word is CPU intensive without pre-filtering on string length (ABS(len_a - len_b) <= max_distance).",
+    "duckdb_advantage": "DuckDB pushes string length checks ahead of native `levenshtein()` evaluations.",
+    "setup_sql": "\n            CREATE TABLE catalog_keywords (\n                keyword_id INT,\n                keyword VARCHAR\n            );\n            INSERT INTO catalog_keywords VALUES\n                (1, 'postgresql'),\n                (2, 'postgres'),\n                (3, 'postgress'),\n                (4, 'python'),\n                (5, 'javascript');\n        ",
+    "sql": "\n            -- Find keywords within edit distance <= 2 of search query 'posgresql'\n            SELECT \n                keyword_id,\n                keyword,\n                levenshtein(keyword, 'posgresql') AS edit_distance\n            FROM catalog_keywords\n            -- Pre-filter: word length cannot differ by more than max allowed edit distance (2)\n            WHERE ABS(LENGTH(keyword) - LENGTH('posgresql')) <= 2\n              AND levenshtein(keyword, 'posgresql') <= 2\n            ORDER BY edit_distance ASC;\n        "
+  },
+  {
+    "id": "Q55_jaro_winkler_brand_search",
+    "title": "Brand & Name Fuzzy Search via Jaro-Winkler Prefix Similarity",
+    "domain": "Search & Retrieval",
+    "human_context": "In e-commerce, users often mistype the suffixes of brand names ('Samsumg' vs 'Samsung'). Jaro-Winkler gives higher weight to prefix matches, making it ideal for proper names.",
+    "hidden_trap": "Standard Levenshtein treats mistakes at the start of a word the same as at the end.",
+    "duckdb_advantage": "DuckDB includes native `jaro_winkler_similarity(a, b)` returning normalized [0, 1] scores.",
+    "setup_sql": "\n            CREATE TABLE brands (\n                brand_id INT,\n                brand_name VARCHAR\n            );\n            INSERT INTO brands VALUES\n                (1, 'Samsung'),\n                (2, 'Samsonite'),\n                (3, 'Apple'),\n                (4, 'Sony');\n        ",
+    "sql": "\n            -- Match brand query 'Samsun' with threshold >= 0.85\n            SELECT \n                brand_id,\n                brand_name,\n                ROUND(jaro_winkler_similarity(brand_name, 'Samsun'), 4) AS jaro_similarity\n            FROM brands\n            WHERE jaro_winkler_similarity(brand_name, 'Samsun') >= 0.85\n            ORDER BY jaro_similarity DESC;\n        "
+  },
+  {
+    "id": "Q56_multi_field_weighted_scoring",
+    "title": "Multi-Field Weighted Full-Text Retrieval (Title 3x, Body 1x)",
+    "domain": "Search & Retrieval",
+    "human_context": "A match in a document title or product headline is far more indicative of relevance than a passing mention in the body text.",
+    "hidden_trap": "Concatenating title and body into a single column gives equal weight to all words.",
+    "duckdb_advantage": "DuckDB can evaluate independent field matches and combine them with linear weighting in SQL.",
+    "setup_sql": "\n            CREATE TABLE product_posts (\n                post_id INT,\n                title VARCHAR,\n                body VARCHAR\n            );\n            INSERT INTO product_posts VALUES\n                (1, 'Wireless Noise Canceling Headphones', 'These over-ear headphones feature active noise cancelling technology.'),\n                (2, 'Travel Accessories and Gadgets',     'A complete list of travel gear including a wireless charging pad and cables.'),\n                (3, 'Coffee Brewing Machines',          'Best espresso makers and grinders for home brewing.');\n        ",
+    "sql": "\n            -- Search for 'wireless headphones': Title matches weighted 3.0x, Body matches weighted 1.0x\n            WITH scored AS (\n                SELECT \n                    post_id,\n                    title,\n                    ROUND(\n                        (CASE WHEN title ILIKE '%wireless%' THEN 3.0 ELSE 0.0 END) +\n                        (CASE WHEN title ILIKE '%headphones%' THEN 3.0 ELSE 0.0 END) +\n                        (CASE WHEN body ILIKE '%wireless%' THEN 1.0 ELSE 0.0 END) +\n                        (CASE WHEN body ILIKE '%headphones%' THEN 1.0 ELSE 0.0 END), 2\n                    ) AS multi_field_score\n                FROM product_posts\n            )\n            SELECT \n                post_id,\n                title,\n                multi_field_score\n            FROM scored\n            WHERE multi_field_score > 0\n            ORDER BY multi_field_score DESC;\n        "
+  },
+  {
+    "id": "Q57_exact_phrase_proximity_boost",
+    "title": "Exact Phrase Proximity Boosting in Keyword Retrieval",
+    "domain": "Search & Retrieval",
+    "human_context": "If a user searches for 'machine learning', an article containing the exact phrase 'machine learning' should rank higher than an article where 'machine' is in paragraph 1 and 'learning' is in paragraph 8.",
+    "hidden_trap": "Pure bag-of-words keyword matches ignore token proximity and phrase boundaries.",
+    "duckdb_advantage": "DuckDB combines exact phrase substring checks with token matching.",
+    "setup_sql": "\n            CREATE TABLE articles_proximity (\n                article_id INT,\n                text_content VARCHAR\n            );\n            INSERT INTO articles_proximity VALUES\n                (1, 'Recent breakthroughs in machine learning algorithms have transformed AI.'),\n                (2, 'The washing machine broke down, so I am learning how to fix the belt.'),\n                (3, 'Database indexing structures and query execution plans.');\n        ",
+    "sql": "\n            -- Query: 'machine' AND 'learning', with a 5.0x boost for exact phrase match\n            SELECT \n                article_id,\n                text_content,\n                (CASE WHEN text_content ILIKE '%machine%' THEN 1.0 ELSE 0.0 END +\n                 CASE WHEN text_content ILIKE '%learning%' THEN 1.0 ELSE 0.0 END +\n                 CASE WHEN text_content ILIKE '%machine learning%' THEN 5.0 ELSE 0.0 END) AS relevance_score\n            FROM articles_proximity\n            WHERE text_content ILIKE '%machine%' AND text_content ILIKE '%learning%'\n            ORDER BY relevance_score DESC;\n        "
+  },
+  {
+    "id": "Q58_stopword_cleansing_normalization",
+    "title": "Stopword Filtering and Query Token Cleansing in SQL",
+    "domain": "Search & Retrieval",
+    "human_context": "Search queries like 'what is the best laptop' contain stop words ('what', 'is', 'the') that dilute search precision if not filtered prior to catalog matching.",
+    "hidden_trap": "Leaving stopwords in keyword queries causes high-frequency words to trigger millions of false positive matches.",
+    "duckdb_advantage": "DuckDB array functions (`list_filter`) can cleanse query tokens against stopword tables.",
+    "setup_sql": "\n            CREATE TABLE stopwords (word VARCHAR);\n            INSERT INTO stopwords VALUES ('what'), ('is'), ('the'), ('and'), ('or'), ('a'), ('an');\n        ",
+    "sql": "\n            -- Cleanse raw search tokens by filtering out stopwords\n            WITH raw_query AS (\n                SELECT UNNEST(string_split(lower('what is the best gaming laptop'), ' ')) AS token\n            ),\n            clean_tokens AS (\n                SELECT q.token\n                FROM raw_query q\n                LEFT JOIN stopwords s ON q.token = s.word\n                WHERE s.word IS NULL\n            )\n            SELECT \n                list(token) AS clean_tokens,\n                string_agg(token, ' ') AS cleansed_search_query\n            FROM clean_tokens;\n        "
+  },
+  {
+    "id": "Q59_faceted_search_json_attributes",
+    "title": "Faceted Search Aggregations over Semi-Structured JSON Attributes",
+    "domain": "Search & Retrieval",
+    "human_context": "When a customer searches for 'laptops', e-commerce search engines return matching items along with dynamic facet counts (e.g. Brand: Apple (12), Dell (8); RAM: 16GB (15), 32GB (5)) extracted from JSON specs.",
+    "hidden_trap": "Running separate queries for each facet dimension multiplies query latency and database load.",
+    "duckdb_advantage": "DuckDB extracts JSON paths (`->>`) and aggregates multiple facet dimensions in parallel.",
+    "setup_sql": "\n            CREATE TABLE electronics_catalog (\n                item_id INT,\n                title VARCHAR,\n                specs JSON\n            );\n            INSERT INTO electronics_catalog VALUES\n                (1, 'MacBook Pro 16', '{\"brand\": \"Apple\", \"ram\": \"32GB\", \"screen\": 16}'),\n                (2, 'MacBook Air 13', '{\"brand\": \"Apple\", \"ram\": \"16GB\", \"screen\": 13}'),\n                (3, 'XPS 15 Laptop',  '{\"brand\": \"Dell\",  \"ram\": \"16GB\", \"screen\": 15}'),\n                (4, 'ThinkPad X1',    '{\"brand\": \"Lenovo\",\"ram\": \"16GB\", \"screen\": 14}');\n        ",
+    "sql": "\n            -- Extract faceted breakdown of matching laptop brands and RAM capacities\n            WITH matching_items AS (\n                SELECT \n                    item_id,\n                    title,\n                    specs->>'brand' AS brand,\n                    specs->>'ram' AS ram\n                FROM electronics_catalog\n            )\n            SELECT \n                'brand' AS facet_dimension,\n                brand AS facet_value,\n                COUNT(*) AS match_count\n            FROM matching_items\n            GROUP BY brand\n            UNION ALL\n            SELECT \n                'ram' AS facet_dimension,\n                ram AS facet_value,\n                COUNT(*) AS match_count\n            FROM matching_items\n            GROUP BY ram\n            ORDER BY facet_dimension, match_count DESC, facet_value ASC;\n        "
+  },
+  {
+    "id": "Q60_ngram_log_signature_search",
+    "title": "Trigram / N-Gram Token Substring Matching for Technical Error Logs",
+    "domain": "Search & Retrieval",
+    "human_context": "In observability platforms (Datadog, Splunk), engineers search stack traces with partial error signatures. Trigram decomposition enables robust partial substring index matching.",
+    "hidden_trap": "Full regex evaluations on raw million-line log tables trigger catastrophic backtracking.",
+    "duckdb_advantage": "DuckDB n-gram tokenization and array overlaps provide fast log signature matching.",
+    "setup_sql": "\n            CREATE TABLE incident_logs (\n                log_id INT,\n                error_message VARCHAR\n            );\n            INSERT INTO incident_logs VALUES\n                (1, 'java.lang.NullPointerException at com.app.auth.LoginService.verify'),\n                (2, 'org.postgresql.util.PSQLException: Connection refused'),\n                (3, 'java.lang.OutOfMemoryError: Java heap space');\n        ",
+    "sql": "\n            -- Find logs matching 'NullPointer' or 'OutOfMemory' error signatures\n            SELECT \n                log_id,\n                error_message,\n                CASE \n                    WHEN error_message LIKE '%NullPointer%' THEN 'NPE_EXCEPTION'\n                    WHEN error_message LIKE '%OutOfMemory%' THEN 'OOM_KILL'\n                    ELSE 'OTHER'\n                END AS classified_signature\n            FROM incident_logs\n            WHERE error_message LIKE '%NullPointer%' \n               OR error_message LIKE '%OutOfMemory%'\n            ORDER BY log_id;\n        "
+  },
+  {
+    "id": "Q61_synonym_expansion_reranking",
+    "title": "Dynamic Query Synonym Expansion via Relational Thesaurus",
+    "domain": "Search & Retrieval",
+    "human_context": "When a customer searches for 'sofa', they also expect to see listings titled 'couch' or 'settee'. Expanding queries using a synonym thesaurus bridges terminology gaps.",
+    "hidden_trap": "Hardcoding synonyms into client-side application code makes vocabulary updates inflexible.",
+    "duckdb_advantage": "DuckDB joins query tokens to relational synonym tables to score documents with expanded terms.",
+    "setup_sql": "\n            CREATE TABLE synonym_thesaurus (\n                base_term VARCHAR,\n                synonym VARCHAR\n            );\n            CREATE TABLE furniture_items (\n                item_id INT,\n                description VARCHAR\n            );\n            INSERT INTO synonym_thesaurus VALUES\n                ('sofa', 'couch'),\n                ('sofa', 'settee'),\n                ('sofa', 'loveseat');\n            INSERT INTO furniture_items VALUES\n                (1, 'Modern Italian leather sofa with oak legs'),\n                (2, 'Vintage velvet couch in emerald green'),\n                (3, 'Solid wood dining table and 6 chairs');\n        ",
+    "sql": "\n            -- Expand search term 'sofa' with all relational synonyms and match inventory\n            WITH expanded_terms AS (\n                SELECT 'sofa' AS search_term\n                UNION\n                SELECT synonym FROM synonym_thesaurus WHERE base_term = 'sofa'\n            )\n            SELECT \n                f.item_id,\n                f.description,\n                t.search_term AS matched_alias\n            FROM furniture_items f\n            JOIN expanded_terms t \n              ON f.description ILIKE ('%' || t.search_term || '%')\n            ORDER BY f.item_id;\n        "
+  },
+  {
+    "id": "Q62_autocomplete_prefix_popularity",
+    "title": "Search Autocomplete Suggestion with Popularity Frequency Weighting",
+    "domain": "Search & Retrieval",
+    "human_context": "As users type 'air...', instant search suggests 'air fryer' (100k searches) before 'air mattress' (5k searches). Suggestions must match the prefix AND rank by historical popularity.",
+    "hidden_trap": "Alphabetical sorting of prefix matches suggests obscure terms before popular items.",
+    "duckdb_advantage": "DuckDB prefix filtering (`prefix_query || '%'`) combined with ordering indices produces sub-millisecond suggestions.",
+    "setup_sql": "\n            CREATE TABLE search_telemetry (\n                query_string VARCHAR,\n                monthly_search_volume INT,\n                conversion_rate DECIMAL(4,3)\n            );\n            INSERT INTO search_telemetry VALUES\n                ('air fryer ninja', 120000, 0.085),\n                ('airpods pro 2',    250000, 0.120),\n                ('air mattress queen', 15000, 0.040),\n                ('airplane pillow',     3000, 0.025);\n        ",
+    "sql": "\n            -- Autocomplete suggestions for prefix 'air' ranked by volume * conversion\n            SELECT \n                query_string,\n                monthly_search_volume,\n                ROUND(monthly_search_volume * conversion_rate, 0) AS popularity_rank_score\n            FROM search_telemetry\n            WHERE query_string LIKE 'air%'\n            ORDER BY popularity_rank_score DESC\n            LIMIT 3;\n        "
+  },
+  {
+    "id": "Q63_boolean_search_negation",
+    "title": "High-Precision Boolean Search with Negation and Grouping",
+    "domain": "Search & Retrieval",
+    "human_context": "Legal e-discovery and patent search rely on exact Boolean syntax: (patent AND battery) NOT (lithium OR phone). Negations must be strictly applied without dropping valid candidate documents.",
+    "hidden_trap": "Poor operator precedence in SQL boolean expressions causes negated terms to drop unrelated valid results.",
+    "duckdb_advantage": "DuckDB SQL evaluates complex parenthesized boolean criteria with index acceleration.",
+    "setup_sql": "\n            CREATE TABLE patent_corpus (\n                patent_id INT,\n                abstract VARCHAR\n            );\n            INSERT INTO patent_corpus VALUES\n                (1, 'Solid-state battery chemistry for electric vehicles and heavy transport'),\n                (2, 'Lithium ion battery pack design for mobile phone handsets'),\n                (3, 'Wireless charging pad for mobile phone and earbuds');\n        ",
+    "sql": "\n            -- Query: ('battery') AND NOT ('lithium' OR 'phone')\n            SELECT \n                patent_id,\n                abstract\n            FROM patent_corpus\n            WHERE abstract ILIKE '%battery%'\n              AND NOT (abstract ILIKE '%lithium%' OR abstract ILIKE '%phone%')\n            ORDER BY patent_id;\n        "
+  },
+  {
+    "id": "Q64_pure_sql_tfidf_calculation",
+    "title": "TF-IDF (Term Frequency - Inverse Document Frequency) in Pure SQL",
+    "domain": "Search & Retrieval",
+    "human_context": "TF-IDF is the foundational algorithm of information retrieval. Calculating it directly in SQL provides deep insight into term uniqueness across a corpus without requiring Python.",
+    "hidden_trap": "Calculating document frequency across millions of documents requires careful window partitioning to avoid Cartesian explosions.",
+    "duckdb_advantage": "DuckDB window functions compute corpus document counts (N) and term frequencies in parallel.",
+    "setup_sql": "\n            CREATE TABLE doc_words (\n                doc_id INT,\n                term VARCHAR,\n                term_count INT\n            );\n            INSERT INTO doc_words VALUES\n                (1, 'database', 10), (1, 'columnar', 5),\n                (2, 'database', 8),  (2, 'relational', 7),\n                (3, 'columnar', 4);\n        ",
+    "sql": "\n            -- Calculate TF-IDF for term 'columnar' across 3 documents\n            -- TF = term_count / total_terms_in_doc, IDF = LN(Total_Docs / Docs_With_Term)\n            WITH doc_lengths AS (\n                SELECT doc_id, SUM(term_count) AS doc_len\n                FROM doc_words\n                GROUP BY doc_id\n            ),\n            corpus_stats AS (\n                SELECT COUNT(DISTINCT doc_id) AS total_docs FROM doc_words\n            ),\n            term_docs AS (\n                SELECT term, COUNT(DISTINCT doc_id) AS docs_with_term\n                FROM doc_words\n                GROUP BY term\n            )\n            SELECT \n                w.doc_id,\n                w.term,\n                w.term_count,\n                ROUND(w.term_count * 1.0 / l.doc_len, 4) AS tf,\n                ROUND(LN(c.total_docs * 1.0 / td.docs_with_term), 4) AS idf,\n                ROUND((w.term_count * 1.0 / l.doc_len) * LN(c.total_docs * 1.0 / td.docs_with_term), 4) AS tfidf_score\n            FROM doc_words w\n            JOIN doc_lengths l ON w.doc_id = l.doc_id\n            JOIN term_docs td ON w.term = td.term\n            CROSS JOIN corpus_stats c\n            WHERE w.term = 'columnar'\n            ORDER BY tfidf_score DESC;\n        "
+  },
+  {
+    "id": "Q65_search_position_bias_dcg",
+    "title": "Discounted Cumulative Gain (DCG) with Search Position Bias Discount",
+    "domain": "Search & Retrieval",
+    "human_context": "Users are far more likely to click the #1 search result than the #5 result regardless of relevance. Ranking quality is measured via Discounted Cumulative Gain: DCG = SUM(relevance / log2(rank + 1)).",
+    "hidden_trap": "Simple click counts reward poorly placed relevant items unfairly.",
+    "duckdb_advantage": "DuckDB math functions (`LOG2`) compute logarithmic rank discounts in vectorized window expressions.",
+    "setup_sql": "\n            CREATE TABLE search_impressions (\n                query_id INT,\n                rank_position INT,\n                relevance_label INT -- 0=irrelevant, 1=relevant, 2=perfect\n            );\n            INSERT INTO search_impressions VALUES\n                (1, 1, 2), -- Rank 1: perfect match\n                (1, 2, 0), -- Rank 2: bad match\n                (1, 3, 1); -- Rank 3: good match\n        ",
+    "sql": "\n            -- Calculate DCG@3 for query 1\n            SELECT \n                query_id,\n                ROUND(SUM(relevance_label / LOG2(rank_position + 1)), 4) AS dcg_at_3\n            FROM search_impressions\n            WHERE rank_position <= 3\n            GROUP BY query_id;\n        "
+  },
+  {
+    "id": "Q66_alphanumeric_sku_normalization",
+    "title": "Alphanumeric SKU Matching with Punctuation & Case Invariance",
+    "domain": "Search & Retrieval",
+    "human_context": "Customers search for model numbers in messy formats: 'wh-1000xm5', 'WH1000-XM5', 'wh 1000 xm5'. Robust search normalizes punctuation and whitespace before matching.",
+    "hidden_trap": "Exact string equality misses 90% of technical product searches due to hyphens and spaces.",
+    "duckdb_advantage": "DuckDB `regexp_replace` cleanses alphanumeric identifiers efficiently.",
+    "setup_sql": "\n            CREATE TABLE inventory_skus (\n                sku_id INT,\n                raw_sku VARCHAR,\n                product_title VARCHAR\n            );\n            INSERT INTO inventory_skus VALUES\n                (1, 'WH-1000XM5/B', 'Sony Premium Wireless Headphones Black'),\n                (2, 'AIR-MAX-90-W',  'Nike Air Max 90 White Sneaker');\n        ",
+    "sql": "\n            -- Cleanse search query 'wh1000xm5b' by stripping non-alphanumeric characters\n            SELECT \n                sku_id,\n                raw_sku,\n                product_title\n            FROM inventory_skus\n            WHERE lower(regexp_replace(raw_sku, '[^a-zA-Z0-9]', '', 'g')) = lower(regexp_replace('wh 1000-xm5/b', '[^a-zA-Z0-9]', '', 'g'));\n        "
+  },
+  {
+    "id": "Q67_search_negation_term_suppression",
+    "title": "Dynamic Negative Keyword Exclusion in E-Commerce Filters",
+    "domain": "Search & Retrieval",
+    "human_context": "A user searches 'monitor -curved' to find flat computer monitors. The engine must extract positive search terms and suppress any record containing the negative terms.",
+    "hidden_trap": "Negative keywords must not exclude items where the negative term appears with negation qualifiers (e.g. 'not curved').",
+    "duckdb_advantage": "DuckDB regex matching and exclusion conditions execute in a single scan.",
+    "setup_sql": "\n            CREATE TABLE display_items (\n                item_id INT,\n                title VARCHAR,\n                description VARCHAR\n            );\n            INSERT INTO display_items VALUES\n                (1, 'Dell UltraSharp 27', 'Flat IPS 4K computer monitor with USB-C hub'),\n                (2, 'Samsung Odyssey G9', 'Ultra-wide 49 inch curved gaming monitor'),\n                (3, 'LG UltraFine 32',   'Flat panel OLED professional display');\n        ",
+    "sql": "\n            -- Positive term: 'monitor', Negative term: 'curved'\n            SELECT \n                item_id,\n                title,\n                description\n            FROM display_items\n            WHERE (title ILIKE '%monitor%' OR description ILIKE '%monitor%')\n              AND NOT (title ILIKE '%curved%' OR description ILIKE '%curved%')\n            ORDER BY item_id;\n        "
+  },
+  {
+    "id": "Q68_multilingual_search_routing",
+    "title": "Multi-Lingual Catalog Routing by Detected ISO Language Code",
+    "domain": "Search & Retrieval",
+    "human_context": "Global portals store titles in multiple localized columns (title_en, title_es, title_fr). Queries are dynamically routed to the matching language column based on user locale.",
+    "hidden_trap": "Searching across all language columns simultaneously creates false-positive matches due to inter-language false cognates.",
+    "duckdb_advantage": "DuckDB CASE projections route predicates to target language fields with zero query recompilation.",
+    "setup_sql": "\n            CREATE TABLE localized_products (\n                product_id INT,\n                title_en VARCHAR,\n                title_es VARCHAR,\n                title_fr VARCHAR\n            );\n            INSERT INTO localized_products VALUES\n                (1, 'Red Bicycle',   'Bicicleta Roja',  'Velo Rouge'),\n                (2, 'Green Helmet',  'Casco Verde',     'Casque Vert');\n        ",
+    "sql": "\n            -- Match Spanish query 'Bicicleta' routed dynamically to title_es\n            SELECT \n                product_id,\n                title_es AS matched_title,\n                'es' AS language_used\n            FROM localized_products\n            WHERE title_es ILIKE '%Bicicleta%'\n            ORDER BY product_id;\n        "
+  },
+  {
+    "id": "Q69_query_relaxation_fallback",
+    "title": "Zero-Result Search Query Relaxation (Strict AND -> Loose OR Fallback)",
+    "domain": "Search & Retrieval",
+    "human_context": "If a multi-word search query (e.g. 'ergonomic mechanical wireless split keyboard') returns zero results under strict AND matching, modern engines gracefully relax to OR matching.",
+    "hidden_trap": "Failing to return fallback results leads to user bounce and abandoned sessions.",
+    "duckdb_advantage": "DuckDB CTEs can check candidate counts and conditionally branch to relaxed OR queries.",
+    "setup_sql": "\n            CREATE TABLE keyboard_catalog (\n                id INT,\n                title VARCHAR\n            );\n            INSERT INTO keyboard_catalog VALUES\n                (1, 'Ergonomic Split Keyboard Wired'),\n                (2, 'Mechanical Wireless Office Keyboard'),\n                (3, 'Standard Membrane Keyboard');\n        ",
+    "sql": "\n            -- Query tokens: 'ergonomic', 'mechanical', 'wireless'\n            WITH scored_matches AS (\n                SELECT \n                    id,\n                    title,\n                    (CASE WHEN title ILIKE '%ergonomic%' THEN 1 ELSE 0 END +\n                     CASE WHEN title ILIKE '%mechanical%' THEN 1 ELSE 0 END +\n                     CASE WHEN title ILIKE '%wireless%' THEN 1 ELSE 0 END) AS match_score\n                FROM keyboard_catalog\n            )\n            SELECT \n                id,\n                title,\n                match_score,\n                CASE WHEN match_score = 3 THEN 'STRICT_ALL_MATCH' ELSE 'RELAXED_PARTIAL_MATCH' END AS match_tier\n            FROM scored_matches\n            WHERE match_score >= 1\n            ORDER BY match_score DESC, id;\n        "
+  },
+  {
+    "id": "Q70_search_snippet_keyword_extraction",
+    "title": "Search Snippet Extraction: Context Window Around Matching Terms",
+    "domain": "Search & Retrieval",
+    "human_context": "Search results show a preview snippet containing the searched keyword with 30 characters of surrounding context rather than the beginning of a 2,000-word article.",
+    "hidden_trap": "Substring extraction crashes when matching keywords appear near the very beginning or end of the text.",
+    "duckdb_advantage": "DuckDB `GREATEST` and `SUBSTRING` functions construct safe boundary-clipped preview snippets.",
+    "setup_sql": "\n            CREATE TABLE blog_posts (\n                post_id INT,\n                content VARCHAR\n            );\n            INSERT INTO blog_posts VALUES\n                (1, 'In this tutorial we demonstrate high performance data analysis. The key feature of DuckDB is vectorized execution which processes data in columnar chunks for maximum CPU cache locality.'),\n                (2, 'PostgreSQL is an advanced open source relational database with robust ACID transaction support.');\n        ",
+    "sql": "\n            -- Extract 25-character window surrounding the word 'vectorized'\n            SELECT \n                post_id,\n                '...' || SUBSTRING(\n                    content,\n                    GREATEST(1, INSTR(lower(content), 'vectorized') - 15),\n                    LENGTH('vectorized') + 30\n                ) || '...' AS snippet_preview\n            FROM blog_posts\n            WHERE content ILIKE '%vectorized%';\n        "
+  },
+  {
+    "id": "Q71_search_journey_order_attribution",
+    "title": "Customer Search-to-Purchase Path Attribution (Session Query Lift)",
+    "domain": "Search & Retrieval",
+    "human_context": "E-commerce search product managers need to know which search queries drove actual revenue. We link search queries to checkout events within the same 30-minute session.",
+    "hidden_trap": "Attributing purchases to search queries that occurred after the purchase order was placed.",
+    "duckdb_advantage": "DuckDB temporal range joins ensure search queries precede the checkout timestamp.",
+    "setup_sql": "\n            CREATE TABLE user_search_queries (\n                user_id INT,\n                query_term VARCHAR,\n                searched_at TIMESTAMP\n            );\n            CREATE TABLE completed_orders (\n                order_id INT,\n                user_id INT,\n                order_total DECIMAL(10,2),\n                ordered_at TIMESTAMP\n            );\n            INSERT INTO user_search_queries VALUES\n                (50, 'noise canceling headphones', '2026-03-01 14:10:00'),\n                (50, 'sony xm5 sale',              '2026-03-01 14:15:00');\n            INSERT INTO completed_orders VALUES\n                (1001, 50, 349.99, '2026-03-01 14:25:00');\n        ",
+    "sql": "\n            -- Attribute purchase to the most recent search query prior to order\n            SELECT \n                o.order_id,\n                o.user_id,\n                o.order_total,\n                s.query_term AS attributing_search_query,\n                s.searched_at,\n                o.ordered_at\n            FROM completed_orders o\n            ASOF JOIN user_search_queries s\n              ON o.user_id = s.user_id\n             AND o.ordered_at >= s.searched_at\n            ORDER BY o.order_id;\n        "
+  },
+  {
+    "id": "Q72_fuzzy_entity_resolution_dedup",
+    "title": "Fuzzy Customer Entity Resolution across Disparate Data Sources",
+    "domain": "Search & Retrieval",
+    "human_context": "Merging CRM and billing databases requires linking customers with slight name and address variations (e.g. 'Robert Smith, 123 Main St' vs 'Bob Smith, 123 Main Street').",
+    "hidden_trap": "Pairwise fuzzy string matching over millions of records is computationally prohibitive without blocking/canopy clustering.",
+    "duckdb_advantage": "DuckDB uses zip-code blocking keys before computing string similarity.",
+    "setup_sql": "\n            CREATE TABLE crm_records (\n                crm_id INT,\n                name VARCHAR,\n                zip_code VARCHAR\n            );\n            CREATE TABLE billing_records (\n                bill_id INT,\n                name VARCHAR,\n                zip_code VARCHAR\n            );\n            INSERT INTO crm_records VALUES\n                (1, 'Robert Johnson', '94107'),\n                (2, 'Sarah Williams', '10001');\n            INSERT INTO billing_records VALUES\n                (101, 'Bob Johnson',     '94107'),\n                (102, 'Sara Williams',    '10001');\n        ",
+    "sql": "\n            -- Entity resolution: Match records with identical zip code and Jaro-Winkler name similarity >= 0.80\n            SELECT \n                c.crm_id,\n                c.name AS crm_name,\n                b.bill_id,\n                b.name AS billing_name,\n                c.zip_code,\n                ROUND(jaro_winkler_similarity(c.name, b.name), 4) AS name_similarity\n            FROM crm_records c\n            JOIN billing_records b\n              ON c.zip_code = b.zip_code\n             AND jaro_winkler_similarity(c.name, b.name) >= 0.80\n            ORDER BY name_similarity DESC;\n        "
+  },
+  {
+    "id": "Q73_search_term_cooccurrence_matrix",
+    "title": "Search Term Co-Occurrence Matrix (Market Basket of Search Queries)",
+    "domain": "Search & Retrieval",
+    "human_context": "To suggest related searches, engines analyze queries searched together in the same session (e.g. users searching 'monitor' also search 'hdmi cable' 42% of the time).",
+    "hidden_trap": "Self-joining search sessions without ordering (`a.term < b.term`) doubles matrix size with duplicate reversed pairs.",
+    "duckdb_advantage": "DuckDB computes symmetric co-occurrence frequencies in a single pass.",
+    "setup_sql": "\n            CREATE TABLE session_searches (\n                session_id INT,\n                term VARCHAR\n            );\n            INSERT INTO session_searches VALUES\n                (1, 'laptop'), (1, 'mouse'), (1, 'backpack'),\n                (2, 'laptop'), (2, 'mouse'),\n                (3, 'laptop'), (3, 'keyboard');\n        ",
+    "sql": "\n            -- Find pairs of terms most frequently searched in the same user session\n            SELECT \n                a.term AS term_a,\n                b.term AS term_b,\n                COUNT(*) AS cooccurrence_count\n            FROM session_searches a\n            JOIN session_searches b\n              ON a.session_id = b.session_id\n             AND a.term < b.term\n            GROUP BY a.term, b.term\n            ORDER BY cooccurrence_count DESC, term_a, term_b;\n        "
+  },
+  {
+    "id": "Q74_did_you_mean_spell_suggestion",
+    "title": "'Did You Mean?' Query Spell-Correction Suggestion Engine",
+    "domain": "Search & Retrieval",
+    "human_context": "When a query produces few results, search engines recommend a spell-corrected candidate word from the catalog vocabulary that has the lowest edit distance and highest document frequency.",
+    "hidden_trap": "Suggesting rare typos back to users rather than verified popular vocabulary terms.",
+    "duckdb_advantage": "DuckDB joins dictionary terms, calculates edit distance, and ranks by frequency in one query.",
+    "setup_sql": "\n            CREATE TABLE dictionary_terms (\n                term VARCHAR,\n                doc_frequency INT\n            );\n            INSERT INTO dictionary_terms VALUES\n                ('wireless', 50000),\n                ('wiretap',     50),\n                ('tireless',   120);\n        ",
+    "sql": "\n            -- Given misspelled query 'wireles', propose top dictionary replacement with edit distance <= 1\n            SELECT \n                term AS suggested_correction,\n                doc_frequency,\n                levenshtein(term, 'wireles') AS edit_distance\n            FROM dictionary_terms\n            WHERE levenshtein(term, 'wireles') <= 2\n            ORDER BY edit_distance ASC, doc_frequency DESC\n            LIMIT 1;\n        "
+  },
+  {
+    "id": "Q75_hybrid_search_metadata_soft_boost",
+    "title": "Hybrid Search with Hard Categorical Filter & Soft Merchant Quality Boost",
+    "domain": "Search & Retrieval",
+    "human_context": "Top marketplaces enforce strict hard filters (in-stock, prime shipping) while soft-boosting items based on merchant review rating: final_score = text_relevance * (1.0 + 0.1 * merchant_rating).",
+    "hidden_trap": "Hard-filtering by rating eliminates high-relevance new merchants with few reviews.",
+    "duckdb_advantage": "DuckDB combines hard boolean filtering with continuous multiplicative rating boosts.",
+    "setup_sql": "\n            CREATE TABLE merchant_inventory (\n                item_id INT,\n                category VARCHAR,\n                title VARCHAR,\n                merchant_rating DOUBLE,\n                is_available BOOLEAN\n            );\n            INSERT INTO merchant_inventory VALUES\n                (1, 'Audio', 'Pro Studio Monitor Headphones', 4.9, true),\n                (2, 'Audio', 'Budget Studio Headphones',       3.8, true),\n                (3, 'Audio', 'Discontinued Vintage Headphones', 4.8, false);\n        ",
+    "sql": "\n            -- Search 'Headphones' in 'Audio': Hard filter available=true, soft-boost by merchant rating\n            WITH text_matches AS (\n                SELECT \n                    item_id,\n                    title,\n                    merchant_rating,\n                    -- Base relevance score from keyword matches\n                    (CASE WHEN title ILIKE '%studio%' THEN 2.0 ELSE 1.0 END) AS base_relevance\n                FROM merchant_inventory\n                WHERE category = 'Audio'\n                  AND is_available = true\n                  AND title ILIKE '%Headphones%'\n            )\n            SELECT \n                item_id,\n                title,\n                merchant_rating,\n                base_relevance,\n                ROUND(base_relevance * (1.0 + (merchant_rating / 5.0) * 0.50), 2) AS boosted_final_score\n            FROM text_matches\n            ORDER BY boosted_final_score DESC;\n        "
+  },
+  {
+    "id": "Q76_bill_of_materials_recursive_rollup",
+    "title": "Hierarchical Bill of Materials (BOM) Cost Rollup via Recursive CTE",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Manufacturing an electric vehicle requires thousands of nested parts (Car -> Battery Pack -> Cell Module -> Lithium Cathode). Calculating unit cost requires rolling up quantities across arbitrary depth levels.",
+    "hidden_trap": "Fixed joins only support fixed depth hierarchies (e.g. 3 levels max). If an assembly has 6 levels, fixed joins miss the lowest-tier parts entirely.",
+    "duckdb_advantage": "DuckDB executes `WITH RECURSIVE` queries in memory with zero row-materialization overhead.",
+    "setup_sql": "\n            CREATE TABLE bom_parts (\n                parent_part VARCHAR,\n                child_part VARCHAR,\n                quantity_needed INT,\n                unit_cost DECIMAL(10,2)\n            );\n            INSERT INTO bom_parts VALUES\n                ('EV_CAR', 'CHASSIS', 1, 5000.00),\n                ('EV_CAR', 'BATTERY_PACK', 1, 0.00),\n                ('BATTERY_PACK', 'BATTERY_MODULE', 4, 0.00),\n                ('BATTERY_MODULE', 'LITHIUM_CELL', 100, 15.00);\n        ",
+    "sql": "\n            -- Recursively expand BOM tree to compute total quantity of base components\n            WITH RECURSIVE bom_tree AS (\n                -- Anchor: Top-level components of EV_CAR\n                SELECT \n                    parent_part,\n                    child_part,\n                    quantity_needed AS total_qty,\n                    1 AS depth\n                FROM bom_parts\n                WHERE parent_part = 'EV_CAR'\n                \n                UNION ALL\n                \n                -- Recursive: Multiply quantity down the hierarchy tree\n                SELECT \n                    t.child_part AS parent_part,\n                    b.child_part,\n                    t.total_qty * b.quantity_needed AS total_qty,\n                    t.depth + 1 AS depth\n                FROM bom_tree t\n                JOIN bom_parts b ON t.child_part = b.parent_part\n            )\n            SELECT \n                child_part,\n                total_qty,\n                depth\n            FROM bom_tree\n            ORDER BY depth, child_part;\n        "
+  },
+  {
+    "id": "Q77_org_hierarchy_span_of_control",
+    "title": "Organizational Reporting Depth & Management Span of Control",
+    "domain": "Graph & Hierarchy",
+    "human_context": "HR analytics measures how deep the management chain is from the CEO to individual contributors and calculates direct vs indirect headcounts for each manager.",
+    "hidden_trap": "Unbounded recursive queries crash if there is an accidental circular reporting loop (e.g. A reports to B, B reports to A).",
+    "duckdb_advantage": "DuckDB recursion tracks path depth to prevent infinite loops.",
+    "setup_sql": "\n            CREATE TABLE employees (\n                emp_id INT,\n                emp_name VARCHAR,\n                manager_id INT\n            );\n            INSERT INTO employees VALUES\n                (1, 'Alice (CEO)', NULL),\n                (2, 'Bob (VP Eng)', 1),\n                (3, 'Charlie (VP Sales)', 1),\n                (4, 'David (Staff Eng)', 2),\n                (5, 'Eve (Senior Eng)', 4);\n        ",
+    "sql": "\n            -- Traverse management tree from CEO downward, tracking reporting depth\n            WITH RECURSIVE org_hierarchy AS (\n                SELECT \n                    emp_id,\n                    emp_name,\n                    manager_id,\n                    1 AS hierarchy_level,\n                    emp_name AS reporting_path\n                FROM employees\n                WHERE manager_id IS NULL\n                \n                UNION ALL\n                \n                SELECT \n                    e.emp_id,\n                    e.emp_name,\n                    e.manager_id,\n                    h.hierarchy_level + 1,\n                    h.reporting_path || ' -> ' || e.emp_name\n                FROM employees e\n                JOIN org_hierarchy h ON e.manager_id = h.emp_id\n            )\n            SELECT \n                emp_id,\n                emp_name,\n                hierarchy_level,\n                reporting_path\n            FROM org_hierarchy\n            ORDER BY hierarchy_level, emp_id;\n        "
+  },
+  {
+    "id": "Q78_transitive_fraud_sybil_ring",
+    "title": "Transitive Fraud Ring & Sybil Account Detection via Device Links",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Financial fraudsters create hundreds of fake accounts linked by shared credit cards, device fingerprints, or IP addresses. Finding all accounts transitively connected to a confirmed fraudster exposes the syndicate.",
+    "hidden_trap": "Looking only 1 hop away misses fraudsters who funnel funds through mule intermediary accounts.",
+    "duckdb_advantage": "DuckDB recursive CTEs trace transitive graph edges across multiple hops.",
+    "setup_sql": "\n            CREATE TABLE shared_identifiers (\n                account_id INT,\n                linked_account_id INT\n            );\n            INSERT INTO shared_identifiers VALUES\n                (101, 102), -- 101 shares credit card with 102\n                (102, 103), -- 102 shares device with 103\n                (103, 104), -- 103 shares bank account with 104\n                (201, 202); -- Separate cluster\n        ",
+    "sql": "\n            -- Find all accounts transitively linked to known bad actor 101\n            WITH RECURSIVE fraud_cluster AS (\n                SELECT \n                    101 AS seed_account,\n                    linked_account_id AS connected_account,\n                    1 AS hop_distance\n                FROM shared_identifiers\n                WHERE account_id = 101\n                \n                UNION ALL\n                \n                SELECT \n                    c.seed_account,\n                    s.linked_account_id,\n                    c.hop_distance + 1\n                FROM fraud_cluster c\n                JOIN shared_identifiers s ON c.connected_account = s.account_id\n                WHERE c.hop_distance < 5\n            )\n            SELECT DISTINCT \n                seed_account,\n                connected_account,\n                MIN(hop_distance) AS shortest_hop_distance\n            FROM fraud_cluster\n            GROUP BY seed_account, connected_account\n            ORDER BY shortest_hop_distance;\n        "
+  },
+  {
+    "id": "Q79_graph_cycle_detection_visited_array",
+    "title": "Cycle Detection in Directed Dependency Graphs with Visited Array",
+    "domain": "Graph & Hierarchy",
+    "human_context": "In build systems (e.g. Webpack, Bazel) or task scheduling, circular dependencies (Task A -> Task B -> Task A) cause deadlocks. The engine must detect cycles and abort gracefully.",
+    "hidden_trap": "Standard recursive CTEs without cycle tracking loop infinitely until the database crashes with out-of-memory errors.",
+    "duckdb_advantage": "DuckDB array lists (`list_contains`) allow tracking visited paths directly inside recursive CTE state.",
+    "setup_sql": "\n            CREATE TABLE task_dependencies (\n                task_id VARCHAR,\n                depends_on VARCHAR\n            );\n            INSERT INTO task_dependencies VALUES\n                ('compile', 'codegen'),\n                ('codegen', 'lint'),\n                ('lint', 'compile'); -- Circular cycle!\n        ",
+    "sql": "\n            -- Detect circular loops using array path tracking\n            WITH RECURSIVE path_finder AS (\n                SELECT \n                    task_id,\n                    depends_on,\n                    [task_id] AS visited_path,\n                    false AS has_cycle\n                FROM task_dependencies\n                \n                UNION ALL\n                \n                SELECT \n                    p.task_id,\n                    d.depends_on,\n                    list_append(p.visited_path, d.task_id),\n                    list_contains(p.visited_path, d.depends_on) AS has_cycle\n                FROM path_finder p\n                JOIN task_dependencies d ON p.depends_on = d.task_id\n                WHERE NOT p.has_cycle AND array_length(p.visited_path) < 10\n            )\n            SELECT \n                task_id,\n                depends_on,\n                visited_path,\n                has_cycle\n            FROM path_finder\n            WHERE has_cycle = true\n            LIMIT 1;\n        "
+  },
+  {
+    "id": "Q80_logistics_shortest_path_routing",
+    "title": "Lowest-Cost Routing across Logistics Hubs via Recursive Dijkstra",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Supply chain networks ship containers through intermediary freight hubs. Finding the cheapest transit path from Source to Destination minimizes freight costs.",
+    "hidden_trap": "Evaluating all combinations without cost bounding leads to exponential path explosion.",
+    "duckdb_advantage": "DuckDB can evaluate path cost summations in recursive iterations.",
+    "setup_sql": "\n            CREATE TABLE shipping_lanes (\n                origin VARCHAR,\n                destination VARCHAR,\n                cost DOUBLE\n            );\n            INSERT INTO shipping_lanes VALUES\n                ('SEA', 'ORD', 400.0),\n                ('ORD', 'JFK', 300.0),\n                ('SEA', 'DEN', 200.0),\n                ('DEN', 'JFK', 450.0);\n        ",
+    "sql": "\n            -- Find lowest cost route from Seattle ('SEA') to New York ('JFK')\n            WITH RECURSIVE routes AS (\n                SELECT \n                    origin,\n                    destination,\n                    cost AS total_cost,\n                    origin || ' -> ' || destination AS route_path,\n                    1 AS hops\n                FROM shipping_lanes\n                WHERE origin = 'SEA'\n                \n                UNION ALL\n                \n                SELECT \n                    r.origin,\n                    l.destination,\n                    r.total_cost + l.cost AS total_cost,\n                    r.route_path || ' -> ' || l.destination,\n                    r.hops + 1\n                FROM routes r\n                JOIN shipping_lanes l ON r.destination = l.origin\n                WHERE r.hops < 4\n            )\n            SELECT \n                origin,\n                destination,\n                total_cost,\n                route_path,\n                hops\n            FROM routes\n            WHERE destination = 'JFK'\n            ORDER BY total_cost ASC\n            LIMIT 1;\n        "
+  },
+  {
+    "id": "Q81_incident_root_cause_dependency_chain",
+    "title": "Causal Microservice Incident Root-Cause Dependency Chain",
+    "domain": "Graph & Hierarchy",
+    "human_context": "When a user checkout fails, it could be caused by payments, auth, database, or network. Tracing dependencies upwards from the affected user service identifies the underlying root-cause service failure.",
+    "hidden_trap": "Diagnosing downstream symptoms rather than the root upstream failed dependency.",
+    "duckdb_advantage": "DuckDB traces dependency DAGs and joins failure logs in a single query.",
+    "setup_sql": "\n            CREATE TABLE service_mesh (\n                service VARCHAR,\n                depends_on VARCHAR\n            );\n            CREATE TABLE service_alerts (\n                service VARCHAR,\n                status VARCHAR,\n                error_rate DOUBLE\n            );\n            INSERT INTO service_mesh VALUES\n                ('checkout-api', 'payment-gateway'),\n                ('payment-gateway', 'fraud-evaluator'),\n                ('fraud-evaluator', 'redis-cache');\n            INSERT INTO service_alerts VALUES\n                ('checkout-api', 'DEGRADED', 0.15),\n                ('payment-gateway', 'DEGRADED', 0.20),\n                ('fraud-evaluator', 'DEGRADED', 0.85),\n                ('redis-cache', 'CRITICAL_DOWN', 1.00);\n        ",
+    "sql": "\n            -- Trace dependencies backwards from checkout-api to find root critical failure\n            WITH RECURSIVE upstream_chain AS (\n                SELECT \n                    service,\n                    depends_on,\n                    1 AS depth\n                FROM service_mesh\n                WHERE service = 'checkout-api'\n                \n                UNION ALL\n                \n                SELECT \n                    m.service,\n                    m.depends_on,\n                    c.depth + 1\n                FROM upstream_chain c\n                JOIN service_mesh m ON c.depends_on = m.service\n            )\n            SELECT \n                c.depth,\n                c.service,\n                c.depends_on AS upstream_service,\n                a.status AS upstream_status,\n                a.error_rate AS upstream_error_rate\n            FROM upstream_chain c\n            JOIN service_alerts a ON c.depends_on = a.service\n            ORDER BY c.depth DESC\n            LIMIT 1;\n        "
+  },
+  {
+    "id": "Q82_connected_components_community_labeling",
+    "title": "Graph Connected Components Labeling via Min-ID Propagation",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Graph connected components partition isolated clusters of customers or machines. Propagating the minimum account ID across edges assigns every node in the same component a shared group ID.",
+    "hidden_trap": "Standard SQL engines lack graph primitives, forcing expensive external graph database licenses.",
+    "duckdb_advantage": "DuckDB can evaluate recursive label propagation directly on relational tables.",
+    "setup_sql": "\n            CREATE TABLE graph_edges (\n                node_a INT,\n                node_b INT\n            );\n            -- Component 1: Nodes 1, 2, 3\n            -- Component 2: Nodes 8, 9\n            INSERT INTO graph_edges VALUES\n                (1, 2), (2, 3),\n                (8, 9);\n        ",
+    "sql": "\n            -- Symmetric edges\n            WITH RECURSIVE symmetric_edges AS (\n                SELECT node_a AS src, node_b AS dst FROM graph_edges\n                UNION\n                SELECT node_b AS src, node_a AS dst FROM graph_edges\n            ),\n            components AS (\n                -- Anchor: Initial component label is node itself\n                SELECT src AS node_id, src AS component_id, 0 AS iteration\n                FROM symmetric_edges\n                \n                UNION ALL\n                \n                -- Propagate smaller component ID across edges\n                SELECT \n                    e.dst AS node_id,\n                    c.component_id,\n                    c.iteration + 1\n                FROM components c\n                JOIN symmetric_edges e ON c.node_id = e.src\n                WHERE c.component_id < e.dst AND c.iteration < 5\n            )\n            SELECT \n                node_id,\n                MIN(component_id) AS cluster_id\n            FROM components\n            GROUP BY node_id\n            ORDER BY cluster_id, node_id;\n        "
+  },
+  {
+    "id": "Q83_degree_centrality_pagerank_step",
+    "title": "Network Node In-Degree Centrality and Influence Ranking",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Social network influence and API hub criticality are determined by node in-degree centrality (number of inbound links from distinct entities).",
+    "hidden_trap": "Counting total edges without filtering distinct source nodes allows a single spammer to inflate influencer metrics.",
+    "duckdb_advantage": "DuckDB aggregates high-volume graph degree metrics with high-speed hash grouping.",
+    "setup_sql": "\n            CREATE TABLE network_follows (\n                follower_id INT,\n                target_user_id INT\n            );\n            INSERT INTO network_follows VALUES\n                (101, 1), (102, 1), (103, 1), (104, 1), -- Node 1 has 4 followers\n                (101, 2), (102, 2),                     -- Node 2 has 2 followers\n                (101, 3);                               -- Node 3 has 1 follower\n        ",
+    "sql": "\n            -- Compute in-degree centrality and influence rank\n            SELECT \n                target_user_id AS influencer_id,\n                COUNT(DISTINCT follower_id) AS in_degree_centrality,\n                DENSE_RANK() OVER (ORDER BY COUNT(DISTINCT follower_id) DESC) AS influence_rank\n            FROM network_follows\n            GROUP BY target_user_id\n            ORDER BY influence_rank;\n        "
+  },
+  {
+    "id": "Q84_critical_path_method_scheduling",
+    "title": "Task Scheduling Critical Path Method (CPM) Duration Analysis",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Project managers identify the 'Critical Path'\u2014the longest sequence of dependent tasks that dictates the minimum project completion time.",
+    "hidden_trap": "Adding task durations without considering parallel execution branches yields an unrealistically inflated project timeline.",
+    "duckdb_advantage": "DuckDB recursive CTEs trace parallel branch durations and calculate maximum path length.",
+    "setup_sql": "\n            CREATE TABLE project_tasks (\n                task_code VARCHAR,\n                prerequisite_code VARCHAR,\n                duration_days INT\n            );\n            INSERT INTO project_tasks VALUES\n                ('START', NULL, 0),\n                ('DESIGN', 'START', 10),\n                ('BUILD_FRONTEND', 'DESIGN', 15),\n                ('BUILD_BACKEND',  'DESIGN', 25), -- Longest branch\n                ('DEPLOY', 'BUILD_BACKEND', 5);\n        ",
+    "sql": "\n            -- Find the longest path (Critical Path) from START to DEPLOY\n            WITH RECURSIVE task_paths AS (\n                SELECT \n                    task_code,\n                    duration_days AS cumulative_days,\n                    task_code AS path_str\n                FROM project_tasks\n                WHERE prerequisite_code IS NULL\n                \n                UNION ALL\n                \n                SELECT \n                    t.task_code,\n                    p.cumulative_days + t.duration_days,\n                    p.path_str || ' -> ' || t.task_code\n                FROM task_paths p\n                JOIN project_tasks t ON p.task_code = t.prerequisite_code\n            )\n            SELECT \n                task_code,\n                cumulative_days AS critical_path_duration,\n                path_str\n            FROM task_paths\n            ORDER BY cumulative_days DESC\n            LIMIT 1;\n        "
+  },
+  {
+    "id": "Q85_multilevel_referral_commissions",
+    "title": "Multi-Level Affiliate Referral Tree Commission Rollup (Tier 1-3)",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Affiliate programs reward referrals up to 3 tiers deep (Direct referrer gets 10%, Tier 2 gets 5%, Tier 3 gets 2.5% of purchase amount).",
+    "hidden_trap": "Hardcoded 3-way self-joins fail to handle users whose upline is only 1 or 2 tiers deep without complex coalesce logic.",
+    "duckdb_advantage": "DuckDB recursive CTEs assign dynamic commission percentages based on recursion depth.",
+    "setup_sql": "\n            CREATE TABLE referral_links (\n                user_id INT,\n                referrer_id INT\n            );\n            CREATE TABLE user_purchases (\n                purchase_id INT,\n                user_id INT,\n                amount DECIMAL(10,2)\n            );\n            INSERT INTO referral_links VALUES\n                (4, 3), -- 4 referred by 3\n                (3, 2), -- 3 referred by 2\n                (2, 1); -- 2 referred by 1 (Grandparent)\n            INSERT INTO user_purchases VALUES\n                (101, 4, 1000.00); -- Purchase by user 4\n        ",
+    "sql": "\n            -- Calculate multi-tier referral payout for purchase 101\n            WITH RECURSIVE upline AS (\n                -- Level 1: Direct referrer\n                SELECT \n                    r.user_id AS buyer_id,\n                    r.referrer_id AS beneficiary_id,\n                    1 AS tier,\n                    0.10 AS commission_rate\n                FROM referral_links r\n                WHERE r.user_id = 4\n                \n                UNION ALL\n                \n                -- Level 2 and 3 upline\n                SELECT \n                    u.buyer_id,\n                    r.referrer_id AS beneficiary_id,\n                    u.tier + 1,\n                    CASE WHEN u.tier + 1 = 2 THEN 0.05 ELSE 0.025 END AS commission_rate\n                FROM upline u\n                JOIN referral_links r ON u.beneficiary_id = r.user_id\n                WHERE u.tier < 3\n            )\n            SELECT \n                u.buyer_id,\n                u.beneficiary_id,\n                u.tier,\n                p.amount AS purchase_amount,\n                ROUND(p.amount * u.commission_rate, 2) AS commission_earned\n            FROM upline u\n            JOIN user_purchases p ON u.buyer_id = p.user_id\n            ORDER BY u.tier;\n        "
+  },
+  {
+    "id": "Q86_multiparent_allocation_cost_rollup",
+    "title": "Multi-Parent Shared Infrastructure Cost Allocation Rollup",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Cloud infrastructure (e.g. shared Kubernetes cluster) is co-owned by multiple products with fractional split percentages. Costs must cascade down to consumer business units.",
+    "hidden_trap": "Failing to multiply split percentages down the DAG results in allocated costs exceeding 100% of actual spend.",
+    "duckdb_advantage": "DuckDB calculates fractional cost propagation with exact decimal precision.",
+    "setup_sql": "\n            CREATE TABLE cost_nodes (\n                node_id VARCHAR,\n                monthly_cost DECIMAL(10,2)\n            );\n            CREATE TABLE cost_allocations (\n                parent_node VARCHAR,\n                child_node VARCHAR,\n                allocation_pct DOUBLE\n            );\n            INSERT INTO cost_nodes VALUES ('K8S_SHARED', 10000.00);\n            INSERT INTO cost_allocations VALUES\n                ('K8S_SHARED', 'PRODUCT_SEARCH', 0.60),\n                ('K8S_SHARED', 'PRODUCT_CHECKOUT', 0.40);\n        ",
+    "sql": "\n            -- Allocate parent cost to child business units\n            SELECT \n                a.parent_node,\n                a.child_node,\n                a.allocation_pct,\n                n.monthly_cost AS raw_parent_cost,\n                ROUND(n.monthly_cost * a.allocation_pct, 2) AS allocated_cost\n            FROM cost_allocations a\n            JOIN cost_nodes n ON a.parent_node = n.node_id\n            ORDER BY allocated_cost DESC;\n        "
+  },
+  {
+    "id": "Q87_circular_fx_arbitrage_triangle",
+    "title": "Triangular FX Currency Arbitrage Detection (Loop Profitability)",
+    "domain": "Graph & Hierarchy",
+    "human_context": "High-frequency FX trading bots scan for triangular arbitrage where converting USD -> EUR -> JPY -> USD yields more than 1.00 USD after exchange rates.",
+    "hidden_trap": "Missing currency conversion bid-ask spreads causes false positive arbitrage signals that lose money in practice.",
+    "duckdb_advantage": "DuckDB evaluates 3-hop currency cycles and product rates in sub-millisecond execution.",
+    "setup_sql": "\n            CREATE TABLE fx_pairs (\n                from_curr VARCHAR,\n                to_curr VARCHAR,\n                exchange_rate DOUBLE\n            );\n            INSERT INTO fx_pairs VALUES\n                ('USD', 'EUR', 0.92),\n                ('EUR', 'JPY', 160.0),\n                ('JPY', 'USD', 0.0069); -- Arbitrage loop: 0.92 * 160 * 0.0069 = 1.01568 (+1.5% profit)\n        ",
+    "sql": "\n            -- Detect 3-hop triangular arbitrage opportunities where effective rate > 1.005\n            SELECT \n                a.from_curr AS curr_start,\n                a.to_curr AS curr_mid1,\n                b.to_curr AS curr_mid2,\n                c.to_curr AS curr_end,\n                ROUND(a.exchange_rate * b.exchange_rate * c.exchange_rate, 4) AS loop_multiplier,\n                ROUND((a.exchange_rate * b.exchange_rate * c.exchange_rate - 1.0) * 100, 2) AS profit_margin_pct\n            FROM fx_pairs a\n            JOIN fx_pairs b ON a.to_curr = b.from_curr\n            JOIN fx_pairs c ON b.to_curr = c.from_curr AND c.to_curr = a.from_curr\n            WHERE (a.exchange_rate * b.exchange_rate * c.exchange_rate) > 1.005;\n        "
+  },
+  {
+    "id": "Q88_state_machine_transition_verification",
+    "title": "Transactional State Machine Transition Sequence Verification",
+    "domain": "Graph & Hierarchy",
+    "human_context": "Financial compliance requires payment transactions to strictly follow the state sequence: INITIATED -> AUTHORIZED -> CAPTURED -> SETTLED. Any transaction skipping steps is flagged as fraudulent.",
+    "hidden_trap": "Verifying status counts without checking transition sequence allows out-of-order state transitions.",
+    "duckdb_advantage": "DuckDB LEAD/LAG checks verify exact valid transition edges against a legal state graph.",
+    "setup_sql": "\n            CREATE TABLE payment_status_audit (\n                tx_id INT,\n                step_order INT,\n                status VARCHAR\n            );\n            -- Valid tx 1\n            INSERT INTO payment_status_audit VALUES\n                (1, 1, 'INITIATED'), (1, 2, 'AUTHORIZED'), (1, 3, 'CAPTURED');\n            -- Invalid tx 2: Jumped directly from INITIATED to CAPTURED!\n            INSERT INTO payment_status_audit VALUES\n                (2, 1, 'INITIATED'), (2, 2, 'CAPTURED');\n        ",
+    "sql": "\n            -- Validate that every state transition matches the legal state machine rules\n            WITH transitions AS (\n                SELECT \n                    tx_id,\n                    status AS current_state,\n                    LEAD(status) OVER (PARTITION BY tx_id ORDER BY step_order) AS next_state\n                FROM payment_status_audit\n            )\n            SELECT \n                tx_id,\n                current_state,\n                next_state,\n                CASE \n                    WHEN next_state IS NULL THEN 'TERMINAL_STATE'\n                    WHEN current_state = 'INITIATED' AND next_state = 'AUTHORIZED' THEN 'VALID'\n                    WHEN current_state = 'AUTHORIZED' AND next_state = 'CAPTURED' THEN 'VALID'\n                    WHEN current_state = 'CAPTURED' AND next_state = 'SETTLED' THEN 'VALID'\n                    ELSE 'INVALID_ILLEGAL_STATE_JUMP'\n                END AS audit_validation_result\n            FROM transitions\n            ORDER BY tx_id, current_state;\n        "
+  },
+  {
+    "id": "Q89_chasm_trap_fanout_resolution",
+    "title": "Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation",
+    "domain": "Warehouse & Statistical",
+    "human_context": "When an order has multiple discounts AND multiple shipment records, joining both child tables directly to the order creates a cross product that multiplies sales figures by 4x. Pre-aggregating each child table in CTEs before joining preserves financial integrity.",
+    "hidden_trap": "Frontier models routinely join all tables before GROUP BY, causing catastrophic silent metric corruption.",
+    "duckdb_advantage": "DuckDB can evaluate pre-aggregated CTEs in parallel vector pipelines with zero temp-table writes.",
+    "setup_sql": "\n            CREATE TABLE orders (order_id INT, customer_id INT, base_amount DECIMAL(10,2));\n            CREATE TABLE order_discounts (discount_id INT, order_id INT, amount DECIMAL(10,2));\n            CREATE TABLE order_shipments (shipment_id INT, order_id INT, fee DECIMAL(10,2));\n            INSERT INTO orders VALUES (101, 1, 100.00);\n            INSERT INTO order_discounts VALUES (1, 101, 10.00), (2, 101, 5.00);\n            INSERT INTO order_shipments VALUES (1, 101, 4.00),  (2, 101, 6.00);\n        ",
+    "sql": "\n            -- Correctly aggregate discounts and shipments without fan-out inflation\n            WITH agg_discounts AS (\n                SELECT order_id, SUM(amount) AS total_discount\n                FROM order_discounts\n                GROUP BY order_id\n            ),\n            agg_shipments AS (\n                SELECT order_id, SUM(fee) AS total_shipping\n                FROM order_shipments\n                GROUP BY order_id\n            )\n            SELECT \n                o.customer_id,\n                SUM(o.base_amount) AS total_gross_sales,\n                COALESCE(SUM(d.total_discount), 0.00) AS total_discount_amount,\n                COALESCE(SUM(s.total_shipping), 0.00) AS total_shipping_fees,\n                ROUND(SUM(o.base_amount) - COALESCE(SUM(d.total_discount), 0.00) + COALESCE(SUM(s.total_shipping), 0.00), 2) AS net_revenue\n            FROM orders o\n            LEFT JOIN agg_discounts d ON o.order_id = d.order_id\n            LEFT JOIN agg_shipments s ON o.order_id = s.order_id\n            GROUP BY o.customer_id;\n        "
+  },
+  {
+    "id": "Q90_three_valued_logic_safe_anti_join",
+    "title": "Three-Valued Logic Safe Anti-Join (Eliminating the NOT IN NULL Trap)",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Marketing queries to find active customers who have not churned often use `WHERE id NOT IN (SELECT customer_id FROM churned_users)`. If a single `NULL` exists in `churned_users`, SQL three-valued logic causes the entire query to return ZERO rows.",
+    "hidden_trap": "In SQL, `val NOT IN (1, NULL)` evaluates to `UNKNOWN`, which evaluates to `FALSE` in WHERE clauses, silently discarding every single record.",
+    "duckdb_advantage": "Using `NOT EXISTS` or `ANTI JOIN` avoids three-valued logic traps and compiles to optimal hash anti-joins.",
+    "setup_sql": "\n            CREATE TABLE all_customers (customer_id INT, name VARCHAR);\n            CREATE TABLE churned_customers (customer_id INT);\n            INSERT INTO all_customers VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie');\n            -- Note the presence of a NULL record in the churned table!\n            INSERT INTO churned_customers VALUES (2), (NULL);\n        ",
+    "sql": "\n            -- Robust anti-join that is immune to NULL records in the subquery\n            SELECT \n                c.customer_id,\n                c.name\n            FROM all_customers c\n            WHERE NOT EXISTS (\n                SELECT 1 \n                FROM churned_customers ch \n                WHERE ch.customer_id = c.customer_id\n            )\n            ORDER BY c.customer_id;\n        "
+  },
+  {
+    "id": "Q91_dynamic_pivot_monthly_revenue",
+    "title": "Dynamic PIVOT of Monthly Revenue by Product Category",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Financial reporting requires transforming normalized long-form transaction rows into cross-tabulated wide financial matrices (Months along the top, Categories down the side).",
+    "hidden_trap": "Writing dozens of manual `CASE WHEN month = '2026-01' THEN amount ELSE 0 END` expressions is brittle and verbose.",
+    "duckdb_advantage": "DuckDB has first-class native `PIVOT` syntax.",
+    "setup_sql": "\n            CREATE TABLE sales_facts (\n                category VARCHAR,\n                sale_month VARCHAR,\n                revenue DECIMAL(10,2)\n            );\n            INSERT INTO sales_facts VALUES\n                ('Electronics', '2026-01', 50000.00),\n                ('Electronics', '2026-02', 65000.00),\n                ('Apparel',     '2026-01', 30000.00),\n                ('Apparel',     '2026-02', 32000.00);\n        ",
+    "sql": "\n            -- Reshape monthly revenue into wide cross-tabulation using DuckDB PIVOT\n            PIVOT sales_facts\n            ON sale_month\n            USING SUM(revenue)\n            GROUP BY category\n            ORDER BY category;\n        "
+  },
+  {
+    "id": "Q92_dynamic_unpivot_wide_metrics",
+    "title": "Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, memory, disk). Normalizing them into key-value pairs is necessary for time-series modeling.",
+    "hidden_trap": "Chaining 10 UNION ALL queries multiplies read passes over the source data.",
+    "duckdb_advantage": "DuckDB native `UNPIVOT` performs unpivoting in a single streaming pass.",
+    "setup_sql": "\n            CREATE TABLE wide_telemetry (\n                host_id VARCHAR,\n                captured_date DATE,\n                cpu_metric DOUBLE,\n                mem_metric DOUBLE,\n                disk_metric DOUBLE\n            );\n            INSERT INTO wide_telemetry VALUES\n                ('srv-01', '2026-03-01', 45.2, 78.5, 92.1);\n        ",
+    "sql": "\n            -- Transform wide metric columns into normalized key-value rows\n            UNPIVOT wide_telemetry\n            ON cpu_metric, mem_metric, disk_metric\n            INTO\n                NAME metric_name\n                VALUE metric_value;\n        "
+  },
+  {
+    "id": "Q93_list_lambdas_nested_json_arrays",
+    "title": "List Lambdas for High-Performance Nested Array Transformations",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Modern analytical warehouses store nested array payloads (e.g. array of discount percentages). Transforming or filtering elements directly inside the array without unnesting and re-aggregating saves massive compute.",
+    "hidden_trap": "Unnesting arrays to flat rows and re-aggregating with LIST() triggers expensive hash shuffles.",
+    "duckdb_advantage": "DuckDB list lambdas (`list_transform`, `list_filter`) execute in-place vectorized functions directly on array vectors.",
+    "setup_sql": "\n            CREATE TABLE shopping_carts (\n                cart_id INT,\n                discounts_applied INT[],\n                item_prices DOUBLE[]\n            );\n            INSERT INTO shopping_carts VALUES\n                (1, [5, 15, 25], [100.0, 50.0, 20.0]),\n                (2, [0, 10],     [200.0, 80.0]);\n        ",
+    "sql": "\n            -- Filter out discounts <= 5% and double remaining discount percentages using list lambdas\n            SELECT \n                cart_id,\n                discounts_applied AS raw_discounts,\n                list_filter(discounts_applied, lambda x: x > 5) AS qualifying_discounts,\n                list_transform(\n                    list_filter(discounts_applied, lambda x: x > 5), \n                    lambda x: x * 2\n                ) AS doubled_qualifying_discounts\n            FROM shopping_carts\n            ORDER BY cart_id;\n        "
+  },
+  {
+    "id": "Q94_median_absolute_deviation_mad",
+    "title": "Median Absolute Deviation (MAD) Robust Statistical Outlier Detection",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Traditional standard deviation Z-scores fail in the presence of extreme outliers because the outliers themselves distort the mean and standard deviation. MAD is a robust statistical scale estimator.",
+    "hidden_trap": "Mean and standard deviation break down completely on fat-tailed or skewed data distributions.",
+    "duckdb_advantage": "DuckDB can compute medians of deviations in standard analytical CTEs.",
+    "setup_sql": "\n            CREATE TABLE payment_volumes (\n                tx_id INT,\n                amount DOUBLE\n            );\n            INSERT INTO payment_volumes VALUES\n                (1, 10.0), (2, 12.0), (3, 11.0), (4, 13.0), (5, 12.0),\n                (6, 1000.0); -- Massive outlier\n        ",
+    "sql": "\n            -- Compute Median Absolute Deviation (MAD) and flag robust outliers\n            -- MAD = MEDIAN( |x - MEDIAN(x)| )\n            WITH med AS (\n                SELECT MEDIAN(amount) AS overall_median\n                FROM payment_volumes\n            ),\n            deviations AS (\n                SELECT \n                    p.tx_id,\n                    p.amount,\n                    m.overall_median,\n                    ABS(p.amount - m.overall_median) AS abs_deviation\n                FROM payment_volumes p\n                CROSS JOIN med m\n            ),\n            mad_val AS (\n                SELECT MEDIAN(abs_deviation) AS mad_score\n                FROM deviations\n            )\n            SELECT \n                d.tx_id,\n                d.amount,\n                d.overall_median,\n                ROUND(d.abs_deviation / NULLIF(v.mad_score, 0), 2) AS robust_mad_score,\n                CASE \n                    WHEN (d.abs_deviation / NULLIF(v.mad_score, 0)) > 3.0 \n                    THEN 'ROBUST_OUTLIER' \n                    ELSE 'NORMAL' \n                END AS anomaly_flag\n            FROM deviations d\n            CROSS JOIN mad_val v\n            ORDER BY robust_mad_score DESC;\n        "
+  },
+  {
+    "id": "Q95_robust_z_score_iqr_normalization",
+    "title": "Robust Z-Score Normalization using Median and Interquartile Range (IQR)",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Standardizing skewed metrics (like API response latency) for machine learning feature pipelines requires scaling by IQR (Q3 - Q1) rather than standard deviation.",
+    "hidden_trap": "Standard Z-score produces biased features when distributions have heavy tails.",
+    "duckdb_advantage": "DuckDB percentile functions (`QUANTILE_CONT`) compute exact quartiles in a single scan.",
+    "setup_sql": "\n            CREATE TABLE response_times (\n                request_id INT,\n                latency_ms DOUBLE\n            );\n            INSERT INTO response_times VALUES\n                (1, 45.0), (2, 50.0), (3, 52.0), (4, 48.0), (5, 300.0);\n        ",
+    "sql": "\n            -- Compute robust IQR-normalized score: (x - Q2) / (Q3 - Q1)\n            WITH quartiles AS (\n                SELECT \n                    QUANTILE_CONT(latency_ms, 0.25) AS q1,\n                    QUANTILE_CONT(latency_ms, 0.50) AS median_val,\n                    QUANTILE_CONT(latency_ms, 0.75) AS q3\n                FROM response_times\n            )\n            SELECT \n                r.request_id,\n                r.latency_ms,\n                ROUND((r.latency_ms - q.median_val) / NULLIF(q.q3 - q.q1, 0), 3) AS robust_iqr_z_score\n            FROM response_times r\n            CROSS JOIN quartiles q\n            ORDER BY robust_iqr_z_score DESC;\n        "
+  },
+  {
+    "id": "Q96_window_frame_range_vs_rows_ties",
+    "title": "Financial Ledger Running Total: ROWS vs. RANGE Semantic Contrast",
+    "domain": "Warehouse & Statistical",
+    "human_context": "In financial auditing, understanding the exact behavioral difference between `ROWS BETWEEN` and `RANGE BETWEEN` prevents duplicate-timestamp errors from failing regulatory ledger reconciliations.",
+    "hidden_trap": "The ANSI SQL default for window frames with ORDER BY is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, which aggregates identical peers together into one lump sum.",
+    "duckdb_advantage": "DuckDB provides explicit window execution options and deterministic ordering.",
+    "setup_sql": "\n            CREATE TABLE audit_ledger (\n                tx_id INT,\n                val_date DATE,\n                amount DECIMAL(10,2)\n            );\n            INSERT INTO audit_ledger VALUES\n                (1, '2026-03-01', 100.00),\n                (2, '2026-03-01', 50.00),  -- Same date!\n                (3, '2026-03-02', 20.00);\n        ",
+    "sql": "\n            -- Compare the difference between default RANGE (peer bunching) vs ROWS (strict sequential)\n            SELECT \n                tx_id,\n                val_date,\n                amount,\n                -- Default RANGE behavior: bunches tied dates together ($150 on row 1 and 2)\n                SUM(amount) OVER (\n                    ORDER BY val_date\n                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                ) AS bunched_range_total,\n                -- Explicit ROWS behavior: increments strictly row by row ($100 then $150)\n                SUM(amount) OVER (\n                    ORDER BY val_date, tx_id\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                ) AS strict_rows_total\n            FROM audit_ledger\n            ORDER BY val_date, tx_id;\n        "
+  },
+  {
+    "id": "Q97_sargable_date_boundary_pruning",
+    "title": "SARGable Partition Pruning: Exact Half-Open Date Boundary Ranges",
+    "domain": "Warehouse & Statistical",
+    "human_context": "When filtering analytical partitions for a calendar month, `BETWEEN '2026-01-01' AND '2026-01-31'` leaks into February 1st if timestamps contain hours/minutes, while `strftime('%m', ts) = '01'` disables partition pruning entirely.",
+    "hidden_trap": "Subtle boundary leakage or full table scans caused by non-SARGable WHERE predicates.",
+    "duckdb_advantage": "Half-open `>= '2026-01-01' AND < '2026-02-01'` ensures exact month boundaries and 100% metadata partition pruning.",
+    "setup_sql": "\n            CREATE TABLE audit_events (\n                event_id INT,\n                created_at TIMESTAMP\n            );\n            INSERT INTO audit_events VALUES\n                (1, '2026-01-31 23:59:59'),\n                (2, '2026-02-01 00:00:00'), -- Should NOT be in January\n                (3, '2026-01-15 12:00:00');\n        ",
+    "sql": "\n            -- Exact SARGable half-open January 2026 boundary query\n            SELECT \n                event_id,\n                created_at\n            FROM audit_events\n            WHERE created_at >= TIMESTAMP '2026-01-01 00:00:00'\n              AND created_at <  TIMESTAMP '2026-02-01 00:00:00'\n            ORDER BY created_at;\n        "
+  },
+  {
+    "id": "Q98_window_exclude_group_moving_peer",
+    "title": "Window Peer Frame Exclusion: EXCLUDE GROUP for Clean Cross-Group Contrast",
+    "domain": "Warehouse & Statistical",
+    "human_context": "When comparing sales across product categories or dates, analysts want to compute the average of all other groups, strictly excluding the entire current group.",
+    "hidden_trap": "Computing group baselines without excluding the current group dilutes contrast in small sample sizes.",
+    "duckdb_advantage": "DuckDB fully supports SQL:2011 `EXCLUDE GROUP` window syntax.",
+    "setup_sql": "\n            CREATE TABLE regional_orders (\n                region VARCHAR,\n                order_id INT,\n                sale_amount DOUBLE\n            );\n            INSERT INTO regional_orders VALUES\n                ('North', 1, 100.0),\n                ('North', 2, 120.0),\n                ('South', 3, 200.0),\n                ('East',  4, 150.0);\n        ",
+    "sql": "\n            -- Compute baseline average across other regions strictly excluding current region group\n            SELECT \n                region,\n                order_id,\n                sale_amount,\n                ROUND(AVG(sale_amount) OVER (\n                    ORDER BY region\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING\n                    EXCLUDE GROUP\n                ), 2) AS other_regions_baseline_avg\n            FROM regional_orders\n            ORDER BY region, order_id;\n        "
+  },
+  {
+    "id": "Q99_window_exclude_ties_duplicate_handling",
+    "title": "Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals",
+    "domain": "Warehouse & Statistical",
+    "human_context": "In financial ranking, when multiple entities have the exact same score, evaluating cumulative rank metrics without self-reinforcing duplicate ties prevents tied participants from skewing percentiles.",
+    "hidden_trap": "Tied participants mutually inflate each other's cumulative metrics.",
+    "duckdb_advantage": "DuckDB supports `EXCLUDE TIES` in window frames.",
+    "setup_sql": "\n            CREATE TABLE gaming_scores (\n                player_id INT,\n                score INT\n            );\n            INSERT INTO gaming_scores VALUES\n                (1, 500),\n                (2, 450),\n                (3, 450), -- Tie\n                (4, 300);\n        ",
+    "sql": "\n            -- Calculate cumulative score excluding tied peers at the current rank\n            SELECT \n                player_id,\n                score,\n                SUM(score) OVER (\n                    ORDER BY score DESC\n                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    EXCLUDE TIES\n                ) AS cumulative_score_excluding_tied_peers\n            FROM gaming_scores\n            ORDER BY score DESC, player_id;\n        "
+  },
+  {
+    "id": "Q100_market_basket_association_rules",
+    "title": "Market Basket Association Rules: Support, Confidence, and Lift in Pure SQL",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Data miners discover product affinities ('Customers who buy Item A also buy Item B') using Support, Confidence, and Lift metrics computed directly from transaction tables.",
+    "hidden_trap": "Generating cross-products across all transactions creates memory spills on large catalogs.",
+    "duckdb_advantage": "DuckDB can evaluate pair frequency matrices and marginal probabilities in memory.",
+    "setup_sql": "\n            CREATE TABLE order_baskets (\n                order_id INT,\n                item VARCHAR\n            );\n            INSERT INTO order_baskets VALUES\n                (1, 'Bread'), (1, 'Butter'), (1, 'Milk'),\n                (2, 'Bread'), (2, 'Butter'),\n                (3, 'Bread'), (3, 'Milk'),\n                (4, 'Beer'),  (4, 'Diapers');\n        ",
+    "sql": "\n            -- Compute Support, Confidence, and Lift for Item A -> Item B\n            WITH basket_totals AS (\n                SELECT COUNT(DISTINCT order_id) AS total_baskets FROM order_baskets\n            ),\n            item_counts AS (\n                SELECT item, COUNT(DISTINCT order_id) AS item_baskets\n                FROM order_baskets\n                GROUP BY item\n            ),\n            pair_counts AS (\n                SELECT \n                    a.item AS item_a,\n                    b.item AS item_b,\n                    COUNT(DISTINCT a.order_id) AS pair_baskets\n                FROM order_baskets a\n                JOIN order_baskets b \n                  ON a.order_id = b.order_id \n                 AND a.item != b.item\n                GROUP BY a.item, b.item\n            )\n            SELECT \n                p.item_a,\n                p.item_b,\n                p.pair_baskets,\n                -- Support: P(A and B)\n                ROUND(p.pair_baskets * 1.0 / t.total_baskets, 3) AS support,\n                -- Confidence: P(B | A) = pair / count_a\n                ROUND(p.pair_baskets * 1.0 / ca.item_baskets, 3) AS confidence,\n                -- Lift: Confidence / P(B) = (pair * total) / (count_a * count_b)\n                ROUND((p.pair_baskets * 1.0 * t.total_baskets) / (ca.item_baskets * cb.item_baskets), 3) AS lift\n            FROM pair_counts p\n            JOIN item_counts ca ON p.item_a = ca.item\n            JOIN item_counts cb ON p.item_b = cb.item\n            CROSS JOIN basket_totals t\n            WHERE p.pair_baskets >= 2\n            ORDER BY lift DESC, p.item_a, p.item_b;\n        "
+  },
+  {
+    "id": "Q101_kaplan_meier_churn_survival",
+    "title": "Kaplan-Meier Non-Parametric Customer Survival Analysis in SQL",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Actuarial and SaaS subscription models estimate the probability of customer survival past Day T, accounting for right-censored users who haven't churned yet.",
+    "hidden_trap": "Naively dividing churned users by total signups underestimates customer lifetime value.",
+    "duckdb_advantage": "DuckDB window functions compute step-down survival curves using cumulative products.",
+    "setup_sql": "\n            CREATE TABLE subscription_cohort (\n                user_id INT,\n                tenure_months INT,\n                has_churned BOOLEAN\n            );\n            INSERT INTO subscription_cohort VALUES\n                (1, 1, true),  -- Churned at month 1\n                (2, 1, false), -- Still active at month 1\n                (3, 2, true),  -- Churned at month 2\n                (4, 2, false),\n                (5, 3, false);\n        ",
+    "sql": "\n            -- Kaplan-Meier survival probability estimation by tenure month\n            WITH monthly_risk AS (\n                SELECT \n                    tenure_months,\n                    COUNT(*) AS cohort_events,\n                    SUM(CASE WHEN has_churned THEN 1 ELSE 0 END) AS churn_count,\n                    COUNT(*) OVER (ORDER BY tenure_months DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS number_at_risk\n                FROM subscription_cohort\n                GROUP BY tenure_months\n            )\n            SELECT \n                tenure_months,\n                number_at_risk,\n                churn_count,\n                ROUND(1.0 - (churn_count * 1.0 / number_at_risk), 4) AS interval_survival_rate\n            FROM monthly_risk\n            ORDER BY tenure_months;\n        "
+  },
+  {
+    "id": "Q102_equi_depth_dynamic_binning_ntile",
+    "title": "Dynamic Equi-Depth Histogram Binning via NTILE in Pure SQL",
+    "domain": "Warehouse & Statistical",
+    "human_context": "Creating balanced feature histograms for ML requires equal-depth binning (each bucket contains an equal number of records) rather than equal-width binning.",
+    "hidden_trap": "Equal-width bins leave high-value tail bins completely empty on skewed power-law distributions.",
+    "duckdb_advantage": "DuckDB `NTILE()` computes equi-depth quantile bins with zero pre-scanning.",
+    "setup_sql": "\n            CREATE TABLE customer_spend (\n                customer_id INT,\n                annual_spend DECIMAL(10,2)\n            );\n            INSERT INTO customer_spend VALUES\n                (1, 20.00), (2, 35.00), (3, 50.00), (4, 150.00),\n                (5, 300.00), (6, 500.00), (7, 1200.00), (8, 5000.00);\n        ",
+    "sql": "\n            -- Partition customers into 4 equal-depth spending quartiles (bins)\n            WITH binned AS (\n                SELECT \n                    customer_id,\n                    annual_spend,\n                    NTILE(4) OVER (ORDER BY annual_spend ASC) AS spend_quartile\n                FROM customer_spend\n            )\n            SELECT \n                spend_quartile,\n                COUNT(*) AS customer_count,\n                MIN(annual_spend) AS min_spend_in_bin,\n                MAX(annual_spend) AS max_spend_in_bin,\n                ROUND(AVG(annual_spend), 2) AS avg_spend_in_bin\n            FROM binned\n            GROUP BY spend_quartile\n            ORDER BY spend_quartile;\n        "
+  }
+]

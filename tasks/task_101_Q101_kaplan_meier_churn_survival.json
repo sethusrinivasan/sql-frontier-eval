@@ -1,0 +1,17 @@
+{
+  "id": "task_101_Q101_kaplan_meier_churn_survival",
+  "name": "Kaplan-Meier Non-Parametric Customer Survival Analysis in SQL",
+  "category": "Warehouse & Statistical",
+  "description": "Actuarial and SaaS subscription models estimate the probability of customer survival past Day T, accounting for right-censored users who haven't churned yet.",
+  "prompt": "Actuarial and SaaS subscription models estimate the probability of customer survival past Day T, accounting for right-censored users who haven't churned yet.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: tenure_months, number_at_risk, churn_count, interval_survival_rate.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE subscription_cohort (\n                user_id INT,\n                tenure_months INT,\n                has_churned BOOLEAN\n            );\n            INSERT INTO subscription_cohort VALUES\n                (1, 1, true),  -- Churned at month 1\n                (2, 1, false), -- Still active at month 1\n                (3, 2, true),  -- Churned at month 2\n                (4, 2, false),\n                (5, 3, false);",
+  "golden_sql": "-- Kaplan-Meier survival probability estimation by tenure month\n            WITH monthly_risk AS (\n                SELECT \n                    tenure_months,\n                    COUNT(*) AS cohort_events,\n                    SUM(CASE WHEN has_churned THEN 1 ELSE 0 END) AS churn_count,\n                    COUNT(*) OVER (ORDER BY tenure_months DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS number_at_risk\n                FROM subscription_cohort\n                GROUP BY tenure_months\n            )\n            SELECT \n                tenure_months,\n                number_at_risk,\n                churn_count,\n                ROUND(1.0 - (churn_count * 1.0 / number_at_risk), 4) AS interval_survival_rate\n            FROM monthly_risk\n            ORDER BY tenure_months;",
+  "ordered": true,
+  "expected_columns": [
+    "tenure_months",
+    "number_at_risk",
+    "churn_count",
+    "interval_survival_rate"
+  ],
+  "why_it_fails": "Naively dividing churned users by total signups underestimates customer lifetime value."
+}

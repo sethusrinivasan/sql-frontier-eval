@@ -1,0 +1,15 @@
+{
+  "id": "task_065_Q65_search_position_bias_dcg",
+  "name": "Discounted Cumulative Gain (DCG) with Search Position Bias Discount",
+  "category": "Search & Retrieval",
+  "description": "Users are far more likely to click the #1 search result than the #5 result regardless of relevance. Ranking quality is measured via Discounted Cumulative Gain: DCG = SUM(relevance / log2(rank + 1)).",
+  "prompt": "Users are far more likely to click the #1 search result than the #5 result regardless of relevance. Ranking quality is measured via Discounted Cumulative Gain: DCG = SUM(relevance / log2(rank + 1)).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: query_id, dcg_at_3.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE search_impressions (\n                query_id INT,\n                rank_position INT,\n                relevance_label INT -- 0=irrelevant, 1=relevant, 2=perfect\n            );\n            INSERT INTO search_impressions VALUES\n                (1, 1, 2), -- Rank 1: perfect match\n                (1, 2, 0), -- Rank 2: bad match\n                (1, 3, 1); -- Rank 3: good match",
+  "golden_sql": "-- Calculate DCG@3 for query 1\n            SELECT \n                query_id,\n                ROUND(SUM(relevance_label / LOG2(rank_position + 1)), 4) AS dcg_at_3\n            FROM search_impressions\n            WHERE rank_position <= 3\n            GROUP BY query_id;",
+  "ordered": false,
+  "expected_columns": [
+    "query_id",
+    "dcg_at_3"
+  ],
+  "why_it_fails": "Simple click counts reward poorly placed relevant items unfairly."
+}

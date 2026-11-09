@@ -1,0 +1,17 @@
+{
+  "id": "task_037_Q37_hybrid_relational_vector_cohort_join",
+  "name": "Cohort-Constrained Vector Match with Geographical Regionality",
+  "category": "Vector & Embeddings",
+  "description": "Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personality/skill compatibility joined with strict relational geographic and category boundaries.",
+  "prompt": "Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personality/skill compatibility joined with strict relational geographic and category boundaries.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: job_id, region, candidate_id, skill_fit_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE candidates (\n                candidate_id INT,\n                region VARCHAR,\n                skills_vec FLOAT[3]\n            );\n            CREATE TABLE job_openings (\n                job_id INT,\n                region VARCHAR,\n                required_vec FLOAT[3]\n            );\n            INSERT INTO candidates VALUES\n                (1, 'US-WEST', [0.8, 0.5, 0.2]::FLOAT[3]),\n                (2, 'EU-CENTRAL', [0.85, 0.5, 0.2]::FLOAT[3]);\n            INSERT INTO job_openings VALUES\n                (101, 'US-WEST', [0.82, 0.48, 0.18]::FLOAT[3]);",
+  "golden_sql": "-- Match jobs to candidates strictly within matching geographical region ordered by skill compatibility\n            SELECT \n                j.job_id,\n                j.region,\n                c.candidate_id,\n                ROUND(array_cosine_similarity(c.skills_vec, j.required_vec), 4) AS skill_fit_score\n            FROM job_openings j\n            JOIN candidates c\n              ON j.region = c.region\n            ORDER BY skill_fit_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "job_id",
+    "region",
+    "candidate_id",
+    "skill_fit_score"
+  ],
+  "why_it_fails": "Matching vectors globally without partitioning by region produces candidates located 3,000 miles away."
+}

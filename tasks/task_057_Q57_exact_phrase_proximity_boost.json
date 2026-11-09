@@ -1,0 +1,16 @@
+{
+  "id": "task_057_Q57_exact_phrase_proximity_boost",
+  "name": "Exact Phrase Proximity Boosting in Keyword Retrieval",
+  "category": "Search & Retrieval",
+  "description": "If a user searches for 'machine learning', an article containing the exact phrase 'machine learning' should rank higher than an article where 'machine' is in paragraph 1 and 'learning' is in paragraph 8.",
+  "prompt": "If a user searches for 'machine learning', an article containing the exact phrase 'machine learning' should rank higher than an article where 'machine' is in paragraph 1 and 'learning' is in paragraph 8.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: article_id, text_content, relevance_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE articles_proximity (\n                article_id INT,\n                text_content VARCHAR\n            );\n            INSERT INTO articles_proximity VALUES\n                (1, 'Recent breakthroughs in machine learning algorithms have transformed AI.'),\n                (2, 'The washing machine broke down, so I am learning how to fix the belt.'),\n                (3, 'Database indexing structures and query execution plans.');",
+  "golden_sql": "-- Query: 'machine' AND 'learning', with a 5.0x boost for exact phrase match\n            SELECT \n                article_id,\n                text_content,\n                (CASE WHEN text_content ILIKE '%machine%' THEN 1.0 ELSE 0.0 END +\n                 CASE WHEN text_content ILIKE '%learning%' THEN 1.0 ELSE 0.0 END +\n                 CASE WHEN text_content ILIKE '%machine learning%' THEN 5.0 ELSE 0.0 END) AS relevance_score\n            FROM articles_proximity\n            WHERE text_content ILIKE '%machine%' AND text_content ILIKE '%learning%'\n            ORDER BY relevance_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "article_id",
+    "text_content",
+    "relevance_score"
+  ],
+  "why_it_fails": "Pure bag-of-words keyword matches ignore token proximity and phrase boundaries."
+}

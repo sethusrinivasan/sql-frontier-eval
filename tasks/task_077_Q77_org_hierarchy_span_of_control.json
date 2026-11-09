@@ -1,0 +1,17 @@
+{
+  "id": "task_077_Q77_org_hierarchy_span_of_control",
+  "name": "Organizational Reporting Depth & Management Span of Control",
+  "category": "Graph & Hierarchy",
+  "description": "HR analytics measures how deep the management chain is from the CEO to individual contributors and calculates direct vs indirect headcounts for each manager.",
+  "prompt": "HR analytics measures how deep the management chain is from the CEO to individual contributors and calculates direct vs indirect headcounts for each manager.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: emp_id, emp_name, hierarchy_level, reporting_path.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE employees (\n                emp_id INT,\n                emp_name VARCHAR,\n                manager_id INT\n            );\n            INSERT INTO employees VALUES\n                (1, 'Alice (CEO)', NULL),\n                (2, 'Bob (VP Eng)', 1),\n                (3, 'Charlie (VP Sales)', 1),\n                (4, 'David (Staff Eng)', 2),\n                (5, 'Eve (Senior Eng)', 4);",
+  "golden_sql": "-- Traverse management tree from CEO downward, tracking reporting depth\n            WITH RECURSIVE org_hierarchy AS (\n                SELECT \n                    emp_id,\n                    emp_name,\n                    manager_id,\n                    1 AS hierarchy_level,\n                    emp_name AS reporting_path\n                FROM employees\n                WHERE manager_id IS NULL\n                \n                UNION ALL\n                \n                SELECT \n                    e.emp_id,\n                    e.emp_name,\n                    e.manager_id,\n                    h.hierarchy_level + 1,\n                    h.reporting_path || ' -> ' || e.emp_name\n                FROM employees e\n                JOIN org_hierarchy h ON e.manager_id = h.emp_id\n            )\n            SELECT \n                emp_id,\n                emp_name,\n                hierarchy_level,\n                reporting_path\n            FROM org_hierarchy\n            ORDER BY hierarchy_level, emp_id;",
+  "ordered": true,
+  "expected_columns": [
+    "emp_id",
+    "emp_name",
+    "hierarchy_level",
+    "reporting_path"
+  ],
+  "why_it_fails": "Unbounded recursive queries crash if there is an accidental circular reporting loop (e.g. A reports to B, B reports to A)."
+}

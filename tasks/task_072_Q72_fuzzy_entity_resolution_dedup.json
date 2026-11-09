@@ -1,0 +1,19 @@
+{
+  "id": "task_072_Q72_fuzzy_entity_resolution_dedup",
+  "name": "Fuzzy Customer Entity Resolution across Disparate Data Sources",
+  "category": "Search & Retrieval",
+  "description": "Merging CRM and billing databases requires linking customers with slight name and address variations (e.g. 'Robert Smith, 123 Main St' vs 'Bob Smith, 123 Main Street').",
+  "prompt": "Merging CRM and billing databases requires linking customers with slight name and address variations (e.g. 'Robert Smith, 123 Main St' vs 'Bob Smith, 123 Main Street').\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: crm_id, crm_name, bill_id, billing_name, zip_code, name_similarity.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE crm_records (\n                crm_id INT,\n                name VARCHAR,\n                zip_code VARCHAR\n            );\n            CREATE TABLE billing_records (\n                bill_id INT,\n                name VARCHAR,\n                zip_code VARCHAR\n            );\n            INSERT INTO crm_records VALUES\n                (1, 'Robert Johnson', '94107'),\n                (2, 'Sarah Williams', '10001');\n            INSERT INTO billing_records VALUES\n                (101, 'Bob Johnson',     '94107'),\n                (102, 'Sara Williams',    '10001');",
+  "golden_sql": "-- Entity resolution: Match records with identical zip code and Jaro-Winkler name similarity >= 0.80\n            SELECT \n                c.crm_id,\n                c.name AS crm_name,\n                b.bill_id,\n                b.name AS billing_name,\n                c.zip_code,\n                ROUND(jaro_winkler_similarity(c.name, b.name), 4) AS name_similarity\n            FROM crm_records c\n            JOIN billing_records b\n              ON c.zip_code = b.zip_code\n             AND jaro_winkler_similarity(c.name, b.name) >= 0.80\n            ORDER BY name_similarity DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "crm_id",
+    "crm_name",
+    "bill_id",
+    "billing_name",
+    "zip_code",
+    "name_similarity"
+  ],
+  "why_it_fails": "Pairwise fuzzy string matching over millions of records is computationally prohibitive without blocking/canopy clustering."
+}

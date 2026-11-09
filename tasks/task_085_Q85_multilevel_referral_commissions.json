@@ -1,0 +1,18 @@
+{
+  "id": "task_085_Q85_multilevel_referral_commissions",
+  "name": "Multi-Level Affiliate Referral Tree Commission Rollup (Tier 1-3)",
+  "category": "Graph & Hierarchy",
+  "description": "Affiliate programs reward referrals up to 3 tiers deep (Direct referrer gets 10%, Tier 2 gets 5%, Tier 3 gets 2.5% of purchase amount).",
+  "prompt": "Affiliate programs reward referrals up to 3 tiers deep (Direct referrer gets 10%, Tier 2 gets 5%, Tier 3 gets 2.5% of purchase amount).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: buyer_id, beneficiary_id, tier, purchase_amount, commission_earned.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE referral_links (\n                user_id INT,\n                referrer_id INT\n            );\n            CREATE TABLE user_purchases (\n                purchase_id INT,\n                user_id INT,\n                amount DECIMAL(10,2)\n            );\n            INSERT INTO referral_links VALUES\n                (4, 3), -- 4 referred by 3\n                (3, 2), -- 3 referred by 2\n                (2, 1); -- 2 referred by 1 (Grandparent)\n            INSERT INTO user_purchases VALUES\n                (101, 4, 1000.00); -- Purchase by user 4",
+  "golden_sql": "-- Calculate multi-tier referral payout for purchase 101\n            WITH RECURSIVE upline AS (\n                -- Level 1: Direct referrer\n                SELECT \n                    r.user_id AS buyer_id,\n                    r.referrer_id AS beneficiary_id,\n                    1 AS tier,\n                    0.10 AS commission_rate\n                FROM referral_links r\n                WHERE r.user_id = 4\n                \n                UNION ALL\n                \n                -- Level 2 and 3 upline\n                SELECT \n                    u.buyer_id,\n                    r.referrer_id AS beneficiary_id,\n                    u.tier + 1,\n                    CASE WHEN u.tier + 1 = 2 THEN 0.05 ELSE 0.025 END AS commission_rate\n                FROM upline u\n                JOIN referral_links r ON u.beneficiary_id = r.user_id\n                WHERE u.tier < 3\n            )\n            SELECT \n                u.buyer_id,\n                u.beneficiary_id,\n                u.tier,\n                p.amount AS purchase_amount,\n                ROUND(p.amount * u.commission_rate, 2) AS commission_earned\n            FROM upline u\n            JOIN user_purchases p ON u.buyer_id = p.user_id\n            ORDER BY u.tier;",
+  "ordered": true,
+  "expected_columns": [
+    "buyer_id",
+    "beneficiary_id",
+    "tier",
+    "purchase_amount",
+    "commission_earned"
+  ],
+  "why_it_fails": "Hardcoded 3-way self-joins fail to handle users whose upline is only 1 or 2 tiers deep without complex coalesce logic."
+}

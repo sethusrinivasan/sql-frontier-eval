@@ -1,0 +1,16 @@
+{
+  "id": "task_035_Q35_kmeans_cluster_assignment_step",
+  "name": "K-Means Clustering Assignment and Centroid Update in Pure SQL",
+  "category": "Vector & Embeddings",
+  "description": "Unsupervised customer segmentation can be run directly inside DuckDB by assigning customer vectors to the nearest centroid and recomputing cluster means in a single query.",
+  "prompt": "Unsupervised customer segmentation can be run directly inside DuckDB by assigning customer vectors to the nearest centroid and recomputing cluster means in a single query.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: point_id, assigned_cluster, distance_to_center.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE cluster_centroids (\n                cluster_id INT,\n                center FLOAT[2]\n            );\n            CREATE TABLE data_points (\n                point_id INT,\n                coord FLOAT[2]\n            );\n            INSERT INTO cluster_centroids VALUES\n                (1, [1.0, 1.0]::FLOAT[2]),\n                (2, [8.0, 8.0]::FLOAT[2]);\n            INSERT INTO data_points VALUES\n                (101, [1.2, 0.9]::FLOAT[2]),\n                (102, [1.5, 1.1]::FLOAT[2]),\n                (103, [7.8, 8.2]::FLOAT[2]);",
+  "golden_sql": "-- Step 1: Assign each point to the closest cluster centroid via array_distance\n            WITH point_distances AS (\n                SELECT \n                    p.point_id,\n                    p.coord,\n                    c.cluster_id,\n                    array_distance(p.coord, c.center) AS dist,\n                    ROW_NUMBER() OVER (PARTITION BY p.point_id ORDER BY array_distance(p.coord, c.center) ASC) AS rank_closest\n                FROM data_points p\n                CROSS JOIN cluster_centroids c\n            )\n            SELECT \n                point_id,\n                cluster_id AS assigned_cluster,\n                ROUND(dist, 4) AS distance_to_center\n            FROM point_distances\n            WHERE rank_closest = 1\n            ORDER BY point_id;",
+  "ordered": true,
+  "expected_columns": [
+    "point_id",
+    "assigned_cluster",
+    "distance_to_center"
+  ],
+  "why_it_fails": "Running ML clustering outside the warehouse requires exporting millions of vectors over the network."
+}

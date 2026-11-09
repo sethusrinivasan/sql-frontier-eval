@@ -1,0 +1,16 @@
+{
+  "id": "task_099_Q99_window_exclude_ties_duplicate_handling",
+  "name": "Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals",
+  "category": "Warehouse & Statistical",
+  "description": "In financial ranking, when multiple entities have the exact same score, evaluating cumulative rank metrics without self-reinforcing duplicate ties prevents tied participants from skewing percentiles.",
+  "prompt": "In financial ranking, when multiple entities have the exact same score, evaluating cumulative rank metrics without self-reinforcing duplicate ties prevents tied participants from skewing percentiles.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: player_id, score, cumulative_score_excluding_tied_peers.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE gaming_scores (\n                player_id INT,\n                score INT\n            );\n            INSERT INTO gaming_scores VALUES\n                (1, 500),\n                (2, 450),\n                (3, 450), -- Tie\n                (4, 300);",
+  "golden_sql": "-- Calculate cumulative score excluding tied peers at the current rank\n            SELECT \n                player_id,\n                score,\n                SUM(score) OVER (\n                    ORDER BY score DESC\n                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    EXCLUDE TIES\n                ) AS cumulative_score_excluding_tied_peers\n            FROM gaming_scores\n            ORDER BY score DESC, player_id;",
+  "ordered": true,
+  "expected_columns": [
+    "player_id",
+    "score",
+    "cumulative_score_excluding_tied_peers"
+  ],
+  "why_it_fails": "Tied participants mutually inflate each other's cumulative metrics."
+}

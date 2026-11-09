@@ -1,0 +1,18 @@
+{
+  "id": "task_081_Q81_incident_root_cause_dependency_chain",
+  "name": "Causal Microservice Incident Root-Cause Dependency Chain",
+  "category": "Graph & Hierarchy",
+  "description": "When a user checkout fails, it could be caused by payments, auth, database, or network. Tracing dependencies upwards from the affected user service identifies the underlying root-cause service failure.",
+  "prompt": "When a user checkout fails, it could be caused by payments, auth, database, or network. Tracing dependencies upwards from the affected user service identifies the underlying root-cause service failure.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: depth, service, upstream_service, upstream_status, upstream_error_rate.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE service_mesh (\n                service VARCHAR,\n                depends_on VARCHAR\n            );\n            CREATE TABLE service_alerts (\n                service VARCHAR,\n                status VARCHAR,\n                error_rate DOUBLE\n            );\n            INSERT INTO service_mesh VALUES\n                ('checkout-api', 'payment-gateway'),\n                ('payment-gateway', 'fraud-evaluator'),\n                ('fraud-evaluator', 'redis-cache');\n            INSERT INTO service_alerts VALUES\n                ('checkout-api', 'DEGRADED', 0.15),\n                ('payment-gateway', 'DEGRADED', 0.20),\n                ('fraud-evaluator', 'DEGRADED', 0.85),\n                ('redis-cache', 'CRITICAL_DOWN', 1.00);",
+  "golden_sql": "-- Trace dependencies backwards from checkout-api to find root critical failure\n            WITH RECURSIVE upstream_chain AS (\n                SELECT \n                    service,\n                    depends_on,\n                    1 AS depth\n                FROM service_mesh\n                WHERE service = 'checkout-api'\n                \n                UNION ALL\n                \n                SELECT \n                    m.service,\n                    m.depends_on,\n                    c.depth + 1\n                FROM upstream_chain c\n                JOIN service_mesh m ON c.depends_on = m.service\n            )\n            SELECT \n                c.depth,\n                c.service,\n                c.depends_on AS upstream_service,\n                a.status AS upstream_status,\n                a.error_rate AS upstream_error_rate\n            FROM upstream_chain c\n            JOIN service_alerts a ON c.depends_on = a.service\n            ORDER BY c.depth DESC\n            LIMIT 1;",
+  "ordered": true,
+  "expected_columns": [
+    "depth",
+    "service",
+    "upstream_service",
+    "upstream_status",
+    "upstream_error_rate"
+  ],
+  "why_it_fails": "Diagnosing downstream symptoms rather than the root upstream failed dependency."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "task_018_Q18_time_decay_user_affinity",
+  "name": "Exponential Time-Decayed User Affinity Scoring",
+  "category": "Temporal & Time-Series",
+  "description": "Recommendation systems score user interest where recent clicks count significantly more than clicks from 30 days ago, modeled via exponential decay: score * e^(-lambda * delta_days).",
+  "prompt": "Recommendation systems score user interest where recent clicks count significantly more than clicks from 30 days ago, modeled via exponential decay: score * e^(-lambda * delta_days).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: user_id, category, decayed_affinity_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE item_clicks (\n                user_id INT,\n                category VARCHAR,\n                click_time TIMESTAMP\n            );\n            INSERT INTO item_clicks VALUES\n                (99, 'laptops', '2026-03-01 10:00:00'), -- Today\n                (99, 'laptops', '2026-02-20 10:00:00'), -- 9 days ago\n                (99, 'shoes',   '2026-01-01 10:00:00'); -- 60 days ago",
+  "golden_sql": "-- Exponential decay affinity score with 7-day half-life (lambda = ln(2)/7 = ~0.099)\n            SELECT \n                user_id,\n                category,\n                ROUND(SUM(\n                    EXP(-0.099 * date_diff('day', click_time, TIMESTAMP '2026-03-01 12:00:00'))\n                ), 3) AS decayed_affinity_score\n            FROM item_clicks\n            GROUP BY user_id, category\n            ORDER BY decayed_affinity_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "user_id",
+    "category",
+    "decayed_affinity_score"
+  ],
+  "why_it_fails": "Equal-weight counts overemphasize obsolete user interests from months ago."
+}

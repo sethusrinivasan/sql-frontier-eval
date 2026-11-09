@@ -1,0 +1,16 @@
+{
+  "id": "task_048_Q48_vector_quantization_distortion",
+  "name": "Vector Quantization Precision Distortion & Reconstruction Error",
+  "category": "Vector & Embeddings",
+  "description": "To compress embeddings from 32-bit floats to 8-bit integers, engineers evaluate the reconstruction error (distance between uncompressed and quantized vector) to measure fidelity loss.",
+  "prompt": "To compress embeddings from 32-bit floats to 8-bit integers, engineers evaluate the reconstruction error (distance between uncompressed and quantized vector) to measure fidelity loss.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: vector_id, l2_quantization_error, cosine_distortion.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE vector_compression_test (\n                vector_id INT,\n                fp32_vec FLOAT[3],\n                quantized_vec FLOAT[3]\n            );\n            INSERT INTO vector_compression_test VALUES\n                (1, [0.12345, 0.67891, 0.44332]::FLOAT[3], [0.12, 0.68, 0.44]::FLOAT[3]),\n                (2, [0.99123, 0.02111, 0.11005]::FLOAT[3], [0.99, 0.02, 0.11]::FLOAT[3]);",
+  "golden_sql": "-- Evaluate Euclidean distortion and cosine fidelity loss per vector\n            SELECT \n                vector_id,\n                ROUND(array_distance(fp32_vec, quantized_vec), 6) AS l2_quantization_error,\n                ROUND(1.0 - array_cosine_similarity(fp32_vec, quantized_vec), 6) AS cosine_distortion\n            FROM vector_compression_test\n            ORDER BY l2_quantization_error DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "vector_id",
+    "l2_quantization_error",
+    "cosine_distortion"
+  ],
+  "why_it_fails": "Deploying quantized embeddings without evaluating distortion leads to silent degradation in search accuracy."
+}

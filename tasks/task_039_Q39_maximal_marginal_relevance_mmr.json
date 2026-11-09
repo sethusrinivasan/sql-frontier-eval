@@ -1,0 +1,18 @@
+{
+  "id": "task_039_Q39_maximal_marginal_relevance_mmr",
+  "name": "Maximal Marginal Relevance (MMR) Diversity Reranking in SQL",
+  "category": "Vector & Embeddings",
+  "description": "Standard vector retrieval often returns 5 virtually identical articles. MMR penalizes redundancy by selecting documents that are similar to the query but dissimilar to already-selected documents.",
+  "prompt": "Standard vector retrieval often returns 5 virtually identical articles. MMR penalizes redundancy by selecting documents that are similar to the query but dissimilar to already-selected documents.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: article_id, headline, query_relevance, redundancy_with_top1, mmr_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE news_articles (\n                article_id INT,\n                headline VARCHAR,\n                vec FLOAT[2]\n            );\n            INSERT INTO news_articles VALUES\n                (1, 'Fed cuts interest rates by 25 bps',      [0.99, 0.05]::FLOAT[2]),\n                (2, 'Central bank lowers benchmark 25 bps',   [0.98, 0.06]::FLOAT[2]), -- Redundant clone\n                (3, 'Tech stock rally follows monetary shift', [0.80, 0.45]::FLOAT[2]); -- Diverse relevant",
+  "golden_sql": "-- First candidate is highest query similarity; score subsequent candidates by query sim minus similarity to article 1\n            WITH ranked_candidates AS (\n                SELECT \n                    article_id,\n                    headline,\n                    vec,\n                    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) AS query_sim\n                FROM news_articles\n            )\n            SELECT \n                c.article_id,\n                c.headline,\n                ROUND(c.query_sim, 4) AS query_relevance,\n                ROUND(array_cosine_similarity(c.vec, top1.vec), 4) AS redundancy_with_top1,\n                -- MMR formula: 0.7 * Sim(doc, query) - 0.3 * Sim(doc, top1)\n                ROUND(0.7 * c.query_sim - 0.3 * array_cosine_similarity(c.vec, top1.vec), 4) AS mmr_score\n            FROM ranked_candidates c\n            CROSS JOIN (SELECT vec FROM ranked_candidates ORDER BY query_sim DESC LIMIT 1) top1\n            ORDER BY mmr_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "article_id",
+    "headline",
+    "query_relevance",
+    "redundancy_with_top1",
+    "mmr_score"
+  ],
+  "why_it_fails": "Pure relevance search creates echo-chamber search results with zero content diversity."
+}

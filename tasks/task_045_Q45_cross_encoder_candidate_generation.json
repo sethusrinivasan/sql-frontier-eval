@@ -1,0 +1,16 @@
+{
+  "id": "task_045_Q45_cross_encoder_candidate_generation",
+  "name": "Two-Stage Retrieval: Bi-Encoder Candidate Generation for Re-ranking",
+  "category": "Vector & Embeddings",
+  "description": "Modern enterprise search uses a 2-stage pipeline: Fast bi-encoder vector search retrieves Top-50 candidates, which are then passed to a computationally heavy cross-encoder for final scoring.",
+  "prompt": "Modern enterprise search uses a 2-stage pipeline: Fast bi-encoder vector search retrieves Top-50 candidates, which are then passed to a computationally heavy cross-encoder for final scoring.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: article_id, category, stage1_biencoder_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE knowledge_articles (\n                article_id INT,\n                category VARCHAR,\n                vec FLOAT[2]\n            );\n            INSERT INTO knowledge_articles VALUES\n                (1, 'tech', [0.9, 0.1]::FLOAT[2]),\n                (2, 'tech', [0.8, 0.2]::FLOAT[2]),\n                (3, 'hr',   [0.1, 0.9]::FLOAT[2]);",
+  "golden_sql": "-- First-stage candidate extraction: Top candidates in relevant category\n            SELECT \n                article_id,\n                category,\n                ROUND(array_cosine_similarity(vec, [0.95, 0.05]::FLOAT[2]), 4) AS stage1_biencoder_score\n            FROM knowledge_articles\n            WHERE category = 'tech'\n            ORDER BY stage1_biencoder_score DESC\n            LIMIT 50;",
+  "ordered": true,
+  "expected_columns": [
+    "article_id",
+    "category",
+    "stage1_biencoder_score"
+  ],
+  "why_it_fails": "Running heavy cross-encoder models across entire datasets is computationally impossible."
+}

@@ -1,0 +1,187 @@
+{
+  "timestamp": "2026-11-09T03:42:05.621892+00:00",
+  "model": "agy/gemini-3.8-flash-low",
+  "is_golden_test": false,
+  "total_tasks": 8,
+  "passed": 8,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_01_fanout",
+      "name": "E-Commerce Financial Aggregation without Join Fan-Out",
+      "category": "Metric Inflation / Chasm Trap",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH merchant_orders AS (\n    SELECT\n        merchant_id,\n        COALESCE(SUM(base_amount), 0) AS total_gross_sales\n    FROM orders\n    GROUP BY merchant_id\n),\norder_discount_totals AS (\n    SELECT\n        o.merchant_id,\n        COALESCE(SUM(d.amount), 0) AS total_discount_amount\n    FROM order_discounts d\n    JOIN orders o ON d.order_id = o.order_id\n    GROUP BY o.merchant_id\n),\norder_shipment_totals AS (\n    SELECT\n        o.merchant_id,\n        COALESCE(SUM(s.shipping_fee), 0) AS total_shipping_fees\n    FROM order_shipments s\n    JOIN orders o ON s.order_id = o.order_id\n    GROUP BY o.merchant_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    COALESCE(mo.total_gross_sales, 0.00) AS total_gross_sales,\n    COALESCE(odt.total_discount_amount, 0.00) AS total_discount_amount,\n    COALESCE(ost.total_shipping_fees, 0.00) AS total_shipping_fees\nFROM merchants m\nLEFT JOIN merchant_orders mo ON m.merchant_id = mo.merchant_id\nLEFT JOIN order_discount_totals odt ON m.merchant_id = odt.merchant_id\nLEFT JOIN order_shipment_totals ost ON m.merchant_id = ost.merchant_id;",
+      "golden_sql": "WITH agg_discounts AS (\n    SELECT order_id, SUM(amount) AS total_discount\n    FROM order_discounts\n    GROUP BY order_id\n),\nagg_shipments AS (\n    SELECT order_id, SUM(shipping_fee) AS total_shipping\n    FROM order_shipments\n    GROUP BY order_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    SUM(o.base_amount) AS total_gross_sales,\n    COALESCE(SUM(d.total_discount), 0.00) AS total_discount_amount,\n    COALESCE(SUM(s.total_shipping), 0.00) AS total_shipping_fees\nFROM merchants m\nJOIN orders o ON m.merchant_id = o.merchant_id\nLEFT JOIN agg_discounts d ON o.order_id = d.order_id\nLEFT JOIN agg_shipments s ON o.order_id = s.order_id\nGROUP BY m.merchant_id, m.merchant_name;",
+      "execution_time_ms": 5.27042499743402,
+      "golden_time_ms": 11.099997998826439,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 1
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4666.780028001085,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH merchant_orders AS (\n    SELECT\n        merchant_id,\n        COALESCE(SUM(base_amount), 0) AS total_gross_sales\n    FROM orders\n    GROUP BY merchant_id\n),\norder_discount_totals AS (\n    SELECT\n        o.merchant_id,\n        COALESCE(SUM(d.amount), 0) AS total_discount_amount\n    FROM order_discounts d\n    JOIN orders o ON d.order_id = o.order_id\n    GROUP BY o.merchant_id\n),\norder_shipment_totals AS (\n    SELECT\n        o.merchant_id,\n        COALESCE(SUM(s.shipping_fee), 0) AS total_shipping_fees\n    FROM order_shipments s\n    JOIN orders o ON s.order_id = o.order_id\n    GROUP BY o.merchant_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    COALESCE(mo.total_gross_sales, 0.00) AS total_gross_sales,\n    COALESCE(odt.total_discount_amount, 0.00) AS total_discount_amount,\n    COALESCE(ost.total_shipping_fees, 0.00) AS total_shipping_fees\nFROM merchants m\nLEFT JOIN merchant_orders mo ON m.merchant_id = mo.merchant_id\nLEFT JOIN order_discount_totals odt ON m.merchant_id = odt.merchant_id\nLEFT JOIN order_shipment_totals ost ON m.merchant_id = ost.merchant_id;\n```"
+      }
+    },
+    {
+      "task_id": "task_02_sessionization",
+      "name": "Clickstream Sessionization with Inactivity Gaps",
+      "category": "Sessionization (Gaps & Islands)",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH session_flags AS (\n    SELECT\n        user_id,\n        event_timestamp,\n        CASE\n            WHEN event_timestamp - LAG(event_timestamp) OVER (\n                PARTITION BY user_id\n                ORDER BY event_timestamp\n            ) > INTERVAL 30 MINUTE\n            OR LAG(event_timestamp) OVER (\n                PARTITION BY user_id\n                ORDER BY event_timestamp\n            ) IS NULL\n            THEN 1\n            ELSE 0\n        END AS is_new_session\n    FROM user_events\n),\nsession_groups AS (\n    SELECT\n        user_id,\n        event_timestamp,\n        SUM(is_new_session) OVER (\n            PARTITION BY user_id\n            ORDER BY event_timestamp\n        ) AS session_id\n    FROM session_flags\n)\nSELECT\n    user_id,\n    session_id,\n    MIN(event_timestamp) AS session_start,\n    MAX(event_timestamp) AS session_end,\n    COUNT(*) AS event_count\nFROM session_groups\nGROUP BY\n    user_id,\n    session_id\nORDER BY\n    user_id ASC,\n    session_start ASC;",
+      "golden_sql": "WITH lagged AS (\n    SELECT\n        user_id,\n        event_timestamp,\n        CASE\n            WHEN event_timestamp - LAG(event_timestamp) OVER (\n                PARTITION BY user_id ORDER BY event_timestamp\n            ) > INTERVAL 30 MINUTE \n                 OR LAG(event_timestamp) OVER (\n                PARTITION BY user_id ORDER BY event_timestamp\n            ) IS NULL THEN 1\n            ELSE 0\n        END AS is_new_session\n    FROM user_events\n),\nsession_indexed AS (\n    SELECT\n        user_id,\n        event_timestamp,\n        CAST(SUM(is_new_session) OVER (\n            PARTITION BY user_id ORDER BY event_timestamp\n            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n        ) AS BIGINT) AS session_id\n    FROM lagged\n)\nSELECT\n    user_id,\n    session_id,\n    MIN(event_timestamp) AS session_start,\n    MAX(event_timestamp) AS session_end,\n    COUNT(*) AS event_count\nFROM session_indexed\nGROUP BY user_id, session_id\nORDER BY user_id ASC, session_start ASC;",
+      "execution_time_ms": 5.0762489991029724,
+      "golden_time_ms": 6.432628997572465,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 3
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 5345.720868001081,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH session_flags AS (\n    SELECT\n        user_id,\n        event_timestamp,\n        CASE\n            WHEN event_timestamp - LAG(event_timestamp) OVER (\n                PARTITION BY user_id\n                ORDER BY event_timestamp\n            ) > INTERVAL 30 MINUTE\n            OR LAG(event_timestamp) OVER (\n                PARTITION BY user_id\n                ORDER BY event_timestamp\n            ) IS NULL\n            THEN 1\n            ELSE 0\n        END AS is_new_session\n    FROM user_events\n),\nsession_groups AS (\n    SELECT\n        user_id,\n        event_timestamp,\n        SUM(is_new_session) OVER (\n            PARTITION BY user_id\n            ORDER BY event_timestamp\n        ) AS session_id\n    FROM session_flags\n)\nSELECT\n    user_id,\n    session_id,\n    MIN(event_timestamp) AS session_start,\n    MAX(event_timestamp) AS session_end,\n    COUNT(*) AS event_count\nFROM session_groups\nGROUP BY\n    user_id,\n    session_id\nORDER BY\n    user_id ASC,\n    session_start ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_03_scd2_join",
+      "name": "Historical SCD Type 2 Point-in-Time Currency Conversion",
+      "category": "SCD Type 2 Point-in-Time Joins",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    t.txn_id,\n    t.currency,\n    t.amount,\n    e.rate_to_usd,\n    ROUND(t.amount * e.rate_to_usd, 2) AS amount_usd\nFROM transactions AS t\nJOIN exchange_rates AS e\n    ON t.currency = e.currency\n    AND t.txn_time >= e.valid_from\n    AND (e.valid_to IS NULL OR t.txn_time < e.valid_to)\nORDER BY t.txn_id ASC;",
+      "golden_sql": "SELECT\n    t.txn_id,\n    t.currency,\n    t.amount,\n    r.rate_to_usd,\n    ROUND(t.amount * r.rate_to_usd, 2) AS amount_usd\nFROM transactions t\nJOIN exchange_rates r\n  ON t.currency = r.currency\n AND t.txn_time >= r.valid_from\n AND (t.txn_time < r.valid_to OR r.valid_to IS NULL)\nORDER BY t.txn_id ASC;",
+      "execution_time_ms": 9.145829997578403,
+      "golden_time_ms": 8.163446000253316,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 3
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4470.666796998557,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    t.txn_id,\n    t.currency,\n    t.amount,\n    e.rate_to_usd,\n    ROUND(t.amount * e.rate_to_usd, 2) AS amount_usd\nFROM transactions AS t\nJOIN exchange_rates AS e\n    ON t.currency = e.currency\n    AND t.txn_time >= e.valid_from\n    AND (e.valid_to IS NULL OR t.txn_time < e.valid_to)\nORDER BY t.txn_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_04_three_valued_logic",
+      "name": "Customer Anti-Join with Three-Valued Null Semantics",
+      "category": "Three-Valued Logic in Anti-Joins",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    c.customer_id,\n    c.customer_name\nFROM customers c\nWHERE NOT EXISTS (\n    SELECT 1\n    FROM returns r\n    WHERE r.customer_id = c.customer_id\n);",
+      "golden_sql": "SELECT\n    c.customer_id,\n    c.customer_name\nFROM customers c\nWHERE NOT EXISTS (\n    SELECT 1 FROM returns r WHERE r.customer_id = c.customer_id\n);",
+      "execution_time_ms": 2.782185998512432,
+      "golden_time_ms": 2.0105439980397932,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 2
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4542.369734001113,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    c.customer_id,\n    c.customer_name\nFROM customers c\nWHERE NOT EXISTS (\n    SELECT 1\n    FROM returns r\n    WHERE r.customer_id = c.customer_id\n);\n```"
+      }
+    },
+    {
+      "task_id": "task_05_window_frame_bounds",
+      "name": "Financial Ledger Running Balance with Duplicate Timestamps",
+      "category": "Window Frame Default Bounds",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    entry_id,\n    account_id,\n    entry_time,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_time ASC, entry_id ASC\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS running_balance\nFROM ledger_entries\nORDER BY\n    account_id ASC,\n    entry_id ASC;",
+      "golden_sql": "SELECT\n    entry_id,\n    account_id,\n    entry_time,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_time, entry_id\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS running_balance\nFROM ledger_entries\nORDER BY account_id ASC, entry_id ASC;",
+      "execution_time_ms": 3.3638250024523586,
+      "golden_time_ms": 2.4601520017313305,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 4
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4756.666207998933,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    entry_id,\n    account_id,\n    entry_time,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_time ASC, entry_id ASC\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS running_balance\nFROM ledger_entries\nORDER BY\n    account_id ASC,\n    entry_id ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_06_funnel_precedence",
+      "name": "Sequential Multi-Stage User Onboarding Conversion Funnel",
+      "category": "Strict Funnel Precedence",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH first_view AS (\n    SELECT\n        user_id,\n        MIN(event_time) AS view_time\n    FROM user_journey_events\n    WHERE event_name = 'view_item'\n    GROUP BY user_id\n),\nfirst_cart AS (\n    SELECT\n        v.user_id,\n        MIN(e.event_time) AS cart_time\n    FROM first_view v\n    JOIN user_journey_events e\n        ON v.user_id = e.user_id\n       AND e.event_name = 'add_to_cart'\n       AND e.event_time > v.view_time\n    GROUP BY v.user_id\n),\nfirst_purchase AS (\n    SELECT\n        c.user_id,\n        MIN(e.event_time) AS purchase_time\n    FROM first_cart c\n    JOIN user_journey_events e\n        ON c.user_id = e.user_id\n       AND e.event_name = 'purchase'\n       AND e.event_time > c.cart_time\n    GROUP BY c.user_id\n)\nSELECT\n    COUNT(v.user_id) AS total_viewers,\n    COUNT(c.user_id) AS converted_cart,\n    COUNT(p.user_id) AS converted_purchase\nFROM first_view v\nLEFT JOIN first_cart c\n    ON v.user_id = c.user_id\nLEFT JOIN first_purchase p\n    ON c.user_id = p.user_id;",
+      "golden_sql": "WITH user_stages AS (\n    SELECT\n        user_id,\n        MIN(CASE WHEN event_name = 'view_item' THEN event_time END) AS view_time,\n        MIN(CASE WHEN event_name = 'add_to_cart' THEN event_time END) AS cart_time,\n        MIN(CASE WHEN event_name = 'purchase' THEN event_time END) AS purchase_time\n    FROM user_journey_events\n    GROUP BY user_id\n)\nSELECT\n    COUNT(CASE WHEN view_time IS NOT NULL THEN 1 END) AS total_viewers,\n    COUNT(CASE WHEN view_time IS NOT NULL AND cart_time > view_time THEN 1 END) AS converted_cart,\n    COUNT(CASE WHEN view_time IS NOT NULL AND cart_time > view_time AND purchase_time > cart_time THEN 1 END) AS converted_purchase\nFROM user_stages;",
+      "execution_time_ms": 12.276944999030093,
+      "golden_time_ms": 3.2118780000018887,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 1
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4879.674667001382,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH first_view AS (\n    SELECT\n        user_id,\n        MIN(event_time) AS view_time\n    FROM user_journey_events\n    WHERE event_name = 'view_item'\n    GROUP BY user_id\n),\nfirst_cart AS (\n    SELECT\n        v.user_id,\n        MIN(e.event_time) AS cart_time\n    FROM first_view v\n    JOIN user_journey_events e\n        ON v.user_id = e.user_id\n       AND e.event_name = 'add_to_cart'\n       AND e.event_time > v.view_time\n    GROUP BY v.user_id\n),\nfirst_purchase AS (\n    SELECT\n        c.user_id,\n        MIN(e.event_time) AS purchase_time\n    FROM first_cart c\n    JOIN user_journey_events e\n        ON c.user_id = e.user_id\n       AND e.event_name = 'purchase'\n       AND e.event_time > c.cart_time\n    GROUP BY c.user_id\n)\nSELECT\n    COUNT(v.user_id) AS total_viewers,\n    COUNT(c.user_id) AS converted_cart,\n    COUNT(p.user_id) AS converted_purchase\nFROM first_view v\nLEFT JOIN first_cart c\n    ON v.user_id = c.user_id\nLEFT JOIN first_purchase p\n    ON c.user_id = p.user_id;\n```"
+      }
+    },
+    {
+      "task_id": "task_07_quadratic_self_join",
+      "name": "Rolling 7-Day Window Aggregation without Quadratic Self-Joins",
+      "category": "Quadratic Self-Joins vs Range Windows",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    revenue_date,\n    gross_amount,\n    SUM(gross_amount) OVER (\n        ORDER BY revenue_date\n        RANGE BETWEEN INTERVAL 6 DAYS PRECEDING AND CURRENT ROW\n    ) AS rolling_7d_revenue\nFROM daily_revenue\nORDER BY revenue_date ASC;",
+      "golden_sql": "SELECT\n    revenue_date,\n    gross_amount,\n    SUM(gross_amount) OVER (\n        ORDER BY revenue_date\n        RANGE BETWEEN INTERVAL 6 DAYS PRECEDING AND CURRENT ROW\n    ) AS rolling_7d_revenue\nFROM daily_revenue\nORDER BY revenue_date ASC;",
+      "execution_time_ms": 2.772838000964839,
+      "golden_time_ms": 2.401998997811461,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 8
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 4183.965265001461,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    revenue_date,\n    gross_amount,\n    SUM(gross_amount) OVER (\n        ORDER BY revenue_date\n        RANGE BETWEEN INTERVAL 6 DAYS PRECEDING AND CURRENT ROW\n    ) AS rolling_7d_revenue\nFROM daily_revenue\nORDER BY revenue_date ASC;\n```"
+      }
+    },
+    {
+      "task_id": "task_08_sargable_pruning",
+      "name": "SARGable Temporal Partition Pruning and Exact Boundary Range",
+      "category": "Non-SARGable Partition Pruning",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    COUNT(*) AS error_count,\n    COUNT(DISTINCT message) AS distinct_error_messages\nFROM system_logs\nWHERE severity = 'ERROR'\n  AND event_timestamp >= TIMESTAMP '2025-01-01 00:00:00'\n  AND event_timestamp < TIMESTAMP '2025-02-01 00:00:00';",
+      "golden_sql": "SELECT\n    COUNT(*) AS error_count,\n    COUNT(DISTINCT message) AS distinct_error_messages\nFROM system_logs\nWHERE severity = 'ERROR'\n  AND event_timestamp >= '2025-01-01 00:00:00'\n  AND event_timestamp < '2025-02-01 00:00:00';",
+      "execution_time_ms": 2.92604500282323,
+      "golden_time_ms": 2.925395001511788,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 1
+      },
+      "llm_metadata": {
+        "model": "gemini-3.8-flash-low",
+        "latency_ms": 3971.8400100027793,
+        "backend": "agy",
+        "raw_response": "```sql\nSELECT\n    COUNT(*) AS error_count,\n    COUNT(DISTINCT message) AS distinct_error_messages\nFROM system_logs\nWHERE severity = 'ERROR'\n  AND event_timestamp >= TIMESTAMP '2025-01-01 00:00:00'\n  AND event_timestamp < TIMESTAMP '2025-02-01 00:00:00';\n```"
+      }
+    }
+  ]
+}

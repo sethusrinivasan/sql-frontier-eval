@@ -1,0 +1,22 @@
+{
+  "id": "task_001_Q01_asof_trade_quote_matching",
+  "name": "Tick-Level Trade Execution Matching via Native ASOF JOIN",
+  "category": "Temporal & Time-Series",
+  "description": "In algorithmic trading, every buy or sell order must be evaluated against the most recent prevailing market quote. Standard relational equality joins fail because quotes and trades happen at irregular microsecond intervals.",
+  "prompt": "In algorithmic trading, every buy or sell order must be evaluated against the most recent prevailing market quote. Standard relational equality joins fail because quotes and trades happen at irregular microsecond intervals.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: trade_id, symbol, trade_time, executed_price, shares, prevailing_quote_time, bid_price, ask_price, slippage.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE quotes (\n                quote_time TIMESTAMP,\n                symbol VARCHAR,\n                bid_price DOUBLE,\n                ask_price DOUBLE\n            );\n            CREATE TABLE trades (\n                trade_time TIMESTAMP,\n                symbol VARCHAR,\n                trade_id INT,\n                executed_price DOUBLE,\n                shares INT\n            );\n            INSERT INTO quotes VALUES\n                ('2026-03-01 09:30:00.100', 'NVDA', 850.10, 850.25),\n                ('2026-03-01 09:30:00.250', 'NVDA', 850.15, 850.30),\n                ('2026-03-01 09:30:00.400', 'NVDA', 850.20, 850.35);\n            INSERT INTO trades VALUES\n                ('2026-03-01 09:30:00.150', 'NVDA', 101, 850.25, 100),\n                ('2026-03-01 09:30:00.300', 'NVDA', 102, 850.30, 200),\n                ('2026-03-01 09:30:00.450', 'NVDA', 103, 850.32, 150);",
+  "golden_sql": "-- Match each executed trade with the latest market quote effective at that exact microsecond\n            SELECT \n                t.trade_id,\n                t.symbol,\n                t.trade_time,\n                t.executed_price,\n                t.shares,\n                q.quote_time AS prevailing_quote_time,\n                q.bid_price,\n                q.ask_price,\n                -- Effective slippage calculation (difference between ask and executed price)\n                ROUND(t.executed_price - q.ask_price, 4) AS slippage\n            FROM trades t\n            ASOF JOIN quotes q\n              ON t.symbol = q.symbol\n             AND t.trade_time >= q.quote_time\n            ORDER BY t.trade_time;",
+  "ordered": true,
+  "expected_columns": [
+    "trade_id",
+    "symbol",
+    "trade_time",
+    "executed_price",
+    "shares",
+    "prevailing_quote_time",
+    "bid_price",
+    "ask_price",
+    "slippage"
+  ],
+  "why_it_fails": "LLMs typically write quadratic triangular self-joins (WHERE q.ts <= t.ts) or window functions with LAG/LAST_VALUE, which create massive memory spikes on high-frequency streams."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "task_074_Q74_did_you_mean_spell_suggestion",
+  "name": "'Did You Mean?' Query Spell-Correction Suggestion Engine",
+  "category": "Search & Retrieval",
+  "description": "When a query produces few results, search engines recommend a spell-corrected candidate word from the catalog vocabulary that has the lowest edit distance and highest document frequency.",
+  "prompt": "When a query produces few results, search engines recommend a spell-corrected candidate word from the catalog vocabulary that has the lowest edit distance and highest document frequency.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: suggested_correction, doc_frequency, edit_distance.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE dictionary_terms (\n                term VARCHAR,\n                doc_frequency INT\n            );\n            INSERT INTO dictionary_terms VALUES\n                ('wireless', 50000),\n                ('wiretap',     50),\n                ('tireless',   120);",
+  "golden_sql": "-- Given misspelled query 'wireles', propose top dictionary replacement with edit distance <= 1\n            SELECT \n                term AS suggested_correction,\n                doc_frequency,\n                levenshtein(term, 'wireles') AS edit_distance\n            FROM dictionary_terms\n            WHERE levenshtein(term, 'wireles') <= 2\n            ORDER BY edit_distance ASC, doc_frequency DESC\n            LIMIT 1;",
+  "ordered": true,
+  "expected_columns": [
+    "suggested_correction",
+    "doc_frequency",
+    "edit_distance"
+  ],
+  "why_it_fails": "Suggesting rare typos back to users rather than verified popular vocabulary terms."
+}

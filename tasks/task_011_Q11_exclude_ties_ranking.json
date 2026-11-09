@@ -1,0 +1,16 @@
+{
+  "id": "task_011_Q11_exclude_ties_ranking",
+  "name": "Excluding Ties in Percentile Ranks via EXCLUDE TIES",
+  "category": "Temporal & Time-Series",
+  "description": "When evaluating employee sales performance, ties should not inflate the percentile score against colleagues who achieved the exact same result.",
+  "prompt": "When evaluating employee sales performance, ties should not inflate the percentile score against colleagues who achieved the exact same result.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: rep_id, sales_quota_achieved, cumulative_sales_exclusive_of_ties.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE rep_sales (\n                rep_id INT,\n                sales_quota_achieved DECIMAL(5,2)\n            );\n            INSERT INTO rep_sales VALUES\n                (1, 120.00),\n                (2, 115.00),\n                (3, 115.00), -- Tie\n                (4, 95.00);",
+  "golden_sql": "-- Compute cumulative sales sum excluding tied peers in current row calculation\n            SELECT \n                rep_id,\n                sales_quota_achieved,\n                SUM(sales_quota_achieved) OVER (\n                    ORDER BY sales_quota_achieved DESC\n                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    EXCLUDE TIES\n                ) AS cumulative_sales_exclusive_of_ties\n            FROM rep_sales\n            ORDER BY sales_quota_achieved DESC, rep_id;",
+  "ordered": true,
+  "expected_columns": [
+    "rep_id",
+    "sales_quota_achieved",
+    "cumulative_sales_exclusive_of_ties"
+  ],
+  "why_it_fails": "Using standard RANK() causes tied individuals to push each other's percentiles higher or lower inconsistently."
+}

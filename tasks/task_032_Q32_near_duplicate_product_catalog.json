@@ -1,0 +1,21 @@
+{
+  "id": "task_032_Q32_near_duplicate_product_catalog",
+  "name": "Multi-Merchant Near-Duplicate Catalog Resolution with Price Consistency",
+  "category": "Vector & Embeddings",
+  "description": "Marketplaces aggregate catalogs from thousands of sellers. Matching identical items requires high semantic vector similarity AND compatible price bounds (e.g. price within 20%).",
+  "prompt": "Marketplaces aggregate catalogs from thousands of sellers. Matching identical items requires high semantic vector similarity AND compatible price bounds (e.g. price within 20%).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: sku_a, merchant_a, title_a, sku_b, merchant_b, title_b, similarity, price_difference_pct.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE merchant_catalog (\n                sku_id INT,\n                merchant VARCHAR,\n                title VARCHAR,\n                price DECIMAL(10,2),\n                vector FLOAT[3]\n            );\n            INSERT INTO merchant_catalog VALUES\n                (1, 'Merchant A', 'Sony WH-1000XM5 Noise-Cancelling Headphones', 349.99, [0.95, 0.1, 0.05]::FLOAT[3]),\n                (2, 'Merchant B', 'Sony WH1000XM5 Wireless Headset - Black',     339.00, [0.94, 0.12, 0.04]::FLOAT[3]),\n                (3, 'Merchant C', 'Sony Headphone Replacement Ear Cushions',       29.99, [0.88, 0.2, 0.1]::FLOAT[3]);",
+  "golden_sql": "-- Match identical product listings across merchants (high similarity + price within 20%)\n            SELECT \n                a.sku_id AS sku_a,\n                a.merchant AS merchant_a,\n                a.title AS title_a,\n                b.sku_id AS sku_b,\n                b.merchant AS merchant_b,\n                b.title AS title_b,\n                ROUND(array_cosine_similarity(a.vector, b.vector), 4) AS similarity,\n                ROUND(ABS(a.price - b.price) / a.price * 100, 1) AS price_difference_pct\n            FROM merchant_catalog a\n            JOIN merchant_catalog b\n              ON a.sku_id < b.sku_id\n             AND a.merchant != b.merchant\n             AND array_cosine_similarity(a.vector, b.vector) >= 0.90\n             AND ABS(a.price - b.price) <= (0.20 * a.price)\n            ORDER BY similarity DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "sku_a",
+    "merchant_a",
+    "title_a",
+    "sku_b",
+    "merchant_b",
+    "title_b",
+    "similarity",
+    "price_difference_pct"
+  ],
+  "why_it_fails": "Vector similarity alone matches accessories to main products; price filtering alone matches unrelated items."
+}

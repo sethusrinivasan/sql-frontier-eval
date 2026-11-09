@@ -1,0 +1,16 @@
+{
+  "id": "task_066_Q66_alphanumeric_sku_normalization",
+  "name": "Alphanumeric SKU Matching with Punctuation & Case Invariance",
+  "category": "Search & Retrieval",
+  "description": "Customers search for model numbers in messy formats: 'wh-1000xm5', 'WH1000-XM5', 'wh 1000 xm5'. Robust search normalizes punctuation and whitespace before matching.",
+  "prompt": "Customers search for model numbers in messy formats: 'wh-1000xm5', 'WH1000-XM5', 'wh 1000 xm5'. Robust search normalizes punctuation and whitespace before matching.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: sku_id, raw_sku, product_title.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE inventory_skus (\n                sku_id INT,\n                raw_sku VARCHAR,\n                product_title VARCHAR\n            );\n            INSERT INTO inventory_skus VALUES\n                (1, 'WH-1000XM5/B', 'Sony Premium Wireless Headphones Black'),\n                (2, 'AIR-MAX-90-W',  'Nike Air Max 90 White Sneaker');",
+  "golden_sql": "-- Cleanse search query 'wh1000xm5b' by stripping non-alphanumeric characters\n            SELECT \n                sku_id,\n                raw_sku,\n                product_title\n            FROM inventory_skus\n            WHERE lower(regexp_replace(raw_sku, '[^a-zA-Z0-9]', '', 'g')) = lower(regexp_replace('wh 1000-xm5/b', '[^a-zA-Z0-9]', '', 'g'));",
+  "ordered": false,
+  "expected_columns": [
+    "sku_id",
+    "raw_sku",
+    "product_title"
+  ],
+  "why_it_fails": "Exact string equality misses 90% of technical product searches due to hyphens and spaces."
+}

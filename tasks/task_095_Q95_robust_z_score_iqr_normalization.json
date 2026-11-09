@@ -1,0 +1,16 @@
+{
+  "id": "task_095_Q95_robust_z_score_iqr_normalization",
+  "name": "Robust Z-Score Normalization using Median and Interquartile Range (IQR)",
+  "category": "Warehouse & Statistical",
+  "description": "Standardizing skewed metrics (like API response latency) for machine learning feature pipelines requires scaling by IQR (Q3 - Q1) rather than standard deviation.",
+  "prompt": "Standardizing skewed metrics (like API response latency) for machine learning feature pipelines requires scaling by IQR (Q3 - Q1) rather than standard deviation.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: request_id, latency_ms, robust_iqr_z_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE response_times (\n                request_id INT,\n                latency_ms DOUBLE\n            );\n            INSERT INTO response_times VALUES\n                (1, 45.0), (2, 50.0), (3, 52.0), (4, 48.0), (5, 300.0);",
+  "golden_sql": "-- Compute robust IQR-normalized score: (x - Q2) / (Q3 - Q1)\n            WITH quartiles AS (\n                SELECT \n                    QUANTILE_CONT(latency_ms, 0.25) AS q1,\n                    QUANTILE_CONT(latency_ms, 0.50) AS median_val,\n                    QUANTILE_CONT(latency_ms, 0.75) AS q3\n                FROM response_times\n            )\n            SELECT \n                r.request_id,\n                r.latency_ms,\n                ROUND((r.latency_ms - q.median_val) / NULLIF(q.q3 - q.q1, 0), 3) AS robust_iqr_z_score\n            FROM response_times r\n            CROSS JOIN quartiles q\n            ORDER BY robust_iqr_z_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "request_id",
+    "latency_ms",
+    "robust_iqr_z_score"
+  ],
+  "why_it_fails": "Standard Z-score produces biased features when distributions have heavy tails."
+}

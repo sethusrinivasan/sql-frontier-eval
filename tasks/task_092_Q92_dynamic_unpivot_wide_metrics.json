@@ -1,0 +1,17 @@
+{
+  "id": "task_092_Q92_dynamic_unpivot_wide_metrics",
+  "name": "Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics",
+  "category": "Warehouse & Statistical",
+  "description": "Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, memory, disk). Normalizing them into key-value pairs is necessary for time-series modeling.",
+  "prompt": "Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, memory, disk). Normalizing them into key-value pairs is necessary for time-series modeling.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: host_id, captured_date, metric_name, metric_value.\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE wide_telemetry (\n                host_id VARCHAR,\n                captured_date DATE,\n                cpu_metric DOUBLE,\n                mem_metric DOUBLE,\n                disk_metric DOUBLE\n            );\n            INSERT INTO wide_telemetry VALUES\n                ('srv-01', '2026-03-01', 45.2, 78.5, 92.1);",
+  "golden_sql": "-- Transform wide metric columns into normalized key-value rows\n            UNPIVOT wide_telemetry\n            ON cpu_metric, mem_metric, disk_metric\n            INTO\n                NAME metric_name\n                VALUE metric_value;",
+  "ordered": false,
+  "expected_columns": [
+    "host_id",
+    "captured_date",
+    "metric_name",
+    "metric_value"
+  ],
+  "why_it_fails": "Chaining 10 UNION ALL queries multiplies read passes over the source data."
+}

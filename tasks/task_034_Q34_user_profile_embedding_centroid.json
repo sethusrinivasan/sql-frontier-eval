@@ -1,0 +1,15 @@
+{
+  "id": "task_034_Q34_user_profile_embedding_centroid",
+  "name": "User Profile Preference Vector Centroid Aggregation",
+  "category": "Vector & Embeddings",
+  "description": "To personalize feeds, recommendation engines compute a dynamic user preference vector by calculating the average centroid of the embeddings of products the user clicked in the last 7 days.",
+  "prompt": "To personalize feeds, recommendation engines compute a dynamic user preference vector by calculating the average centroid of the embeddings of products the user clicked in the last 7 days.\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: user_id, user_preference_centroid.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE user_clicks_vectors (\n                user_id INT,\n                item_id INT,\n                item_vector FLOAT[3]\n            );\n            INSERT INTO user_clicks_vectors VALUES\n                (42, 1, [0.8, 0.2, 0.1]::FLOAT[3]),\n                (42, 2, [0.6, 0.4, 0.2]::FLOAT[3]),\n                (42, 3, [0.7, 0.3, 0.3]::FLOAT[3]);",
+  "golden_sql": "-- Calculate element-wise centroid vector for user 42\n            WITH unnested_dims AS (\n                SELECT \n                    user_id,\n                    item_id,\n                    UNNEST(item_vector) AS val,\n                    GENERATE_SUBSCRIPTS(item_vector, 1) AS dim_idx\n                FROM user_clicks_vectors\n            ),\n            avg_dims AS (\n                SELECT \n                    user_id,\n                    dim_idx,\n                    ROUND(AVG(val), 4) AS avg_dim_val\n                FROM unnested_dims\n                GROUP BY user_id, dim_idx\n                ORDER BY user_id, dim_idx\n            )\n            SELECT \n                user_id,\n                LIST(avg_dim_val)::FLOAT[3] AS user_preference_centroid\n            FROM avg_dims\n            GROUP BY user_id;",
+  "ordered": true,
+  "expected_columns": [
+    "user_id",
+    "user_preference_centroid"
+  ],
+  "why_it_fails": "SQL standard lacks native array averaging; unnesting arrays without proper positional indexes scrambles vector dimensions."
+}

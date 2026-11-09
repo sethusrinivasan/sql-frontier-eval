@@ -1,0 +1,18 @@
+{
+  "id": "task_075_Q75_hybrid_search_metadata_soft_boost",
+  "name": "Hybrid Search with Hard Categorical Filter & Soft Merchant Quality Boost",
+  "category": "Search & Retrieval",
+  "description": "Top marketplaces enforce strict hard filters (in-stock, prime shipping) while soft-boosting items based on merchant review rating: final_score = text_relevance * (1.0 + 0.1 * merchant_rating).",
+  "prompt": "Top marketplaces enforce strict hard filters (in-stock, prime shipping) while soft-boosting items based on merchant review rating: final_score = text_relevance * (1.0 + 0.1 * merchant_rating).\n\nExecute the required analytical SQL calculation in DuckDB.\nExpected output columns: item_id, title, merchant_rating, base_relevance, boosted_final_score.\nResults should be ordered as specified.",
+  "setup_sql": "CREATE TABLE merchant_inventory (\n                item_id INT,\n                category VARCHAR,\n                title VARCHAR,\n                merchant_rating DOUBLE,\n                is_available BOOLEAN\n            );\n            INSERT INTO merchant_inventory VALUES\n                (1, 'Audio', 'Pro Studio Monitor Headphones', 4.9, true),\n                (2, 'Audio', 'Budget Studio Headphones',       3.8, true),\n                (3, 'Audio', 'Discontinued Vintage Headphones', 4.8, false);",
+  "golden_sql": "-- Search 'Headphones' in 'Audio': Hard filter available=true, soft-boost by merchant rating\n            WITH text_matches AS (\n                SELECT \n                    item_id,\n                    title,\n                    merchant_rating,\n                    -- Base relevance score from keyword matches\n                    (CASE WHEN title ILIKE '%studio%' THEN 2.0 ELSE 1.0 END) AS base_relevance\n                FROM merchant_inventory\n                WHERE category = 'Audio'\n                  AND is_available = true\n                  AND title ILIKE '%Headphones%'\n            )\n            SELECT \n                item_id,\n                title,\n                merchant_rating,\n                base_relevance,\n                ROUND(base_relevance * (1.0 + (merchant_rating / 5.0) * 0.50), 2) AS boosted_final_score\n            FROM text_matches\n            ORDER BY boosted_final_score DESC;",
+  "ordered": true,
+  "expected_columns": [
+    "item_id",
+    "title",
+    "merchant_rating",
+    "base_relevance",
+    "boosted_final_score"
+  ],
+  "why_it_fails": "Hard-filtering by rating eliminates high-relevance new merchants with few reviews."
+}
