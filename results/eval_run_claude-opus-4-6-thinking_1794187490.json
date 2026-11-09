@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-11-09T01:24:50.192834+00:00",
+  "model": "claude-opus-4-6-thinking",
+  "is_golden_test": false,
+  "total_tasks": 1,
+  "passed": 1,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_01_fanout",
+      "name": "E-Commerce Financial Aggregation without Join Fan-Out",
+      "category": "Metric Inflation / Chasm Trap",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH order_discounts_agg AS (\n    SELECT order_id, SUM(amount) AS total_discount\n    FROM order_discounts\n    GROUP BY order_id\n),\norder_shipments_agg AS (\n    SELECT order_id, SUM(shipping_fee) AS total_shipping\n    FROM order_shipments\n    GROUP BY order_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    SUM(o.base_amount)                          AS total_gross_sales,\n    SUM(COALESCE(d.total_discount, 0))          AS total_discount_amount,\n    SUM(COALESCE(s.total_shipping, 0))          AS total_shipping_fees\nFROM merchants m\nJOIN orders o              ON o.merchant_id = m.merchant_id\nLEFT JOIN order_discounts_agg d ON d.order_id = o.order_id\nLEFT JOIN order_shipments_agg s ON s.order_id = o.order_id\nGROUP BY m.merchant_id, m.merchant_name;",
+      "golden_sql": "WITH agg_discounts AS (\n    SELECT order_id, SUM(amount) AS total_discount\n    FROM order_discounts\n    GROUP BY order_id\n),\nagg_shipments AS (\n    SELECT order_id, SUM(shipping_fee) AS total_shipping\n    FROM order_shipments\n    GROUP BY order_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    SUM(o.base_amount) AS total_gross_sales,\n    COALESCE(SUM(d.total_discount), 0.00) AS total_discount_amount,\n    COALESCE(SUM(s.total_shipping), 0.00) AS total_shipping_fees\nFROM merchants m\nJOIN orders o ON m.merchant_id = o.merchant_id\nLEFT JOIN agg_discounts d ON o.order_id = d.order_id\nLEFT JOIN agg_shipments s ON o.order_id = s.order_id\nGROUP BY m.merchant_id, m.merchant_name;",
+      "execution_time_ms": 5.33752900082618,
+      "golden_time_ms": 9.411375001945999,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 1
+      },
+      "llm_metadata": {
+        "model": "claude-opus-4-6-thinking",
+        "latency_ms": 7550.390789998346,
+        "backend": "agy",
+        "raw_response": "```sql\nWITH order_discounts_agg AS (\n    SELECT order_id, SUM(amount) AS total_discount\n    FROM order_discounts\n    GROUP BY order_id\n),\norder_shipments_agg AS (\n    SELECT order_id, SUM(shipping_fee) AS total_shipping\n    FROM order_shipments\n    GROUP BY order_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    SUM(o.base_amount)                          AS total_gross_sales,\n    SUM(COALESCE(d.total_discount, 0))          AS total_discount_amount,\n    SUM(COALESCE(s.total_shipping, 0))          AS total_shipping_fees\nFROM merchants m\nJOIN orders o              ON o.merchant_id = m.merchant_id\nLEFT JOIN order_discounts_agg d ON d.order_id = o.order_id\nLEFT JOIN order_shipments_agg s ON s.order_id = o.order_id\nGROUP BY m.merchant_id, m.merchant_name;\n```"
+      }
+    }
+  ]
+}

@@ -84,10 +84,14 @@ sql-frontier-eval/
 │   ├── test_harness.py           # 8 Unit tests for engine sandboxing, sorting, profiling
 │   └── test_llm.py               # 4 Unit tests for SQL regex block parsing
 └── results/                      # Persisted JSON benchmark runs
-    ├── eval_run_gemini-3.8-flash-medium_1794186799.json
-    ├── eval_run_gemini-3.8-flash-low_1794186841.json
-    ├── eval_run_offline_1794186318.json
-    └── eval_run_offline_1794186320.json
+    ├── eval_run_gemini-3.8-flash-medium_1794186799.json  # 8/8 Passed (100.0%)
+    ├── eval_run_claude-opus-4-6-thinking_1794187547.json # 7/8 Passed (87.5%)
+    ├── eval_run_claude-sonnet-4-6_1794187183.json        # 7/8 Passed (87.5%)
+    ├── eval_run_gpt-oss-120b-medium_1794187234.json      # 7/8 Passed (87.5%)
+    ├── eval_run_gemini-3.8-flash-low_1794186841.json     # 7/8 Passed (87.5%)
+    ├── eval_run_gemini-3.8-flash-high_1794187896.json    # 6/8 Passed (75.0%)
+    ├── eval_run_offline_1794186318.json                  # Golden Ground Truth (100.0%)
+    └── eval_run_offline_1794186320.json                  # Naive Trap Baseline (0.0%)
 ```
 
 ### Key Hardening Highlights
@@ -179,12 +183,21 @@ Category: Metric Inflation / Chasm Trap | Verdict: VALUE_MISMATCH
 ==========================================================================================
 ```
 
-### Live Evaluation via Gemini (Antigravity CLI)
-Benchmark frontier models live in authenticated environments:
+### Live Evaluation via Frontier CLI (Antigravity Models)
+Benchmark frontier models directly in authenticated environments:
 
 ```bash
 # Evaluate Gemini 3.8 Flash with Medium Reasoning (100% Score)
 python run_eval.py --model gemini-3.8-flash-medium
+
+# Evaluate Claude Opus 4.6 Thinking (87.5% Score)
+python run_eval.py --model claude-opus-4-6-thinking
+
+# Evaluate Claude Sonnet 4.6 Thinking (87.5% Score)
+python run_eval.py --model claude-sonnet-4-6
+
+# Evaluate GPT-OSS 120B Medium (87.5% Score)
+python run_eval.py --model gpt-oss-120b-medium
 
 # Evaluate Gemini 3.8 Flash with Low Reasoning (Fast 4s Inference)
 python run_eval.py --model gemini-3.8-flash-low
