@@ -17,6 +17,8 @@ Modern text-to-SQL benchmarks (such as Spider and BIRD) predominantly evaluate t
 | Model / Baseline | Pass Rate | Correct / Total | Avg Model Latency | Engine Exec Latency | Primary Failure Modes | Run Artifact |
 |---|---|---|---|---|---|---|
 | **Gemini 3.8 Flash (Medium)** | **100.0%** | **8 / 8** | 27.6s | **4.5 ms** | None (Zero failures across all 8 tasks) | [`results/eval_run_gemini-3.8-flash-medium_1794186799.json`](results/eval_run_gemini-3.8-flash-medium_1794186799.json) |
+| **Claude Sonnet 4.6 (Thinking)** | **87.5%** | **7 / 8** | 6.8s | **4.8 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_claude-sonnet-4-6_1794187183.json`](results/eval_run_claude-sonnet-4-6_1794187183.json) |
+| **GPT-OSS 120B (Medium)** | **87.5%** | **7 / 8** | 5.5s | **5.5 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_gpt-oss-120b-medium_1794187234.json`](results/eval_run_gpt-oss-120b-medium_1794187234.json) |
 | **Gemini 3.8 Flash (Low)** | **87.5%** | **7 / 8** | **4.2s** | **5.4 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_gemini-3.8-flash-low_1794186841.json`](results/eval_run_gemini-3.8-flash-low_1794186841.json) |
 | **Golden Ground Truth** | **100.0%** | **8 / 8** | N/A | **3.8 ms** | Baseline Verification (0% False Negatives) | [`results/eval_run_offline_1794186318.json`](results/eval_run_offline_1794186318.json) |
 | **Offline Reference / Naive** | **0.0%** | **0 / 8** | N/A | **2.6 ms** | 100% Trap Detection (Metric skew, row loss, O(N²) joins) | [`results/eval_run_offline_1794186320.json`](results/eval_run_offline_1794186320.json) |
@@ -48,16 +50,16 @@ Each task in the benchmark is paired with synthetic seed data, deterministic mul
 
 ## Detailed Task-by-Task Scorecard
 
-| Task ID | Task Description | Gemini 3.8 Flash (Med) | Gemini 3.8 Flash (Low) | Offline Naive Verdict | Root Cause Detected |
-|---|---|:---:|:---:|:---:|---|
-| **01** | E-Commerce Join Fan-Out / Chasm Trap | **PASS** (5.0ms) | **PASS** (5.3ms) | `VALUE_MISMATCH` | Multi-table joins before `GROUP BY` multiply sums 4x |
-| **02** | Inactivity Gap Sessionization (30 min) | **PASS** (5.7ms) | **PASS** (4.6ms) | `SHAPE_MISMATCH` | Misuse of `ROW_NUMBER()` instead of cumulative step flags |
-| **03** | SCD Type 2 Currency Conversion | **PASS** (8.1ms) | **PASS** (14.4ms) | `SHAPE_MISMATCH` | Omitting `OR valid_to IS NULL` drops ongoing rates |
-| **04** | Anti-Join with Three-Valued Nulls | **PASS** (2.2ms) | **PASS** (2.6ms) | `SHAPE_MISMATCH` | `NOT IN` with subquery NULLs returns empty dataset |
-| **05** | Running Balance with Duplicate Timestamps | **PASS** (2.7ms) | **PASS** (3.1ms) | `VALUE_MISMATCH` | Default `RANGE` frame groups identical timestamp peers |
-| **06** | Sequential Conversion Funnel Precedence | **PASS** (5.3ms) | `EFFICIENCY_VIOLATION` | `VALUE_MISMATCH` | Independent conditional counts ignore step timestamps |
-| **07** | Rolling 7-Day Window vs Triangular Join | **PASS** (4.6ms) | **PASS** (4.6ms) | `EFFICIENCY_VIOLATION` | Non-equi triangular self-join causes quadratic merge join |
-| **08** | SARGable Partition Date Filtering | **PASS** (2.7ms) | **PASS** (3.5ms) | `VALUE_MISMATCH` | `BETWEEN` boundary leak captures Feb 1st midnight |
+| Task ID | Task Description | Gemini 3.8 Flash (Med) | Claude Sonnet 4.6 | GPT-OSS 120B | Gemini 3.8 Flash (Low) | Offline Naive Verdict | Root Cause Detected |
+|---|---|:---:|:---:|:---:|:---:|:---:|---|
+| **01** | E-Commerce Join Fan-Out / Chasm Trap | **PASS** (5.0ms) | **PASS** (10.9ms) | **PASS** (10.9ms) | **PASS** (5.3ms) | `VALUE_MISMATCH` | Multi-table joins before `GROUP BY` multiply sums 4x |
+| **02** | Inactivity Gap Sessionization (30 min) | **PASS** (5.7ms) | **PASS** (5.3ms) | **PASS** (8.4ms) | **PASS** (4.6ms) | `SHAPE_MISMATCH` | Misuse of `ROW_NUMBER()` instead of cumulative step flags |
+| **03** | SCD Type 2 Currency Conversion | **PASS** (8.1ms) | **PASS** (8.5ms) | **PASS** (8.3ms) | **PASS** (14.4ms) | `SHAPE_MISMATCH` | Omitting `OR valid_to IS NULL` drops ongoing rates |
+| **04** | Anti-Join with Three-Valued Nulls | **PASS** (2.2ms) | **PASS** (2.4ms) | **PASS** (4.1ms) | **PASS** (2.6ms) | `SHAPE_MISMATCH` | `NOT IN` with subquery NULLs returns empty dataset |
+| **05** | Running Balance with Duplicate Timestamps | **PASS** (2.7ms) | **PASS** (2.9ms) | **PASS** (6.6ms) | **PASS** (3.1ms) | `VALUE_MISMATCH` | Default `RANGE` frame groups identical timestamp peers |
+| **06** | Sequential Conversion Funnel Precedence | **PASS** (5.3ms) | `EFFICIENCY_VIOLATION` | `EFFICIENCY_VIOLATION` | `EFFICIENCY_VIOLATION` | `VALUE_MISMATCH` | Independent conditional counts ignore step timestamps |
+| **07** | Rolling 7-Day Window vs Triangular Join | **PASS** (4.6ms) | **PASS** (2.7ms) | **PASS** (3.1ms) | **PASS** (4.6ms) | `EFFICIENCY_VIOLATION` | Non-equi triangular self-join causes quadratic merge join |
+| **08** | SARGable Partition Date Filtering | **PASS** (2.7ms) | **PASS** (5.4ms) | **PASS** (4.0ms) | **PASS** (3.5ms) | `VALUE_MISMATCH` | `BETWEEN` boundary leak captures Feb 1st midnight |
 
 ---
 
