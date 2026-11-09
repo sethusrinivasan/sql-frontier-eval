@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Slide 6 - Deliverables</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      width: 1920px;
+      height: 1080px;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 60px 90px 140px 90px;
+      overflow: hidden;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #30363d;
+      padding-bottom: 20px;
+    }
+    .title {
+      font-size: 2.8rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin: 0;
+    }
+    .title span { color: #58a6ff; }
+    .badge {
+      background: rgba(63, 185, 80, 0.15);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.4);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 25px;
+      margin-top: 30px;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #58a6ff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-body {
+      font-size: 1.05rem;
+      color: #c9d1d9;
+      line-height: 1.55;
+    }
+    .highlight {
+      color: #3fb950;
+      font-weight: 600;
+    }
+    .card-footer {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid #30363d;
+      font-size: 0.95rem;
+      color: #8b949e;
+    }
+    .bottom-banner {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 15px;
+    }
+    .banner-text {
+      font-size: 1.1rem;
+      color: #c9d1d9;
+    }
+    .banner-badge {
+      background: rgba(88, 166, 255, 0.15);
+      color: #58a6ff;
+      border: 1px solid rgba(88, 166, 255, 0.4);
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">Submission Package &amp; <span>Reproducibility</span></div>
+    <div class="badge">Ready for Review</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div>
+        <div class="card-title">📦 Submission ZIP Archive</div>
+        <div class="card-body">
+          Complete code package under 50 MB threshold (<span class="highlight">87 KB total</span>). Includes test suite, 8 task definitions, and self-contained DuckDB evaluation harness.
+        </div>
+      </div>
+      <div class="card-footer"><code>sql-frontier-eval-submission.zip</code></div>
+    </div>
+
+    <div class="card">
+      <div>
+        <div class="card-title">🚀 1-Step Verification</div>
+        <div class="card-body">
+          Run <code>./verify.sh</code> to execute 12 unit tests, verify 100% golden baselines (0% false negatives), and test offline trap detection in under 5 seconds.
+        </div>
+      </div>
+      <div class="card-footer">Zero flaky tests &bull; Deterministic sorting</div>
+    </div>
+
+    <div class="card">
+      <div>
+        <div class="card-title">📊 Open Benchmark Results</div>
+        <div class="card-body">
+          Complete JSON run logs across Gemini, Claude, and GPT committed to repository. Accompanied by publication report in <code>BENCHMARK_REPORT.md</code>.
+        </div>
+      </div>
+      <div class="card-footer">12 JSON runs in <code>results/</code></div>
+    </div>
+  </div>
+
+  <div class="bottom-banner">
+    <div class="banner-text">
+      🤝 <strong>AI-Assisted Development Acknowledgement:</strong> Built with <strong>Google Antigravity (AGY)</strong> powered by Gemini 3.8 Flash, with human-in-the-loop engineering direction and mathematical verification.
+    </div>
+    <div class="banner-badge">MIT License</div>
+  </div>
+</body>
+</html>

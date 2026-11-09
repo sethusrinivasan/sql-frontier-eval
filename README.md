@@ -67,6 +67,10 @@ sql-frontier-eval/
 ├── SUBMISSION_SUMMARY.md         # Official hackathon form submission text
 ├── VIDEO_WALKTHROUGH_SCRIPT.md   # 4.5-minute video walkthrough teleprompter script
 ├── walkthrough_presentation.html # Interactive HTML presentation slide deck
+├── sql_frontier_eval_walkthrough.mp4 # Full 1080p narrated video walkthrough with burned-in CC (3m 53s)
+├── video/                        # Video generation assets, slide scenes & SRT captions
+│   ├── build_video.py            # Automated video compilation pipeline
+│   └── walkthrough_captions.srt  # Synchronized closed-caption subtitles
 ├── harness/
 │   ├── engine.py                 # SQLEvalEngine: In-memory DuckDB sandbox with JSON profiling
 │   ├── grader.py                 # SQLGrader: Semantic value equivalence & operator checks

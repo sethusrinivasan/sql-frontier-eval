@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Slide 3 - Diagnostics</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      width: 1920px;
+      height: 1080px;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 60px 90px 140px 90px;
+      overflow: hidden;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #30363d;
+      padding-bottom: 20px;
+    }
+    .title {
+      font-size: 2.8rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin: 0;
+    }
+    .title span { color: #58a6ff; }
+    .badge {
+      background: rgba(248, 81, 73, 0.15);
+      color: #f85149;
+      border: 1px solid rgba(248, 81, 73, 0.4);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+    .content-split {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 30px;
+      margin-top: 25px;
+    }
+    .terminal-box {
+      background: #030712;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    .term-header {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+    pre {
+      margin: 0;
+      font-family: "SF Mono", Monaco, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      color: #93c5fd;
+    }
+    .c-red { color: #f85149; font-weight: bold; }
+    .c-green { color: #3fb950; font-weight: bold; }
+    .c-yellow { color: #e3b341; }
+    .features-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .feat-item {
+      margin-bottom: 20px;
+    }
+    .feat-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #58a6ff;
+      margin-bottom: 6px;
+    }
+    .feat-desc {
+      font-size: 1.05rem;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">Deep Diagnostics &amp; <span>Automated Walkthrough</span></div>
+    <div class="badge">Engine Profiler</div>
+  </div>
+
+  <div class="content-split">
+    <div class="terminal-box">
+      <div class="term-header">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+      </div>
+      <pre>
+<span class="c-red">❌ EVALUATION FAILURE WALKTHROUGH: E-Commerce Fan-Out</span>
+Category: Metric Inflation / Chasm Trap | Verdict: <span class="c-red">VALUE_MISMATCH</span>
+
+[Actual Candidate Output] (1 row x 5 cols):
++----+---------------+------------------+-------------------+
+|    |   merchant_id | merchant_name    | total_gross_sales |
++====+===============+==================+===================+
+|  0 |             1 | Acme Electronics |     <span class="c-red">400.00</span>        |
++----+---------------+------------------+-------------------+
+
+[Expected Golden Output] (1 row x 5 cols):
++----+---------------+------------------+-------------------+
+|    |   merchant_id | merchant_name    | total_gross_sales |
++====+===============+==================+===================+
+|  0 |             1 | Acme Electronics |     <span class="c-green">100.00</span>        |
++----+---------------+------------------+-------------------+
+
+• <span class="c-yellow">Root Cause Detected:</span> Joining 2 child tables before GROUP BY
+  created a 2x2 = 4x Cartesian fan-out (<span class="c-red">+300.00 / 400% skew</span>).
+      </pre>
+    </div>
+
+    <div class="features-card">
+      <div class="feat-item">
+        <div class="feat-title">🔍 DuckDB In-Memory Execution Sandbox</div>
+        <div class="feat-desc">Every query runs in isolated ephemeral DuckDB sessions, preventing database leakage and ensuring deterministic multiset state.</div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-title">⚡ Deep Plan Profiling (EXPLAIN JSON)</div>
+        <div class="feat-desc">Recursively traverses physical operator trees to catch disallowed operators: <span class="c-red">CROSS_PRODUCT</span>, <span class="c-red">PIECEWISE_MERGE_JOIN</span>, and <span class="c-red">BLOCKWISE_NL_JOIN</span>.</div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-title">📐 Tolerance &amp; Multiset Grading</div>
+        <div class="feat-desc">Deterministic DataFrame multiset sorting eliminates parallel worker nondeterminism, while float tolerance handles decimal coercion.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

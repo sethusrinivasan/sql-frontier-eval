@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Slide 4 - Scorecard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      width: 1920px;
+      height: 1080px;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 60px 90px 140px 90px;
+      overflow: hidden;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #30363d;
+      padding-bottom: 20px;
+    }
+    .title {
+      font-size: 2.8rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin: 0;
+    }
+    .title span { color: #58a6ff; }
+    .badge {
+      background: rgba(63, 185, 80, 0.15);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.4);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 25px;
+      background: #161b22;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    th, td {
+      padding: 16px 20px;
+      text-align: left;
+      border-bottom: 1px solid #30363d;
+      font-size: 1.05rem;
+    }
+    th {
+      background: #090d16;
+      color: #f0f6fc;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 0.95rem;
+    }
+    .c-green { color: #3fb950; font-weight: bold; }
+    .c-yellow { color: #e3b341; font-weight: bold; }
+    .c-red { color: #f85149; font-weight: bold; }
+    .c-blue { color: #58a6ff; font-weight: bold; }
+    .footer-note {
+      margin-top: 15px;
+      font-size: 0.95rem;
+      color: #8b949e;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">Empirical Benchmark: <span>Frontier Model Scorecard</span></div>
+    <div class="badge">Live Evaluation Runs</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Frontier Model</th>
+        <th>Pass Rate</th>
+        <th>Score</th>
+        <th>Avg Latency</th>
+        <th>Engine Time</th>
+        <th>Key Analytical Outcome</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Gemini 3.8 Flash (Medium Reasoning)</strong></td>
+        <td><span class="c-green">100.0%</span></td>
+        <td><strong>8 / 8</strong></td>
+        <td>27.6s</td>
+        <td>4.5 ms</td>
+        <td>Perfect 8/8; formulated single-scan conditional flags for funnel</td>
+      </tr>
+      <tr>
+        <td><strong>Claude Opus 4.6 (Thinking)</strong></td>
+        <td><span class="c-yellow">87.5%</span></td>
+        <td>7 / 8</td>
+        <td>6.8s</td>
+        <td>5.3 ms</td>
+        <td>Failed Task 06 (Unnested distinct counts created CROSS_PRODUCT)</td>
+      </tr>
+      <tr>
+        <td><strong>Claude Sonnet 4.6 (Thinking)</strong></td>
+        <td><span class="c-yellow">87.5%</span></td>
+        <td>7 / 8</td>
+        <td>6.8s</td>
+        <td>4.8 ms</td>
+        <td>Failed Task 06 (Unnested distinct counts created CROSS_PRODUCT)</td>
+      </tr>
+      <tr>
+        <td><strong>GPT-OSS 120B (Medium)</strong></td>
+        <td><span class="c-yellow">87.5%</span></td>
+        <td>7 / 8</td>
+        <td>5.5s</td>
+        <td>5.5 ms</td>
+        <td>Failed Task 06 (Unnested distinct counts created CROSS_PRODUCT)</td>
+      </tr>
+      <tr>
+        <td><strong>Gemini 3.8 Flash (Low Reasoning)</strong></td>
+        <td><span class="c-yellow">87.5%</span></td>
+        <td>7 / 8</td>
+        <td>4.2s</td>
+        <td>5.4 ms</td>
+        <td>Ultra-fast 4.2s inference; tripped by funnel precedence</td>
+      </tr>
+      <tr>
+        <td><strong>Gemini 3.8 Flash (High Reasoning)</strong></td>
+        <td><span class="c-yellow">75.0%</span></td>
+        <td>6 / 8</td>
+        <td>31.1s</td>
+        <td>4.3 ms</td>
+        <td>Tasks 02 &amp; 06 timed out at default 90s threshold</td>
+      </tr>
+      <tr>
+        <td><strong>Golden Ground-Truth Baseline</strong></td>
+        <td><span class="c-green">100.0%</span></td>
+        <td>8 / 8</td>
+        <td>—</td>
+        <td>3.8 ms</td>
+        <td>100% Pass; 0% False Negatives verified</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer-note">
+    * All runs fully persisted in <code>results/</code> with raw prompts, generated SQL, execution plans, and tabular comparison outputs.
+  </div>
+</body>
+</html>

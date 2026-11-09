@@ -41,5 +41,9 @@ Built on an isolated in-memory **DuckDB 2.0 engine**, the harness enforces **zer
 * **Automated 1-Step Verification**: Run `./verify.sh` to execute 12 unit tests, 100% golden baseline checks, and offline failure detection in under 5 seconds.
 * **Live Model Benchmarks**: Integrates directly with frontier models across providers (`gemini-3.8-flash-high/medium/low`, `claude-opus-4-6-thinking`, `claude-sonnet-4-6`, `gpt-oss-120b-medium`) and OpenRouter.
 * **Persistent Benchmark Results**: Timestamped JSON run artifacts stored in [`results/`](results/) and summarized in [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md).
-* **Video Walkthrough & Storyboard**: Timed 4.5-minute presentation script in [`VIDEO_WALKTHROUGH_SCRIPT.md`](VIDEO_WALKTHROUGH_SCRIPT.md) and interactive HTML slide deck in [`walkthrough_presentation.html`](walkthrough_presentation.html).
+* **Video Walkthrough & Storyboard**:
+  - Full 1080p Narrated Video Walkthrough with Burned-In Closed Captions: [`sql_frontier_eval_walkthrough.mp4`](sql_frontier_eval_walkthrough.mp4) (3m 53s, 6.92 MB, ready for YouTube, Google Drive, or Loom upload).
+  - Synchronized Subtitle File: [`video/walkthrough_captions.srt`](video/walkthrough_captions.srt).
+  - Timed Presentation Teleprompter Script: [`VIDEO_WALKTHROUGH_SCRIPT.md`](VIDEO_WALKTHROUGH_SCRIPT.md).
+  - Interactive HTML Slide Deck: [`walkthrough_presentation.html`](walkthrough_presentation.html).
 * **AI-Assisted Development Acknowledgement**: Transparently disclosed in documentation as developed in partnership with Google Antigravity (AGY) powered by Gemini 3.8 Flash.

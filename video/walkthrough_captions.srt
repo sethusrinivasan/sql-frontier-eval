@@ -1,0 +1,151 @@
+1
+00:00:00,800 --> 00:00:05,514
+When deploying generative AI into modern columnar data warehouses,
+
+2
+00:00:05,514 --> 00:00:09,285
+the most dangerous bugs aren't syntax errors.
+
+3
+00:00:09,285 --> 00:00:13,326
+It is when a query executes without a single warning,
+
+4
+00:00:13,326 --> 00:00:18,984
+but silently quadruples your financial KPIs or corrupts user cohorts.
+
+5
+00:00:18,984 --> 00:00:25,045
+Traditional benchmarks only test basic relational lookups and textbook joins.
+
+6
+00:00:25,045 --> 00:00:32,049
+We built SQL Frontier Eval to evaluate frontier models on real-world analytical invariants.
+
+7
+00:00:32,849 --> 00:00:39,213
+To truly stress-test frontier models, we curated an eight-category failure taxonomy.
+
+8
+00:00:39,213 --> 00:00:44,250
+This covers high-stakes real-world pitfalls like the Chasm Trap,
+
+9
+00:00:44,250 --> 00:00:50,216
+where joining two one-to-many child tables multiplies gross revenue four-fold.
+
+10
+00:00:50,216 --> 00:00:56,182
+We test Gaps and Islands sessionization with thirty-minute inactivity thresholds,
+
+11
+00:00:56,182 --> 00:01:01,485
+point-in-time SCD Type Two joins with open-ended null bounds,
+
+12
+00:01:01,485 --> 00:01:08,776
+and subtle three-valued logic where a single NULL in a subquery empties an entire dataset.
+
+13
+00:01:08,776 --> 00:01:15,670
+We also evaluate window frame bounds, funnel precedence, and non-SARGable date pruning.
+
+14
+00:01:16,469 --> 00:01:23,424
+Under the hood, SQL Frontier Eval executes inside an isolated in-memory DuckDB sandbox.
+
+15
+00:01:23,424 --> 00:01:29,682
+To eliminate test flakiness, our grader enforces deterministic multiset row sorting.
+
+16
+00:01:29,682 --> 00:01:34,967
+Crucially, our engine inspects DuckDB's physical EXPLAIN plan
+
+17
+00:01:34,967 --> 00:01:41,643
+to flag disallowed anti-patterns like Cartesian cross products and quadratic joins.
+
+18
+00:01:41,643 --> 00:01:48,597
+And whenever an evaluation fails, the harness automatically generates a full walkthrough
+
+19
+00:01:48,597 --> 00:01:55,829
+displaying side-by-side output tables, arithmetic deltas, and root-cause explanations.
+
+20
+00:01:56,629 --> 00:02:03,792
+We evaluated frontier models across major AI providers: Gemini, Claude, and GPT.
+
+21
+00:02:03,792 --> 00:02:09,236
+The empirical scorecard revealed significant capability differences.
+
+22
+00:02:09,236 --> 00:02:15,682
+Gemini 3.8 Flash with Medium Reasoning achieved a perfect eight out of eight,
+
+23
+00:02:15,682 --> 00:02:19,264
+flawlessly handling every analytical trap.
+
+24
+00:02:19,264 --> 00:02:26,140
+Claude Opus 4.6 Thinking, Claude Sonnet 4.6, GPT-OSS 120B, and Gemini Low
+
+25
+00:02:26,140 --> 00:02:31,583
+all delivered fast inference and scored seven out of eight,
+
+26
+00:02:31,583 --> 00:02:38,459
+with all of them failing on Task 06: strict sequential funnel precedence.
+
+27
+00:02:39,259 --> 00:02:44,969
+Here is why Task 06 was the great discriminator between frontier models.
+
+28
+00:02:44,969 --> 00:02:50,135
+When calculating sequential user onboarding conversion stages,
+
+29
+00:02:50,135 --> 00:02:55,845
+Claude and GPT wrote multiple unnested distinct count subqueries.
+
+30
+00:02:55,845 --> 00:03:01,962
+This triggered internal Cartesian cross-product execution plans in DuckDB.
+
+31
+00:03:01,962 --> 00:03:08,760
+In contrast, Gemini 3.8 Flash with Medium Reasoning synthesized a single-scan CTE
+
+32
+00:03:08,760 --> 00:03:14,469
+using conditional aggregation flags that executed in just four milliseconds.
+
+33
+00:03:15,269 --> 00:03:21,176
+SQL Frontier Eval is fully reproducible and packaged for hackathon submission.
+
+34
+00:03:21,176 --> 00:03:27,476
+The entire codebase is compressed into an eighty-seven kilobyte code-only archive.
+
+35
+00:03:27,476 --> 00:03:34,301
+A single script, verify dot s h, executes all twelve unit tests and baselines in five seconds.
+
+36
+00:03:34,301 --> 00:03:39,551
+All empirical run logs are openly committed to the Git repository.
+
+37
+00:03:39,551 --> 00:03:46,769
+This evaluation suite was developed using Google Antigravity with human engineering oversight.
+
+38
+00:03:46,769 --> 00:03:53,069
+Thank you, and let us make AI data engineering reliable and mathematically sound.
