@@ -1,0 +1,24 @@
+{
+  "id": "task_07_quadratic_self_join",
+  "name": "Rolling 7-Day Window Aggregation without Quadratic Self-Joins",
+  "category": "Quadratic Self-Joins vs Range Windows",
+  "description": "Tests whether models leverage native SQL range window frames over non-equi self-joins that cause quadratic memory and CPU explosions.",
+  "prompt": "Calculate the 7-day rolling total revenue for each date in `daily_revenue`.\n\nThe 7-day rolling revenue for a given date is the sum of `gross_amount` for that date and the preceding 6 calendar days (e.g., INTERVAL 6 DAYS).\n\nRequired output columns:\n- revenue_date (DATE)\n- gross_amount (DECIMAL)\n- rolling_7d_revenue (DECIMAL)\n\nSort the results by revenue_date ASC.",
+  "setup_sql": "CREATE TABLE daily_revenue (\n    revenue_date DATE,\n    gross_amount DECIMAL(10,2)\n);\n\nINSERT INTO daily_revenue VALUES\n('2025-01-01', 100.00),\n('2025-01-02', 150.00),\n('2025-01-03', 200.00),\n('2025-01-04', 120.00),\n('2025-01-05', 180.00),\n('2025-01-06', 220.00),\n('2025-01-07', 300.00),\n('2025-01-08', 250.00);",
+  "golden_sql": "SELECT\n    revenue_date,\n    gross_amount,\n    SUM(gross_amount) OVER (\n        ORDER BY revenue_date\n        RANGE BETWEEN INTERVAL 6 DAYS PRECEDING AND CURRENT ROW\n    ) AS rolling_7d_revenue\nFROM daily_revenue\nORDER BY revenue_date ASC;",
+  "naive_llm_sql": "SELECT\n    a.revenue_date,\n    a.gross_amount,\n    SUM(b.gross_amount) AS rolling_7d_revenue\nFROM daily_revenue a\nJOIN daily_revenue b\n  ON b.revenue_date BETWEEN a.revenue_date - INTERVAL 6 DAYS AND a.revenue_date\nGROUP BY a.revenue_date, a.gross_amount\nORDER BY a.revenue_date ASC;",
+  "ordered": true,
+  "expected_columns": [
+    "revenue_date",
+    "gross_amount",
+    "rolling_7d_revenue"
+  ],
+  "efficiency_rules": {
+    "disallowed_operators": [
+      "CROSS_PRODUCT",
+      "BLOCKWISE_NL_JOIN",
+      "PIECEWISE_MERGE_JOIN"
+    ]
+  },
+  "why_it_fails": "Frontier models frequently generate triangular self-joins (JOIN ON b.date BETWEEN a.date - 6 AND a.date) instead of standard SQL RANGE window functions. On enterprise data warehouses (Snowflake, BigQuery, DuckDB), this produces an O(N^2) join operator (such as PIECEWISE_MERGE_JOIN or nested-loop joins) that degrades from linear to quadratic complexity and risks memory spills or warehouse timeouts."
+}

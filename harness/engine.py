@@ -48,12 +48,23 @@ class SQLEvalEngine:
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             return None, str(e), elapsed_ms
 
-    def profile_query(self, query: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    def profile_query(self, query: str) -> Tuple[Optional[Any], Optional[str]]:
         """
-        Runs EXPLAIN ANALYZE with JSON profiling enabled and returns the parsed profile tree.
+        Runs EXPLAIN (FORMAT JSON) to extract the execution plan tree.
+        Falls back to EXPLAIN ANALYZE for backward compatibility.
         """
+        # Primary: EXPLAIN (FORMAT JSON)
         try:
-            # Enable JSON profiling specifically for this EXPLAIN ANALYZE statement
+            prof_df = self.con.execute(f"EXPLAIN (FORMAT JSON) {query}").df()
+            if not prof_df.empty and "explain_value" in prof_df.columns:
+                profile_raw = prof_df["explain_value"].iloc[0]
+                profile_json = json.loads(profile_raw)
+                return profile_json, None
+        except Exception:
+            pass
+
+        # Fallback: EXPLAIN ANALYZE with JSON profiling
+        try:
             self.con.execute("PRAGMA enable_profiling = 'json';")
             prof_df = self.con.execute(f"EXPLAIN ANALYZE {query}").df()
             self.con.execute("PRAGMA disable_profiling;")
@@ -65,7 +76,6 @@ class SQLEvalEngine:
             profile_json = json.loads(profile_raw)
             return profile_json, None
         except Exception as e:
-            # Ensure profiling is disabled if an error occurs
             try:
                 self.con.execute("PRAGMA disable_profiling;")
             except Exception:
@@ -73,24 +83,35 @@ class SQLEvalEngine:
             return None, str(e)
 
     @staticmethod
-    def extract_operators(profile_tree: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def extract_operators(profile_tree: Any) -> List[Dict[str, Any]]:
         """
         Recursively extracts all operators from DuckDB's profile JSON tree.
+        Handles both DuckDB 1.x and 2.x formats.
         """
         operators = []
 
-        def _traverse(node: Dict[str, Any]):
+        def _traverse(node: Any):
+            if isinstance(node, list):
+                for item in node:
+                    _traverse(item)
+                return
             if not isinstance(node, dict):
                 return
-            if "operator_type" in node or "operator_name" in node:
-                operators.append({
-                    "type": node.get("operator_type", "UNKNOWN"),
-                    "name": node.get("operator_name", ""),
-                    "cardinality": node.get("operator_cardinality", 0),
-                    "timing_sec": node.get("operator_timing", 0.0),
-                    "rows_scanned": node.get("operator_rows_scanned", 0),
-                    "extra_info": node.get("extra_info", {})
-                })
+
+            raw_type = node.get("operator_type") or node.get("name") or "UNKNOWN"
+            op_type = raw_type
+            if op_type in ("SEQ_SCAN", "COLUMN_DATA_SCAN"):
+                op_type = "TABLE_SCAN"
+
+            operators.append({
+                "type": op_type,
+                "raw_type": raw_type,
+                "name": node.get("operator_name") or node.get("name", ""),
+                "cardinality": node.get("operator_cardinality") or node.get("extra_info", {}).get("Estimated Cardinality", 0),
+                "timing_sec": node.get("operator_timing", 0.0),
+                "rows_scanned": node.get("operator_rows_scanned", 0),
+                "extra_info": node.get("extra_info", {})
+            })
             for child in node.get("children", []):
                 _traverse(child)
 
@@ -130,13 +151,14 @@ class SQLEvalEngine:
         operators = cls.extract_operators(profile_tree)
         detected = []
 
-        default_disallowed = {"CROSS_PRODUCT", "BLOCKWISE_NL_JOIN"}
-        if disallowed_ops:
-            default_disallowed.update(op.upper() for op in disallowed_ops)
+        if disallowed_ops is not None:
+            active_disallowed = {op.upper() for op in disallowed_ops}
+        else:
+            active_disallowed = {"CROSS_PRODUCT", "BLOCKWISE_NL_JOIN"}
 
         for op in operators:
             op_type = op["type"].upper()
-            if op_type in default_disallowed:
+            if op_type in active_disallowed:
                 detected.append(
                     f"Disallowed operator '{op_type}' detected in execution plan (intermediate cardinality: {op['cardinality']})"
                 )

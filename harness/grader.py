@@ -204,11 +204,13 @@ class SQLGrader:
                 # Numeric comparison
                 if isinstance(val_g, (int, float, np.number)) and isinstance(val_c, (int, float, np.number)):
                     if not np.isclose(val_g, val_c, rtol=1e-3, atol=1e-3):
+                        exp_val = int(val_g) if isinstance(val_g, (int, np.integer)) else float(val_g)
+                        act_val = int(val_c) if isinstance(val_c, (int, np.integer)) else float(val_c)
                         return {
                             "column": col,
                             "row_index": idx,
-                            "expected": val_g,
-                            "actual": val_c,
+                            "expected": exp_val,
+                            "actual": act_val,
                             "difference": float(val_c - val_g)
                         }
                 elif val_g != val_c:

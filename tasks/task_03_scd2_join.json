@@ -1,0 +1,24 @@
+{
+  "id": "task_03_scd2_join",
+  "name": "Historical SCD Type 2 Point-in-Time Currency Conversion",
+  "category": "SCD Type 2 Point-in-Time Joins",
+  "description": "Joins financial transactions to Slowly Changing Dimension (SCD Type 2) exchange rate tables matching effective date ranges, correctly handling open-ended NULL upper bounds.",
+  "prompt": "Convert each financial transaction in `transactions` to USD using the historically effective rate from `exchange_rates` (SCD Type 2 table).\n\nAn exchange rate record is effective for a transaction if:\n1. The transaction currency matches the rate currency,\n2. The transaction timestamp is greater than or equal to `valid_from`, AND\n3. The transaction timestamp is strictly less than `valid_to`, OR `valid_to` is NULL (indicating the current, ongoing rate).\n\nRequired output columns:\n- txn_id (INT)\n- currency (VARCHAR)\n- amount (DECIMAL)\n- rate_to_usd (DECIMAL)\n- amount_usd (DECIMAL): Calculated as ROUND(amount * rate_to_usd, 2)\n\nSort the results by txn_id ASC.",
+  "setup_sql": "CREATE TABLE transactions (\n    txn_id INT,\n    currency VARCHAR,\n    amount DECIMAL(10,2),\n    txn_time TIMESTAMP\n);\n\nCREATE TABLE exchange_rates (\n    rate_id INT,\n    currency VARCHAR,\n    rate_to_usd DECIMAL(10,4),\n    valid_from TIMESTAMP,\n    valid_to TIMESTAMP\n);\n\nINSERT INTO transactions VALUES\n(1, 'EUR', 100.00, '2025-01-05 12:00:00'),\n(2, 'EUR', 200.00, '2025-01-20 15:30:00'),\n(3, 'GBP', 50.00,  '2025-01-10 09:00:00');\n\n-- SCD2 rates: EUR changed on Jan 15; GBP has no end date (current ongoing rate)\nINSERT INTO exchange_rates VALUES\n(10, 'EUR', 1.0500, '2025-01-01 00:00:00', '2025-01-15 00:00:00'),\n(11, 'EUR', 1.0800, '2025-01-15 00:00:00', NULL),\n(12, 'GBP', 1.2500, '2025-01-01 00:00:00', NULL);",
+  "golden_sql": "SELECT\n    t.txn_id,\n    t.currency,\n    t.amount,\n    r.rate_to_usd,\n    ROUND(t.amount * r.rate_to_usd, 2) AS amount_usd\nFROM transactions t\nJOIN exchange_rates r\n  ON t.currency = r.currency\n AND t.txn_time >= r.valid_from\n AND (t.txn_time < r.valid_to OR r.valid_to IS NULL)\nORDER BY t.txn_id ASC;",
+  "naive_llm_sql": "SELECT\n    t.txn_id,\n    t.currency,\n    t.amount,\n    r.rate_to_usd,\n    ROUND(t.amount * r.rate_to_usd, 2) AS amount_usd\nFROM transactions t\nJOIN exchange_rates r\n  ON t.currency = r.currency\n AND t.txn_time >= r.valid_from\n AND t.txn_time <= r.valid_to\nORDER BY t.txn_id ASC;",
+  "ordered": true,
+  "expected_columns": [
+    "txn_id",
+    "currency",
+    "amount",
+    "rate_to_usd",
+    "amount_usd"
+  ],
+  "efficiency_rules": {
+    "disallowed_operators": [
+      "CROSS_PRODUCT"
+    ]
+  },
+  "why_it_fails": "Frontier models routinely fail SCD Type 2 point-in-time join logic in two ways: (1) omitting the open-ended current record condition `OR valid_to IS NULL`, which causes current active records to be silently dropped during INNER JOINs, and (2) using `<=` instead of `<` on the upper boundary, which causes duplicate rows when a transaction occurs exactly on the boundary timestamp of an SCD revision."
+}

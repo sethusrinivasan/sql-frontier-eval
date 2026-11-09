@@ -1,0 +1,182 @@
+# SQL-Frontier-Eval: Benchmark Report & Empirical Analysis
+
+> **Comprehensive evaluation of Frontier AI Models on Analytical SQL, Silent Metric Corruption, and Execution Anti-Patterns.**  
+> Built for the **micro1 Eval Hackathon** on HackerRank Engage.  
+> **Evaluation Date:** November 2026 | **Execution Engine:** DuckDB 2.0 In-Memory Engine
+
+---
+
+## Executive Summary
+
+Modern text-to-SQL benchmarks (such as Spider and BIRD) predominantly evaluate transactional lookups and textbook joins. However, in production analytics environments (Snowflake, BigQuery, Databricks, DuckDB), the most catastrophic failures are not syntax errors—they are **silent metric corruption** and **computational blowups**.
+
+**SQL-Frontier-Eval** evaluates frontier language models across an 8-category analytical failure taxonomy. Each task tests whether a model generates semantically correct, warehouse-efficient SQL or falls into well-documented analytical traps.
+
+### Headline Benchmark Results
+
+| Model / Baseline | Pass Rate | Correct / Total | Avg Model Latency | Engine Exec Latency | Primary Failure Modes | Run Artifact |
+|---|---|---|---|---|---|---|
+| **Gemini 3.8 Flash (Medium)** | **100.0%** | **8 / 8** | 27.6s | **4.5 ms** | None (Zero failures across all 8 tasks) | [`results/eval_run_gemini-3.8-flash-medium_1794186799.json`](results/eval_run_gemini-3.8-flash-medium_1794186799.json) |
+| **Gemini 3.8 Flash (Low)** | **87.5%** | **7 / 8** | **4.2s** | **5.4 ms** | Strict Funnel Precedence (`CROSS_PRODUCT` scalar join) | [`results/eval_run_gemini-3.8-flash-low_1794186841.json`](results/eval_run_gemini-3.8-flash-low_1794186841.json) |
+| **Golden Ground Truth** | **100.0%** | **8 / 8** | N/A | **3.8 ms** | Baseline Verification (0% False Negatives) | [`results/eval_run_offline_1794186318.json`](results/eval_run_offline_1794186318.json) |
+| **Offline Reference / Naive** | **0.0%** | **0 / 8** | N/A | **2.6 ms** | 100% Trap Detection (Metric skew, row loss, O(N²) joins) | [`results/eval_run_offline_1794186320.json`](results/eval_run_offline_1794186320.json) |
+
+---
+
+## The 8-Category Analytical Failure Taxonomy
+
+Each task in the benchmark is paired with synthetic seed data, deterministic multiset verification, tolerance-based numeric assertion, and execution plan profiling:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                           SQL-FRONTIER-EVAL TAXONOMY                             │
+├─────────────────────┬────────────────────────────────┬───────────────────────────┤
+│ Task ID             │ Category                       │ Real-World Risk Exposed   │
+├─────────────────────┼────────────────────────────────┼───────────────────────────┤
+│ task_01_fanout      │ Metric Inflation / Chasm Trap  │ 4x KPI multiplication     │
+│ task_02_sessionize  │ Gaps & Islands Sessionization  │ Miscalculated sessions    │
+│ task_03_scd2_join   │ SCD Type 2 Point-in-Time Joins │ Silent loss of active row │
+│ task_04_three_value │ Three-Valued Logic Anti-Joins  │ 0 rows returned on NULL   │
+│ task_05_win_bounds  │ Window Frame Default Bounds    │ Peer row timestamp bunch  │
+│ task_06_funnel_prec │ Strict Funnel Precedence       │ Out-of-order conversions  │
+│ task_07_quad_join   │ Quadratic Self-Joins           │ O(N²) memory/CPU spill    │
+│ task_08_sargable    │ Non-SARGable Partition Pruning │ Full warehouse table scan │
+└─────────────────────┴────────────────────────────────┴───────────────────────────┘
+```
+
+---
+
+## Detailed Task-by-Task Scorecard
+
+| Task ID | Task Description | Gemini 3.8 Flash (Med) | Gemini 3.8 Flash (Low) | Offline Naive Verdict | Root Cause Detected |
+|---|---|:---:|:---:|:---:|---|
+| **01** | E-Commerce Join Fan-Out / Chasm Trap | **PASS** (5.0ms) | **PASS** (5.3ms) | `VALUE_MISMATCH` | Multi-table joins before `GROUP BY` multiply sums 4x |
+| **02** | Inactivity Gap Sessionization (30 min) | **PASS** (5.7ms) | **PASS** (4.6ms) | `SHAPE_MISMATCH` | Misuse of `ROW_NUMBER()` instead of cumulative step flags |
+| **03** | SCD Type 2 Currency Conversion | **PASS** (8.1ms) | **PASS** (14.4ms) | `SHAPE_MISMATCH` | Omitting `OR valid_to IS NULL` drops ongoing rates |
+| **04** | Anti-Join with Three-Valued Nulls | **PASS** (2.2ms) | **PASS** (2.6ms) | `SHAPE_MISMATCH` | `NOT IN` with subquery NULLs returns empty dataset |
+| **05** | Running Balance with Duplicate Timestamps | **PASS** (2.7ms) | **PASS** (3.1ms) | `VALUE_MISMATCH` | Default `RANGE` frame groups identical timestamp peers |
+| **06** | Sequential Conversion Funnel Precedence | **PASS** (5.3ms) | `EFFICIENCY_VIOLATION` | `VALUE_MISMATCH` | Independent conditional counts ignore step timestamps |
+| **07** | Rolling 7-Day Window vs Triangular Join | **PASS** (4.6ms) | **PASS** (4.6ms) | `EFFICIENCY_VIOLATION` | Non-equi triangular self-join causes quadratic merge join |
+| **08** | SARGable Partition Date Filtering | **PASS** (2.7ms) | **PASS** (3.5ms) | `VALUE_MISMATCH` | `BETWEEN` boundary leak captures Feb 1st midnight |
+
+---
+
+## Deep-Dive Failure Case Studies
+
+### 1. The Chasm Trap / Metric Inflation (`task_01_fanout`)
+* **The Scenario**: An e-commerce orders table joined to two 1-to-many child tables (`order_discounts` and `order_shipments`).
+* **The Naive Failure**:
+  ```sql
+  SELECT m.merchant_name, SUM(o.base_amount), SUM(d.amount), SUM(s.shipping_fee)
+  FROM merchants m
+  JOIN orders o ON m.merchant_id = o.merchant_id
+  LEFT JOIN order_discounts d ON o.order_id = d.order_id
+  LEFT JOIN order_shipments s ON o.order_id = s.order_id
+  GROUP BY m.merchant_name;
+  ```
+* **The Consequence**: 2 discount rows $\times$ 2 shipment rows create an intermediate Cartesian fan-out of 4 rows per order. `base_amount` of \$100 is silently reported as **\$400.00 (4.0x gross sales inflation)**.
+* **The Solution**: CTE pre-aggregation or correlated subqueries before joining.
+
+### 2. Three-Valued Logic in Anti-Joins (`task_04_three_valued_logic`)
+* **The Scenario**: Find customers who have never filed a product return.
+* **The Naive Failure**:
+  ```sql
+  SELECT customer_id, customer_name
+  FROM customers
+  WHERE customer_id NOT IN (SELECT customer_id FROM returns);
+  ```
+* **The Consequence**: If the `returns` table contains a single anonymous guest return with `customer_id IS NULL`, SQL three-valued logic causes `x NOT IN (1, NULL)` to evaluate to `UNKNOWN`. As a result, the query returns **0 rows**, completely corrupting the active customer cohort.
+* **The Solution**: `NOT EXISTS (SELECT 1 FROM returns r WHERE r.customer_id = c.customer_id)`.
+
+### 3. Window Frame Default Bounds (`task_05_window_frame_bounds`)
+* **The Scenario**: Ledger running balance with multiple transactions occurring at the identical second (`2025-01-01 10:00:00`).
+* **The Naive Failure**:
+  ```sql
+  SUM(amount) OVER (PARTITION BY account_id ORDER BY entry_time)
+  ```
+* **The Consequence**: In ANSI SQL and DuckDB, omitting the window frame defaults to `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`. This bundles duplicate timestamp peers together, producing balances of `[80.0, 80.0, 60.0]` instead of `[50.0, 80.0, 60.0]`.
+* **The Solution**: Explicit `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` with tie-breaker ordering on `entry_id`.
+
+### 4. Quadratic Triangular Self-Joins (`task_07_quadratic_self_join`)
+* **The Scenario**: Calculating rolling 7-day total revenue.
+* **The Anti-Pattern**:
+  ```sql
+  SELECT a.revenue_date, SUM(b.gross_amount)
+  FROM daily_revenue a
+  JOIN daily_revenue b
+    ON b.revenue_date BETWEEN a.revenue_date - INTERVAL 6 DAYS AND a.revenue_date
+  GROUP BY a.revenue_date, a.gross_amount;
+  ```
+* **Execution Profiler Detection**: Traversal of DuckDB's physical plan tree immediately catches the `PIECEWISE_MERGE_JOIN` operator ($O(N^2)$ non-equi join), triggering an automated `EFFICIENCY_VIOLATION`.
+* **The Solution**: Single-pass `RANGE BETWEEN INTERVAL 6 DAYS PRECEDING AND CURRENT ROW`.
+
+---
+
+## Empirical Comparison: Gemini Reasoning Effort Scaling
+
+Comparing **Gemini 3.8 Flash (Medium)** against **Gemini 3.8 Flash (Low)** reveals critical insights for AI prompt engineering and agent design:
+
+```
+Gemini 3.8 Flash (Medium Reasoning):  ████████████████████ 100.0% (8/8)  [Avg Latency: 27.6s]
+Gemini 3.8 Flash (Low Reasoning):     █████████████████░░░  87.5% (7/8)  [Avg Latency:  4.2s]
+```
+
+1. **Analytical Soundness**: At medium reasoning effort, Gemini 3.8 Flash scored **100% across all 8 challenging analytical tasks**, demonstrating flawless handling of the Chasm Trap, 3-valued null semantics, SCD Type 2 point-in-time bounds, and Gaps & Islands window indexing.
+2. **Reasoning Scaling on Strict Funnels**: On Task 06 (Strict Funnel Precedence), low-reasoning generated an unnested cross product of multiple subqueries. At medium reasoning, Gemini synthesized a clean single-scan CTE with conditional aggregation flags (`MIN(CASE WHEN event = ...)`), avoiding cross-join operators completely.
+3. **Execution Efficiency**: Both Gemini configurations produced queries with zero quadratic self-joins, leveraging DuckDB native `RANGE BETWEEN` window frames.
+
+---
+
+## Automated Walkthrough Generation
+
+When any candidate query fails, the evaluation harness prints a detailed terminal walkthrough formatted with `sqlparse` and `tabulate`:
+
+```text
+==========================================================================================
+❌ EVALUATION FAILURE WALKTHROUGH: E-Commerce Financial Aggregation without Join Fan-Out
+Category: Metric Inflation / Chasm Trap | Verdict: VALUE_MISMATCH
+==========================================================================================
+
+1. QUERIES EXECUTED
+[Candidate Query (Tested - Latency: 3.6ms)]
+  SELECT m.merchant_id,
+         m.merchant_name,
+         sum(o.base_amount) AS total_gross_sales, ...
+  FROM merchants m
+  JOIN orders o ON m.merchant_id = o.merchant_id
+  LEFT JOIN order_discounts d ON o.order_id = d.order_id
+  LEFT JOIN order_shipments s ON o.order_id = s.order_id
+  GROUP BY m.merchant_id, m.merchant_name;
+
+2. TABULAR QUERY RESULTS COMPARISON
+[Actual Candidate Output] (1 rows x 5 columns):
+  +----+---------------+------------------+---------------------+-------------------------+
+  |    |   merchant_id | merchant_name    |   total_gross_sales |   total_discount_amount |
+  +====+===============+==================+=====================+=========================+
+  |  0 |             1 | Acme Electronics |                 400 |                      30 |
+  +----+---------------+------------------+---------------------+-------------------------+
+
+[Expected Golden Output] (1 rows x 5 columns):
+  +----+---------------+------------------+---------------------+-------------------------+
+  |  0 |             1 | Acme Electronics |                 100 |                      15 |
+  +----+---------------+------------------+---------------------+-------------------------+
+
+3. FAILURE ANALYSIS & ROOT CAUSE
+• Verdict Reason: Data discrepancy: 'total_gross_sales' at Row 0 expected 100.0, got 400.0 (+300.00 / 4.0x inflation).
+• Root Cause: Joining two 1:N child tables before grouping created a 2 * 2 = 4x Cartesian fan-out.
+==========================================================================================
+```
+
+---
+
+## AI-Assisted Development Acknowledgement
+
+In accordance with hackathon submission guidelines, we transparently acknowledge the usage of **AI-assisted development**:
+* **Pair Programming Partner**: Developed with the assistance of **Google Antigravity (AGY)** agentic AI pair programming system powered by Gemini 3.8 Flash.
+* **Human-in-the-Loop Oversight**: Benchmark design, analytical failure taxonomy taxonomy curation, test fixture definitions, execution profiling rules, and mathematical verification were directed and validated by human analytical engineering review.
+
+---
+
+## Summary for Hackathon Judges
+
+SQL-Frontier-Eval delivers a turnkey, production-grade eval for modern enterprise analytics. By isolating silent correctness traps and quadratic engine anti-patterns, it provides the deterministic rigor needed to evaluate and guide frontier models in real-world data warehouse environments.

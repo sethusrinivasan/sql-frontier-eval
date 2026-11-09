@@ -1,0 +1,25 @@
+{
+  "id": "task_02_sessionization",
+  "name": "Clickstream Sessionization with Inactivity Gaps",
+  "category": "Sessionization (Gaps & Islands)",
+  "description": "Groups web analytics events into browsing sessions where an inactivity gap greater than 30 minutes demarcates a new session boundary.",
+  "prompt": "You are given a table of raw web clickstream events `user_events`. Group each user's events into distinct browsing sessions.\n\nA new session starts when:\n1. It is the user's very first event, OR\n2. More than 30 minutes (DuckDB: INTERVAL 30 MINUTE) have elapsed since the user's immediately preceding event.\n\nFor each user and session, return:\n- user_id (INT)\n- session_id (BIGINT or INT): A sequential integer session index per user starting at 1\n- session_start (TIMESTAMP): Timestamp of the first event in the session\n- session_end (TIMESTAMP): Timestamp of the last event in the session\n- event_count (BIGINT or INT): Total number of events in this session\n\nSort the results by user_id ASC, session_start ASC.",
+  "setup_sql": "CREATE TABLE user_events (\n    event_id INT,\n    user_id INT,\n    event_timestamp TIMESTAMP,\n    page_url VARCHAR\n);\n\nINSERT INTO user_events VALUES\n(1, 10, '2025-01-01 10:00:00', '/home'),\n(2, 10, '2025-01-01 10:15:00', '/pricing'),\n(3, 10, '2025-01-01 11:00:00', '/docs'),\n(4, 10, '2025-01-01 11:10:00', '/checkout'),\n(5, 20, '2025-01-01 09:00:00', '/blog');",
+  "golden_sql": "WITH lagged AS (\n    SELECT\n        user_id,\n        event_timestamp,\n        CASE\n            WHEN event_timestamp - LAG(event_timestamp) OVER (\n                PARTITION BY user_id ORDER BY event_timestamp\n            ) > INTERVAL 30 MINUTE \n                 OR LAG(event_timestamp) OVER (\n                PARTITION BY user_id ORDER BY event_timestamp\n            ) IS NULL THEN 1\n            ELSE 0\n        END AS is_new_session\n    FROM user_events\n),\nsession_indexed AS (\n    SELECT\n        user_id,\n        event_timestamp,\n        CAST(SUM(is_new_session) OVER (\n            PARTITION BY user_id ORDER BY event_timestamp\n            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n        ) AS BIGINT) AS session_id\n    FROM lagged\n)\nSELECT\n    user_id,\n    session_id,\n    MIN(event_timestamp) AS session_start,\n    MAX(event_timestamp) AS session_end,\n    COUNT(*) AS event_count\nFROM session_indexed\nGROUP BY user_id, session_id\nORDER BY user_id ASC, session_start ASC;",
+  "naive_llm_sql": "SELECT\n    user_id,\n    ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY event_timestamp) AS session_id,\n    MIN(event_timestamp) AS session_start,\n    MAX(event_timestamp) AS session_end,\n    COUNT(*) AS event_count\nFROM user_events\nGROUP BY user_id, event_timestamp\nORDER BY user_id ASC, session_start ASC;",
+  "ordered": true,
+  "expected_columns": [
+    "user_id",
+    "session_id",
+    "session_start",
+    "session_end",
+    "event_count"
+  ],
+  "efficiency_rules": {
+    "disallowed_operators": [
+      "CROSS_PRODUCT",
+      "BLOCKWISE_NL_JOIN"
+    ]
+  },
+  "why_it_fails": "Sessionization with inactivity timeouts is a classic Gaps & Islands problem. Naive LLMs routinely attempt to group directly by timestamps or confuse ROW_NUMBER() with session grouping, failing to calculate the cumulative sum of step flags (LAG condition). The optimal pattern requires a two-step window CTE: step 1 identifies boundary leaps (> 30 min) with LAG(), and step 2 computes a running cumulative sum of those flags to assign unique session IDs."
+}

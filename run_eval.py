@@ -13,7 +13,7 @@ import sqlparse
 
 from harness.engine import SQLEvalEngine
 from harness.grader import SQLGrader
-from harness.llm import OpenRouterClient
+from harness.llm import OpenRouterClient, AgyClient, get_llm_client
 
 def beautify_sql(query: str) -> str:
     """
@@ -199,12 +199,12 @@ def run_evaluation(args) -> Dict[str, Any]:
         print(f"[ERROR] No task files found matching pattern: {args.tasks}")
         sys.exit(1)
 
-    # Initialize OpenRouter client if not in offline mode
+    # Initialize LLM client if not in offline mode
     llm_client = None
     if args.model != "offline" and not args.test_gold:
-        llm_client = OpenRouterClient()
-        if not llm_client.api_key:
-            print("[WARNING] OPENROUTER_API_KEY environment variable is not set. Switching to offline mode.")
+        llm_client, err = get_llm_client(args.model)
+        if err or not llm_client:
+            print(f"[WARNING] {err or 'Could not initialize client'}. Switching to offline mode.")
             args.model = "offline"
 
     print("=" * 80)
@@ -255,7 +255,8 @@ def run_evaluation(args) -> Dict[str, Any]:
             candidate_sql = task.get("naive_llm_sql", task["golden_sql"])
             print("  Candidate: Local naive/reference query (offline mode)")
         else:
-            print(f"  Generating SQL via OpenRouter ({args.model})...")
+            backend_name = "Antigravity CLI" if isinstance(llm_client, AgyClient) else "OpenRouter"
+            print(f"  Generating SQL via {backend_name} ({args.model})...")
             gen_sql, gen_err, llm_meta = llm_client.generate_sql(
                 task_prompt=task["prompt"],
                 setup_sql=task["setup_sql"],
@@ -267,7 +268,8 @@ def run_evaluation(args) -> Dict[str, Any]:
                 cand_exec_err = gen_err
             else:
                 candidate_sql = gen_sql
-                print(f"  Generation finished in {llm_meta.get('latency_ms', 0):.1f}ms ({llm_meta.get('total_tokens', 0)} tokens)")
+                token_info = f" ({llm_meta.get('total_tokens', 0)} tokens)" if "total_tokens" in llm_meta else ""
+                print(f"  Generation finished in {llm_meta.get('latency_ms', 0):.1f}ms{token_info}")
 
         # 4. Execute Candidate Query
         cand_df = None
@@ -365,7 +367,7 @@ def run_evaluation(args) -> Dict[str, Any]:
         safe_model = args.model.replace("/", "_").replace(":", "_")
         filename = f"results/eval_run_{safe_model}_{int(time.time())}.json"
         with open(filename, "w") as f:
-            json.dump(run_summary, f, indent=2)
+            json.dump(run_summary, f, indent=2, default=str)
         print(f"[Results Persisted] Saved run artifact to {filename}")
 
     return run_summary

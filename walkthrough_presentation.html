@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SQL-Frontier-Eval: Walkthrough Presentation</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --text: #c9d1d9;
+      --title: #f0f6fc;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .slide-container {
+      width: 90%;
+      max-width: 1050px;
+      margin: 40px auto;
+    }
+    .slide {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      margin-bottom: 50px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h1, h2, h3 {
+      color: var(--title);
+      margin-top: 0;
+    }
+    h1 { font-size: 2.2rem; border-bottom: 2px solid var(--accent); padding-bottom: 12px; }
+    h2 { font-size: 1.6rem; color: var(--accent); margin-bottom: 20px; }
+    .badge {
+      display: inline-block;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+    .badge-hackathon {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--green);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin: 25px 0;
+    }
+    .card {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .card h4 {
+      margin: 0 0 10px 0;
+      color: var(--accent);
+    }
+    pre {
+      background: #030712;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 15px;
+      overflow-x: auto;
+      color: #93c5fd;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .highlight-red { color: var(--red); font-weight: bold; }
+    .highlight-green { color: var(--green); font-weight: bold; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      text-align: left;
+    }
+    th {
+      background: #090d16;
+      color: var(--title);
+    }
+    .nav-hint {
+      text-align: center;
+      color: #8b949e;
+      margin-top: -20px;
+      margin-bottom: 30px;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="slide-container">
+    <div class="nav-hint">Scroll down to advance slides during the 5-minute video walkthrough</div>
+
+    <!-- Slide 1 -->
+    <div class="slide">
+      <span class="badge badge-hackathon">micro1 Eval Hackathon Submission</span>
+      <h1>SQL-Frontier-Eval</h1>
+      <h2>Benchmarking Frontier AI on Complex Analytical SQL & Silent Metric Corruption</h2>
+      <p style="font-size: 1.15rem; line-height: 1.6;">
+        Evaluating semantic correctness, mathematical KPI integrity, and plan efficiency on modern analytical engines (DuckDB, Snowflake, BigQuery, Databricks).
+      </p>
+      <div class="grid">
+        <div class="card">
+          <h4>📌 The Core Problem</h4>
+          <p>Textbook Text-to-SQL benchmarks only test syntax and basic relational lookups. In production warehouses, LLMs generate <strong>silent metric inflation</strong> and <strong>computational row explosions</strong> with zero syntax errors.</p>
+        </div>
+        <div class="card">
+          <h4>🏗️ Hardened Architecture</h4>
+          <p>DuckDB in-memory isolation, deterministic multiset row matching, floating-point numeric tolerance, and EXPLAIN JSON physical operator traversal.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 2 -->
+    <div class="slide">
+      <span class="badge">Failure Taxonomy</span>
+      <h2>The 8-Category Analytical Failure Taxonomy</h2>
+      <div class="grid">
+        <div class="card">
+          <h4>01. The Chasm Trap</h4>
+          <p>Joining multiple 1:N child tables before <code>GROUP BY</code> multiplies base metrics (e.g. 4x gross sales).</p>
+        </div>
+        <div class="card">
+          <h4>02. Gaps & Islands</h4>
+          <p>Web analytics 30-min inactivity sessionization requiring cumulative step flags.</p>
+        </div>
+        <div class="card">
+          <h4>03. SCD Type 2 Point-in-Time</h4>
+          <p>Historical currency conversion rates where missing <code>valid_to IS NULL</code> drops ongoing rows.</p>
+        </div>
+        <div class="card">
+          <h4>04. Three-Valued Logic</h4>
+          <p>Anti-joins using <code>NOT IN</code> over subqueries with NULLs silently returning 0 rows.</p>
+        </div>
+        <div class="card">
+          <h4>05. Window Frame Bounds</h4>
+          <p>Default <code>RANGE</code> frame improperly bunching duplicate timestamp transactions together.</p>
+        </div>
+        <div class="card">
+          <h4>06. Strict Funnel Precedence</h4>
+          <p>Multi-stage conversion funnels requiring strict chronological step order.</p>
+        </div>
+        <div class="card">
+          <h4>07. Quadratic Self-Joins</h4>
+          <p>Triangular joins on rolling metrics triggering O(N²) memory spills instead of window scans.</p>
+        </div>
+        <div class="card">
+          <h4>08. Non-SARGable Pruning</h4>
+          <p>Date function wrapping defeating columnar partition min/max pruning.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 3 -->
+    <div class="slide">
+      <span class="badge">Live Demonstration</span>
+      <h2>Pinpointed Failure Walkthrough Diagnostics</h2>
+      <p>When an evaluation fails, SQL-Frontier-Eval prints an in-depth analytical post-mortem:</p>
+      <pre>
+==========================================================================================
+❌ EVALUATION FAILURE WALKTHROUGH: E-Commerce Financial Aggregation without Join Fan-Out
+Category: Metric Inflation / Chasm Trap | Verdict: VALUE_MISMATCH
+==========================================================================================
+
+[Actual Candidate Output] (1 rows x 5 columns):
+  +----+---------------+------------------+---------------------+-------------------------+
+  |    |   merchant_id | merchant_name    |   total_gross_sales |   total_discount_amount |
+  +====+===============+==================+=====================+=========================+
+  |  0 |             1 | Acme Electronics |      <span class="highlight-red">400.00</span>         |                   30.00 |
+  +----+---------------+------------------+---------------------+-------------------------+
+
+[Expected Golden Output] (1 rows x 5 columns):
+  +----+---------------+------------------+---------------------+-------------------------+
+  |    |   merchant_id | merchant_name    |   total_gross_sales |   total_discount_amount |
+  +====+===============+==================+=====================+=========================+
+  |  0 |             1 | Acme Electronics |      <span class="highlight-green">100.00</span>         |                   15.00 |
+  +----+---------------+------------------+---------------------+-------------------------+
+
+• Value Discrepancy: 'total_gross_sales' expected 100.0, got 400.0 (<span class="highlight-red">+300.00 / 4.0x inflation</span>).
+• Root Cause: Joining two 1:N child tables before grouping created a 2 * 2 = 4x Cartesian fan-out.</pre>
+    </div>
+
+    <!-- Slide 4 -->
+    <div class="slide">
+      <span class="badge">Benchmark Results</span>
+      <h2>Empirical Results: Gemini Frontier Models</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Model / Evaluated Target</th>
+            <th>Pass Rate</th>
+            <th>Score</th>
+            <th>Avg Latency</th>
+            <th>Analytical Key Takeaway</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Gemini 3.8 Flash (Medium Reasoning)</strong></td>
+            <td><strong class="highlight-green">100.0%</strong></td>
+            <td><strong>8 / 8</strong></td>
+            <td>27.6s</td>
+            <td>Flawless execution across all 8 complex analytical traps</td>
+          </tr>
+          <tr>
+            <td><strong>Gemini 3.8 Flash (Low Reasoning)</strong></td>
+            <td><strong style="color:#e3b341;">87.5%</strong></td>
+            <td>7 / 8</td>
+            <td>4.2s</td>
+            <td>Passed 7/8 tasks in ~4s; stumbled on multi-stage funnels</td>
+          </tr>
+          <tr>
+            <td><strong>Golden Ground-Truth Baseline</strong></td>
+            <td><strong class="highlight-green">100.0%</strong></td>
+            <td>8 / 8</td>
+            <td>3.8ms</td>
+            <td>Zero false negatives verified</td>
+          </tr>
+          <tr>
+            <td><strong>Offline Reference / Naive Queries</strong></td>
+            <td><strong class="highlight-red">0.0%</strong></td>
+            <td>0 / 8</td>
+            <td>2.6ms</td>
+            <td>100% precision in detecting metric inflation and O(N²) traps</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Slide 5 -->
+    <div class="slide">
+      <span class="badge">Submission Summary</span>
+      <h2>Submission Deliverables & Acknowledgement</h2>
+      <div class="grid">
+        <div class="card">
+          <h4>📦 Complete Package</h4>
+          <p>Clean code-only ZIP (&lt;1 MB), complete 8-task suite, DuckDB engine, and automated test harness.</p>
+        </div>
+        <div class="card">
+          <h4>🤖 AI-Assisted Development</h4>
+          <p>Developed with the assistance of <strong>Google Antigravity (AGY)</strong> powered by Gemini 3.8 Flash under human engineering direction.</p>
+        </div>
+      </div>
+      <p style="text-align: center; margin-top: 30px; font-weight: 600; color: var(--accent);">
+        Repository: <a href="https://github.com/sql-frontier-eval" style="color:var(--accent);">github.com/sql-frontier-eval</a>
+      </p>
+    </div>
+
+  </div>
+
+</body>
+</html>

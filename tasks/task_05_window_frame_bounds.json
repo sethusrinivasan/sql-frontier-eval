@@ -1,0 +1,24 @@
+{
+  "id": "task_05_window_frame_bounds",
+  "name": "Financial Ledger Running Balance with Duplicate Timestamps",
+  "category": "Window Frame Default Bounds",
+  "description": "Tests window frame boundary specification (ROWS vs default RANGE) on duplicate timestamp ordering.",
+  "prompt": "Calculate the sequential running balance after each ledger transaction for each account in `ledger_entries`.\n\nNote that multiple ledger entries can occur at the exact same timestamp. Each transaction must be accumulated strictly entry-by-entry based on entry_id ordering, avoiding premature peer grouping.\n\nRequired output columns:\n- entry_id (INT)\n- account_id (INT)\n- entry_time (TIMESTAMP)\n- amount (DECIMAL)\n- running_balance (DECIMAL): Cumulative sum of amount for the account up to and including this entry\n\nSort the results by account_id ASC, entry_id ASC.",
+  "setup_sql": "CREATE TABLE ledger_entries (\n    entry_id INT,\n    account_id INT,\n    entry_time TIMESTAMP,\n    amount DECIMAL(10,2)\n);\n\n-- Multiple entries at exact same second for account 100\nINSERT INTO ledger_entries VALUES\n(1, 100, '2025-01-01 10:00:00', 50.00),\n(2, 100, '2025-01-01 10:00:00', 30.00),\n(3, 100, '2025-01-01 10:15:00', -20.00),\n(4, 200, '2025-01-01 12:00:00', 100.00);",
+  "golden_sql": "SELECT\n    entry_id,\n    account_id,\n    entry_time,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_time, entry_id\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS running_balance\nFROM ledger_entries\nORDER BY account_id ASC, entry_id ASC;",
+  "naive_llm_sql": "SELECT\n    entry_id,\n    account_id,\n    entry_time,\n    amount,\n    SUM(amount) OVER (\n        PARTITION BY account_id\n        ORDER BY entry_time\n    ) AS running_balance\nFROM ledger_entries\nORDER BY account_id ASC, entry_id ASC;",
+  "ordered": true,
+  "expected_columns": [
+    "entry_id",
+    "account_id",
+    "entry_time",
+    "amount",
+    "running_balance"
+  ],
+  "efficiency_rules": {
+    "disallowed_operators": [
+      "CROSS_PRODUCT"
+    ]
+  },
+  "why_it_fails": "In ANSI SQL and DuckDB, `SUM(...) OVER (ORDER BY col)` defaults to `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` rather than `ROWS`. When two rows have identical ordering keys (same entry_time), RANGE treats them as equal peers and includes BOTH rows in the aggregate for the first row, prematurely applying the peer sum ($80.00 instead of $50.00). Strict cumulative calculations require explicit `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` and tie-breaker sorting."
+}

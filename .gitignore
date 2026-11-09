@@ -15,8 +15,11 @@ ENV/
 htmlcov/
 
 # Results / Artifacts
-results/*.json
-!results/.gitkeep
+# Track benchmark run artifacts in repo
+!results/*.json
+
+# Archives
+*.zip
 
 # IDE
 .vscode/

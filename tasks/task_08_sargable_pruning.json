@@ -1,0 +1,21 @@
+{
+  "id": "task_08_sargable_pruning",
+  "name": "SARGable Temporal Partition Pruning and Exact Boundary Range",
+  "category": "Non-SARGable Partition Pruning",
+  "description": "Tests SARGable timestamp filtering and strict month boundary conditions, preventing full-scan string functions and end-of-interval leaks.",
+  "prompt": "Analyze `system_logs` to calculate the count of ERROR logs and distinct error messages recorded during the calendar month of January 2025.\n\nRequirements:\n1. Filter for `severity = 'ERROR'`.\n2. Filter strictly for events in January 2025 (from 2025-01-01 00:00:00 up to but strictly excluding 2025-02-01 00:00:00).\n3. Keep the timestamp predicate SARGable (using direct range comparisons on `event_timestamp`) so that analytical partitions can be pruned.\n\nRequired output columns:\n- error_count (BIGINT or INT)\n- distinct_error_messages (BIGINT or INT)\n\nOnly a single summary row is returned.",
+  "setup_sql": "CREATE TABLE system_logs (\n    log_id BIGINT,\n    event_timestamp TIMESTAMP,\n    severity VARCHAR,\n    message VARCHAR\n);\n\nINSERT INTO system_logs VALUES\n(1, '2024-12-31 23:59:59', 'ERROR', 'Disk almost full'),\n(2, '2025-01-01 00:00:00', 'ERROR', 'Connection timed out'),\n(3, '2025-01-15 12:30:00', 'INFO',  'Healthcheck OK'),\n(4, '2025-01-20 18:00:00', 'ERROR', 'Out of memory'),\n(5, '2025-01-20 19:00:00', 'ERROR', 'Connection timed out'),\n(6, '2025-02-01 00:00:00', 'ERROR', 'Network unreachable');",
+  "golden_sql": "SELECT\n    COUNT(*) AS error_count,\n    COUNT(DISTINCT message) AS distinct_error_messages\nFROM system_logs\nWHERE severity = 'ERROR'\n  AND event_timestamp >= '2025-01-01 00:00:00'\n  AND event_timestamp < '2025-02-01 00:00:00';",
+  "naive_llm_sql": "SELECT\n    COUNT(*) AS error_count,\n    COUNT(DISTINCT message) AS distinct_error_messages\nFROM system_logs\nWHERE severity = 'ERROR'\n  AND event_timestamp BETWEEN '2025-01-01' AND '2025-02-01';",
+  "ordered": false,
+  "expected_columns": [
+    "error_count",
+    "distinct_error_messages"
+  ],
+  "efficiency_rules": {
+    "disallowed_operators": [
+      "BLOCKWISE_NL_JOIN"
+    ]
+  },
+  "why_it_fails": "Models frequently write `BETWEEN '2025-01-01' AND '2025-02-01'`, which is inclusive on both ends and mistakenly captures records occurring exactly at midnight on February 1st (leaking records into the previous month's report). Alternatively, models wrap timestamp columns in non-SARGable scalar functions (like strftime or date_part), defeating column min/max partition pruning in columnar engines."
+}

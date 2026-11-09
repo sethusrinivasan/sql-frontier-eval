@@ -1,0 +1,22 @@
+{
+  "id": "task_06_funnel_precedence",
+  "name": "Sequential Multi-Stage User Onboarding Conversion Funnel",
+  "category": "Strict Funnel Precedence",
+  "description": "Calculates user conversion through a multi-step sequence where events must strictly obey chronological order.",
+  "prompt": "Analyze user conversion across a 3-step marketing funnel using `user_journey_events`:\n1. Step 1 (View): The user viewed an item (`event_name = 'view_item'`).\n2. Step 2 (Cart): The user added an item to cart (`event_name = 'add_to_cart'`) strictly AFTER their initial view event.\n3. Step 3 (Purchase): The user completed a purchase (`event_name = 'purchase'`) strictly AFTER their cart event.\n\nCalculate the count of distinct users reaching each sequential stage in the funnel.\n\nRequired output columns:\n- total_viewers (BIGINT or INT): Distinct users who viewed an item\n- converted_cart (BIGINT or INT): Distinct users who added to cart after viewing\n- converted_purchase (BIGINT or INT): Distinct users who purchased after adding to cart\n\nOnly a single summary row is returned.",
+  "setup_sql": "CREATE TABLE user_journey_events (\n    event_id INT,\n    user_id INT,\n    event_name VARCHAR,\n    event_time TIMESTAMP\n);\n\nINSERT INTO user_journey_events VALUES\n-- User 1: valid sequence (view -> cart -> purchase)\n(1, 1, 'view_item',   '2025-01-01 10:00:00'),\n(2, 1, 'add_to_cart', '2025-01-01 10:05:00'),\n(3, 1, 'purchase',    '2025-01-01 10:10:00'),\n\n-- User 2: abandoned after cart (view -> cart)\n(4, 2, 'view_item',   '2025-01-01 11:00:00'),\n(5, 2, 'add_to_cart', '2025-01-01 11:15:00'),\n\n-- User 3: viewed only\n(6, 3, 'view_item',   '2025-01-01 12:00:00'),\n\n-- User 4: out of order! Purchased before viewing (1-click reorder)\n(7, 4, 'purchase',    '2025-01-01 08:00:00'),\n(8, 4, 'view_item',   '2025-01-01 09:00:00');",
+  "golden_sql": "WITH user_stages AS (\n    SELECT\n        user_id,\n        MIN(CASE WHEN event_name = 'view_item' THEN event_time END) AS view_time,\n        MIN(CASE WHEN event_name = 'add_to_cart' THEN event_time END) AS cart_time,\n        MIN(CASE WHEN event_name = 'purchase' THEN event_time END) AS purchase_time\n    FROM user_journey_events\n    GROUP BY user_id\n)\nSELECT\n    COUNT(CASE WHEN view_time IS NOT NULL THEN 1 END) AS total_viewers,\n    COUNT(CASE WHEN view_time IS NOT NULL AND cart_time > view_time THEN 1 END) AS converted_cart,\n    COUNT(CASE WHEN view_time IS NOT NULL AND cart_time > view_time AND purchase_time > cart_time THEN 1 END) AS converted_purchase\nFROM user_stages;",
+  "naive_llm_sql": "SELECT\n    COUNT(DISTINCT CASE WHEN event_name = 'view_item' THEN user_id END) AS total_viewers,\n    COUNT(DISTINCT CASE WHEN event_name = 'add_to_cart' THEN user_id END) AS converted_cart,\n    COUNT(DISTINCT CASE WHEN event_name = 'purchase' THEN user_id END) AS converted_purchase\nFROM user_journey_events;",
+  "ordered": false,
+  "expected_columns": [
+    "total_viewers",
+    "converted_cart",
+    "converted_purchase"
+  ],
+  "efficiency_rules": {
+    "disallowed_operators": [
+      "CROSS_PRODUCT"
+    ]
+  },
+  "why_it_fails": "Frontier models frequently calculate funnel conversions using independent conditional aggregations (COUNT DISTINCT CASE WHEN event = 'purchase'). This completely ignores the chronological order requirement (t_view < t_cart < t_purchase), mistakenly counting users who purchased via separate shortcuts or had events recorded out of sequence as successful sequential conversions."
+}

@@ -1,0 +1,21 @@
+{
+  "id": "task_04_three_valued_logic",
+  "name": "Customer Anti-Join with Three-Valued Null Semantics",
+  "category": "Three-Valued Logic in Anti-Joins",
+  "description": "Exposes silent data loss caused by SQL three-valued logic when models use NOT IN over subqueries containing NULLs.",
+  "prompt": "Find all customers who have NEVER filed a product return. Check against the `returns` table.\n\nRequired output columns:\n- customer_id (INT)\n- customer_name (VARCHAR)\n\nRow order does not matter.",
+  "setup_sql": "CREATE TABLE customers (\n    customer_id INT,\n    customer_name VARCHAR\n);\n\nCREATE TABLE orders (\n    order_id INT,\n    customer_id INT,\n    order_date DATE\n);\n\nCREATE TABLE returns (\n    return_id INT,\n    order_id INT,\n    customer_id INT\n);\n\nINSERT INTO customers VALUES\n(1, 'Alice Smith'),\n(2, 'Bob Jones'),\n(3, 'Charlie Brown');\n\nINSERT INTO orders VALUES\n(101, 1, '2025-01-01'),\n(102, 2, '2025-01-02'),\n(103, 3, '2025-01-03');\n\n-- Alice returned order 101. An anonymous/guest return has customer_id = NULL\nINSERT INTO returns VALUES\n(1, 101, 1),\n(2, 999, NULL);",
+  "golden_sql": "SELECT\n    c.customer_id,\n    c.customer_name\nFROM customers c\nWHERE NOT EXISTS (\n    SELECT 1 FROM returns r WHERE r.customer_id = c.customer_id\n);",
+  "naive_llm_sql": "SELECT\n    c.customer_id,\n    c.customer_name\nFROM customers c\nWHERE c.customer_id NOT IN (\n    SELECT customer_id FROM returns\n);",
+  "ordered": false,
+  "expected_columns": [
+    "customer_id",
+    "customer_name"
+  ],
+  "efficiency_rules": {
+    "disallowed_operators": [
+      "CROSS_PRODUCT"
+    ]
+  },
+  "why_it_fails": "In ANSI SQL three-valued logic, `x NOT IN (1, NULL)` evaluates to `UNKNOWN` rather than TRUE because SQL cannot guarantee x is not equal to the unknown value. Consequently, any query using `WHERE id NOT IN (SELECT id FROM ...)` where the subquery contains even a single NULL value evaluates to UNKNOWN for all rows, silently returning 0 results. Correct solutions require NOT EXISTS or LEFT JOIN ... WHERE ... IS NULL."
+}
