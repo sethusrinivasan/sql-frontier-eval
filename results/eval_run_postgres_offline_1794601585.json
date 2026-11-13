@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-11-13T20:26:25.486308+00:00",
+  "model": "offline",
+  "engine": "postgres",
+  "is_golden_test": true,
+  "total_tasks": 0,
+  "passed": 0,
+  "failed": 0,
+  "pass_rate_pct": 0.0,
+  "tasks": []
+}

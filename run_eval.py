@@ -179,6 +179,13 @@ def parse_args():
         help="Run evaluation against the golden query itself to ensure zero false failures"
     )
     parser.add_argument(
+        "--engine",
+        type=str,
+        default="duckdb",
+        choices=["duckdb", "postgres"],
+        help="Database execution engine: 'duckdb' (default, in-memory OLAP) or 'postgres' (PostgreSQL 18+ via Docker)"
+    )
+    parser.add_argument(
         "--save-results",
         action="store_true",
         default=True,
@@ -192,7 +199,7 @@ def parse_args():
     return parser.parse_args()
 
 def run_evaluation(args) -> Dict[str, Any]:
-    engine = SQLEvalEngine()
+    engine = SQLEvalEngine(engine_type=args.engine)
     task_files = sorted(glob.glob(args.tasks))
 
     if not task_files:
@@ -211,7 +218,8 @@ def run_evaluation(args) -> Dict[str, Any]:
     print(f"SQL FRONTIER EVALUATION RUNNER")
     print(f"Target Model: {args.model} {'(TESTING GOLDEN BASELINE)' if args.test_gold else ''}")
     print(f"Tasks Discovered: {len(task_files)}")
-    print(f"Execution Engine: DuckDB in-memory (threads=4)")
+    engine_desc = "DuckDB 2.0 In-Memory (threads=4)" if args.engine == "duckdb" else "PostgreSQL 18+ (Docker Compose with pgvector)"
+    print(f"Execution Engine: {engine_desc}")
     print("=" * 80)
 
     task_results = []
@@ -354,6 +362,7 @@ def run_evaluation(args) -> Dict[str, Any]:
     run_summary = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "model": args.model,
+        "engine": args.engine,
         "is_golden_test": args.test_gold,
         "total_tasks": total,
         "passed": passed_count,
@@ -365,7 +374,8 @@ def run_evaluation(args) -> Dict[str, Any]:
     if args.save_results:
         os.makedirs("results", exist_ok=True)
         safe_model = args.model.replace("/", "_").replace(":", "_")
-        filename = f"results/eval_run_{safe_model}_{int(time.time())}.json"
+        engine_prefix = f"{args.engine}_" if args.engine != "duckdb" else ""
+        filename = f"results/eval_run_{engine_prefix}{safe_model}_{int(time.time())}.json"
         with open(filename, "w") as f:
             json.dump(run_summary, f, indent=2, default=str)
         print(f"[Results Persisted] Saved run artifact to {filename}")

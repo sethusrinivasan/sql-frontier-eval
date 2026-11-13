@@ -86,3 +86,37 @@ def test_grader_first_mismatch_diff():
     assert diff["expected"] == 100.0
     assert diff["actual"] == 400.0
     assert diff["difference"] == 300.0
+
+
+def test_postgres_engine_isolation_and_execution():
+    try:
+        engine = SQLEvalEngine(engine_type="postgres")
+    except Exception as e:
+        pytest.skip(f"PostgreSQL container not reachable: {e}")
+
+    engine.load_seed_data("CREATE TABLE pg_t1 (id INT, val VARCHAR); INSERT INTO pg_t1 VALUES (1, 'pg_test');")
+    df1, err1, _ = engine.execute_query("SELECT * FROM pg_t1;")
+    assert err1 is None
+    assert len(df1) == 1
+    assert df1.iloc[0]["val"] == "pg_test"
+
+    # Reset sandbox should cleanly drop eval_sandbox schema
+    engine.reset_sandbox()
+    df2, err2, _ = engine.execute_query("SELECT * FROM pg_t1;")
+    assert err2 is not None
+    assert "pg_t1" in err2
+
+def test_postgres_engine_profiling_and_operators():
+    try:
+        engine = SQLEvalEngine(engine_type="postgres")
+    except Exception as e:
+        pytest.skip(f"PostgreSQL container not reachable: {e}")
+
+    engine.load_seed_data("CREATE TABLE pg_items (id INT); INSERT INTO pg_items SELECT generate_series(1, 20);")
+    profile, err = engine.profile_query("SELECT count(*) FROM pg_items;")
+    assert err is None
+    assert profile is not None
+
+    operators = engine.extract_operators(profile)
+    op_types = [op["type"] for op in operators]
+    assert any("SCAN" in op or "AGGREGATE" in op for op in op_types)
