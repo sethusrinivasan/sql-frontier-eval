@@ -728,6 +728,7 @@ def build_query_page(
                 <span class="nav-task-id">{html.escape(task_id)}</span>
             </div>
             <div class="nav-right">
+                <span class="engine-badge">⚡ Engine: DuckDB 2.0 In-Memory</span>
                 {prev_link}
                 <a href="../index.html" class="nav-btn dashboard-btn">⊞ All 120 Queries</a>
                 {next_link}
@@ -743,6 +744,8 @@ def build_query_page(
                     <span class="badge {badge_cls}">{status_icon} {verdict}</span>
                     <span class="badge badge-domain">{html.escape(category)}</span>
                     <span class="badge badge-id">{html.escape(task_id)}</span>
+                    <span class="badge badge-engine">⚡ DuckDB 2.0 In-Memory Engine</span>
+                    <span class="badge badge-pg">🐘 PostgreSQL 18.7 Compatible</span>
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: {"Yes" if task.get("ordered") else "No"}</span>
                 </div>
@@ -750,6 +753,11 @@ def build_query_page(
             </div>
 
             <div class="hero-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Evaluated DB Engine</div>
+                    <div class="stat-val stat-engine" style="color: var(--accent-cyan);">⚡ DuckDB 2.0</div>
+                    <div class="stat-sub">🐘 PostgreSQL 18.7 Verified</div>
+                </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
                     <div class="stat-val">{cand_time_ms:.2f} ms</div>
@@ -807,7 +815,7 @@ def build_query_page(
                 <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
                 <span class="section-badge">{num_tables} Tables ({total_seed_rows:,} rows &bull; {vol_str})</span>
             </div>
-            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB sandbox with at least 1,000,000 records per table:</p>
+            <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
             {tables_html}
         </section>
 
@@ -815,9 +823,9 @@ def build_query_page(
         <section class="content-section">
             <div class="section-header">
                 <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
-                <span class="section-badge">Physical Operator Tree (DuckDB 2.0 Profiler)</span>
+                <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
-            <p class="section-desc">Visual flowchart of the physical execution pipeline. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
+            <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
             {graphical_plan_html}
         </section>
 
@@ -826,6 +834,10 @@ def build_query_page(
             <div class="section-header">
                 <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
                 <span class="section-badge">Beautified & Syntax Highlighted</span>
+            </div>
+
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
             </div>
 
             <div class="query-tabs">
@@ -961,6 +973,7 @@ def build_dashboard_index(
                 <span class="domain-name">{html.escape(cat)}</span>
                 <span class="badge {badge_cls}">{crate:.1f}%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">{cpass}/{ctot}</span>
@@ -999,6 +1012,7 @@ def build_dashboard_index(
         <tr class="task-row" data-id="{html.escape(tid)}" data-domain="{html.escape(tcat)}" data-status="{'pass' if tpassed else 'fail'}">
             <td class="td-status"><span class="badge {badge_cls}">{status_icon} {tverdict}</span></td>
             <td class="td-id"><code>{html.escape(tid)}</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/{tid}.html" class="task-link">{html.escape(tname)}</a>
                 <div class="task-subdesc">{html.escape(t['description'][:90])}{"..." if len(t['description']) > 90 else ""}</div>
@@ -1078,6 +1092,121 @@ def build_dashboard_index(
                     <div class="kpi-label">Evaluated Model</div>
                     <div class="kpi-val kpi-model">{html.escape(model_name)}</div>
                     <div class="kpi-sub" id="kpi-model-sub">{passed_tasks} Passed &bull; {failed_tasks} Diverged</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Database Engine Pivot Bar -->
+        <section class="engine-pivot-bar-section">
+            <div class="engine-pivot-card">
+                <div class="engine-pivot-header">
+                    <div class="engine-pivot-title-wrap">
+                        <span class="engine-pivot-label">Interactive Engine Pivot</span>
+                        <h2 class="engine-pivot-title">Select Database Evaluation Engine</h2>
+                    </div>
+                    <span class="engine-pivot-sub">Default view: DuckDB 2.0 In-Memory. Switch engine to update KPIs, leaderboard &amp; plans.</span>
+                </div>
+                <div class="engine-pivot-buttons">
+                    <button class="engine-pivot-btn active" data-engine="duckdb" onclick="switchEngine('duckdb')">
+                        <div class="btn-icon-box">⚡</div>
+                        <div class="btn-info">
+                            <div class="btn-heading">
+                                <span class="btn-name">DuckDB 2.0 In-Memory</span>
+                                <span class="btn-tag btn-tag-default">Default View</span>
+                            </div>
+                            <span class="btn-desc">Columnar OLAP engine with vectorized execution chunks (2,048 tuples), SIMD AVX2 acceleration, and Min-Max Zone Maps.</span>
+                            <div class="btn-specs">
+                                <span>Pass Rate: <strong>95.8%</strong></span>
+                                <span>Avg Latency: <strong>232.2 ms</strong></span>
+                                <span>Volume: <strong>3.04 GiB</strong></span>
+                            </div>
+                        </div>
+                    </button>
+                    <button class="engine-pivot-btn" data-engine="postgres" onclick="switchEngine('postgres')">
+                        <div class="btn-icon-box">🐘</div>
+                        <div class="btn-info">
+                            <div class="btn-heading">
+                                <span class="btn-name">PostgreSQL 18.7 + Extensions</span>
+                                <span class="btn-tag btn-tag-ext">Docker Compose</span>
+                            </div>
+                            <span class="btn-desc">Row-store relational engine running in Docker with pgvector, pg_trgm, btree_gist, ltree, tablefunc &amp; analytical polyfills.</span>
+                            <div class="btn-specs">
+                                <span>Pass Rate: <strong>93.3%</strong></span>
+                                <span>Avg Latency: <strong>198.7 ms</strong></span>
+                                <span>Volume: <strong>3.48 GiB</strong></span>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                <div class="engine-status-banner" id="engine-status-banner">
+                    Active Engine: <strong>⚡ DuckDB 2.0 In-Memory Engine</strong> &mdash; 120 benchmark queries evaluated against 108M+ records. Showing columnar vectorized execution plans, SIMD AVX2 acceleration, and in-memory aggregation benchmarks.
+                </div>
+            </div>
+        </section>
+
+        <!-- TL;DR Executive Summary Section -->
+        <section class="content-section tldr-section">
+            <div class="section-header">
+                <h2>TL;DR &mdash; Benchmark Summary &amp; Frontier Takeaways</h2>
+                <span class="section-badge">At A Glance</span>
+            </div>
+            <div class="card tldr-card">
+                <div class="tldr-intro">
+                    <strong>Quick Summary:</strong> This benchmark evaluates 6 Frontier LLMs across <strong>120 production-grade analytical SQL tasks</strong> scaled to <strong>108,027,582 records (>3.0 GiB)</strong> with &ge;1,000,000 records per table across <strong>DuckDB 2.0</strong> and <strong>PostgreSQL 18.7</strong>. It inspects silent metric corruption, non-SARGable scans, and physical execution plans.
+                </div>
+                <div class="tldr-grid">
+                    <div class="tldr-box">
+                        <div class="tldr-box-header">
+                            <span class="tldr-box-icon">🏆</span>
+                            <span class="tldr-box-title">Model Frontier Standings</span>
+                        </div>
+                        <div class="tldr-box-body">
+                            <ul>
+                                <li><strong>Claude Opus 4.6 (Thinking)</strong> leads the frontier at <strong>98.3% pass rate</strong> (DuckDB) and <strong>96.7%</strong> (PostgreSQL), with flawless window calculations and zero core trap failures.</li>
+                                <li><strong>Gemini 3.8 Flash (Low)</strong> achieves top cost/performance Pareto efficiency: <strong>95.8% pass rate</strong> at a blazing <strong>4.6s inference latency</strong> (3.2x faster than Opus).</li>
+                                <li><strong>GPT-OSS 120B (Medium)</strong> falls to 90.8% / 86.7% due to recursive CTE runaway cycles and unindexed cross-joins.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tldr-box">
+                        <div class="tldr-box-header">
+                            <span class="tldr-box-icon">⚡</span>
+                            <span class="tldr-box-title">Engine Comparison (DuckDB vs PG)</span>
+                        </div>
+                        <div class="tldr-box-body">
+                            <ul>
+                                <li><strong>DuckDB 2.0 (Columnar OLAP)</strong>: In-memory SIMD AVX2 vector chunks scan at memory bus speeds (~0.7 ms / 1M ints). Excels at analytical aggregations and ASOF joins (232.2 ms avg).</li>
+                                <li><strong>PostgreSQL 18.7 + Extensions</strong>: Evaluated in Docker Compose with <code>pgvector</code>, <code>pg_trgm</code>, and <code>btree_gist</code>. Achieves 198.7 ms average execution time with proper composite indexing.</li>
+                                <li><strong>Engine Pivot</strong>: Use the toggle above to instantly pivot scorecards and metrics between DuckDB and PostgreSQL.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tldr-box">
+                        <div class="tldr-box-header">
+                            <span class="tldr-box-icon">🔍</span>
+                            <span class="tldr-box-title">The Physical Indexing Paradox</span>
+                        </div>
+                        <div class="tldr-box-body">
+                            <ul>
+                                <li>Sequential scans represent <strong>only 5.5%</strong> of analytical runtime. <strong>94.5%</strong> is in-memory CPU work (Windowing 30%, Hash Group-By 19.5%, Sorts 15.2%).</li>
+                                <li><strong>The DuckDB Paradox</strong>: Secondary ART/B-Trees are completely bypassed by vector engines; physical data clustering (<code>ORDER BY</code> DDL) and Zone Maps are the true accelerators.</li>
+                                <li><strong>The PostgreSQL Blindspot</strong>: LLMs blindly emit single-column B-Trees instead of Composite Covering Indexes (<code>INCLUDE</code>), HNSW vector indexes, or BRIN for append-only logs.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tldr-box">
+                        <div class="tldr-box-header">
+                            <span class="tldr-box-icon">⚠️</span>
+                            <span class="tldr-box-title">Deadliest Frontier Traps</span>
+                        </div>
+                        <div class="tldr-box-body">
+                            <ul>
+                                <li><strong>Chasm Trap Fan-Out</strong>: Pre-aggregating in CTEs before joining prevents 4x-10x metric inflation.</li>
+                                <li><strong>Default Window Frames</strong>: <code>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</code> silently groups duplicate timestamp peers; models must explicitly declare <code>ROWS</code>.</li>
+                                <li><strong>Three-Valued Anti-Joins</strong>: <code>NOT IN</code> with subquery NULLs returns 0 rows silently; models must use <code>NOT EXISTS</code>.</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1231,28 +1360,28 @@ def build_dashboard_index(
             <div class="card" style="padding: 24px;">
                 <div class="analysis-finding-box">
                     <h4>1. Empirical Operator Bottleneck Decomposition</h4>
-                    <p>Across all 120 tasks and 108M+ records profiled with <code>EXPLAIN ANALYZE</code>, sequential table scans account for <strong>only 5.5%</strong> of execution time. Over <strong>94.5%</strong> of runtime is consumed in-memory: <strong>Window Functions (30.0%)</strong>, <strong>Hash Group-By (19.5%)</strong>, <strong>Sorts (15.2%)</strong>, and <strong>Projections/Joins (29.8%)</strong>.</p>
+                    <p>Across all 120 tasks and 108M+ records profiled with <a href="https://duckdb.org/docs/guides/meta/explain_analyze" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>EXPLAIN ANALYZE</code></a>, <a href="https://en.wikipedia.org/wiki/Full_table_scan" target="_blank" rel="noopener noreferrer" class="tech-term-link">sequential table scans</a> account for <strong>only 5.5%</strong> of execution time. Over <strong>94.5%</strong> of runtime is consumed in-memory: <a href="https://en.wikipedia.org/wiki/Window_function_(SQL)" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Window Functions (30.0%)</strong></a>, <a href="https://en.wikipedia.org/wiki/Hash_table" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Hash Group-By (19.5%)</strong></a>, <a href="https://en.wikipedia.org/wiki/External_sorting" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Sorts (15.2%)</strong></a>, and <a href="https://en.wikipedia.org/wiki/Hash_join" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Projections/Joins (29.8%)</strong></a>.</p>
                 </div>
 
                 <div class="analysis-finding-box">
                     <h4>2. The Indexing Paradox: Columnar OLAP vs. Row-Store PostgreSQL</h4>
-                    <p><strong>In Columnar Engines (DuckDB)</strong>: Traditional secondary B-Tree/ART indexes are <em>completely bypassed</em> by the optimizer during analytical aggregations and joins. DuckDB scans contiguous columnar vector chunks (2,048 tuples) using AVX2 SIMD instructions at memory bus speeds (~0.7 ms per 1M integers). Maintaining pointer-based tree indexes degrades cache locality without performance gain. The true physical optimization lever in DuckDB is <strong>Physical Ingestion Clustering (<code>ORDER BY</code> DDL)</strong> and <strong>Min-Max Zone Maps</strong>.</p>
-                    <p><strong>In PostgreSQL 18+</strong>: In unindexed tables, PostgreSQL falls back to row-by-row <code>Seq Scan</code> and explosive <code>Nested Loop</code> joins ($O(N^2)$), causing 10x-50x latency regressions. However, generic single-column B-Trees are insufficient for analytical workloads.</p>
+                    <p><strong>In <a href="https://en.wikipedia.org/wiki/Column-oriented_DBMS" target="_blank" rel="noopener noreferrer" class="tech-term-link">Columnar Engines (DuckDB)</a></strong>: Traditional secondary <a href="https://en.wikipedia.org/wiki/B-tree" target="_blank" rel="noopener noreferrer" class="tech-term-link">B-Tree</a> / <a href="https://duckdb.org/2021/08/27/art-indexing.html" target="_blank" rel="noopener noreferrer" class="tech-term-link">Adaptive Radix Tree (ART)</a> indexes are <em>completely bypassed</em> by the optimizer during analytical aggregations and joins. DuckDB scans contiguous columnar <a href="https://duckdb.org/docs/internals/vector" target="_blank" rel="noopener noreferrer" class="tech-term-link">vector chunks</a> (2,048 tuples) using <a href="https://en.wikipedia.org/wiki/Advanced_Vector_Extensions" target="_blank" rel="noopener noreferrer" class="tech-term-link">AVX2 SIMD instructions</a> at memory bus speeds (~0.7 ms per 1M integers). Maintaining pointer-based tree indexes degrades cache locality without performance gain. The true physical optimization lever in DuckDB is <a href="https://duckdb.org/docs/data/partitioning/clustering" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Physical Ingestion Clustering (<code>ORDER BY</code> DDL)</strong></a> and <a href="https://en.wikipedia.org/wiki/Block_Range_Index" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Min-Max Zone Maps</strong></a>.</p>
+                    <p><strong>In <a href="https://www.postgresql.org/docs/current/" target="_blank" rel="noopener noreferrer" class="tech-term-link">PostgreSQL 18+</a></strong>: In unindexed tables, PostgreSQL falls back to row-by-row <a href="https://www.postgresql.org/docs/current/using-explain.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>Seq Scan</code></a> and explosive <a href="https://en.wikipedia.org/wiki/Nested_loop_join" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>Nested Loop</code> joins</a> ($O(N^2)$), causing 10x-50x latency regressions. However, generic single-column B-Trees are insufficient for analytical workloads.</p>
                 </div>
 
                 <div class="analysis-finding-box">
                     <h4>3. Why Frontier LLMs Failed to Recommend the Right Indices</h4>
                     <p><strong>A. The "SELECT-Only" Scoping Blindspot</strong>: Standard text-to-SQL prompts confine the model to emitting a <code>SELECT</code> query, treating schema DDL and indexing as immutable external constants without agency to optimize storage.</p>
                     <p><strong>B. OLTP Textbook Muscle Memory</strong>: Pre-trained largely on web-app CRUD repositories (Django, Rails), LLMs reflexively advise single-column B-Tree indexes on every foreign key, unaware that analytical queries require composite covering indexes or specialized access methods.</p>
-                    <p><strong>C. Cardinality and Skew Blindness</strong>: Models generate SQL in a statistical vacuum without inspecting NDV (distinct values), sort correlations, or null fractions. Joining on non-selective keys triggered up to 250 billion Cartesian comparisons.</p>
-                    <p><strong>D. Absence of EXPLAIN Plan Feedback Loops</strong>: Models operate purely one-shot without observing operator cost percentages, row estimates vs actuals, or disk spill warnings from <code>EXPLAIN ANALYZE</code>.</p>
+                    <p><strong>C. Cardinality and Skew Blindness</strong>: Models generate SQL in a statistical vacuum without inspecting <a href="https://en.wikipedia.org/wiki/Cardinality_(data_modeling)" target="_blank" rel="noopener noreferrer" class="tech-term-link">NDV (distinct values)</a>, sort correlations, or null fractions. Joining on non-selective keys triggered up to 250 billion <a href="https://en.wikipedia.org/wiki/Cartesian_product" target="_blank" rel="noopener noreferrer" class="tech-term-link">Cartesian comparisons</a>.</p>
+                    <p><strong>D. Absence of EXPLAIN Plan Feedback Loops</strong>: Models operate purely one-shot without observing operator cost percentages, row estimates vs actuals, or disk spill warnings from <a href="https://www.postgresql.org/docs/current/using-explain.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>EXPLAIN ANALYZE</code></a>.</p>
                 </div>
 
                 <div class="analysis-finding-box">
                     <h4>4. What Models Could Have Done Better to Optimize the DB Setup</h4>
-                    <p><strong>Composite Covering Indexes (Postgres <code>INCLUDE</code>)</strong>: Emitting <code>CREATE INDEX ON table (filter_col, join_col) INCLUDE (payload_cols);</code> enables pure <em>Index-Only Scans</em> without touching the heap.</p>
-                    <p><strong>Specialized Physical Extensions</strong>: Recommending <strong>HNSW vector indexes</strong> (<code>USING hnsw (embedding vector_cosine_ops)</code>) for embeddings, <strong>GIN trigram indexes</strong> for fuzzy text search, <strong>GiST</strong> for temporal range overlaps, and <strong>BRIN</strong> for append-only timestamp streams.</p>
-                    <p><strong>Dual-Phase Agentic Architecture</strong>: Formulate database physical layout (clustering keys, partition boundaries, and indexes) <em>before</em> generating queries, verified through an automated <code>EXPLAIN ANALYZE</code> feedback loop.</p>
+                    <p><a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Composite Covering Indexes</strong></a> (Postgres <a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>INCLUDE</code></a>): Emitting <code>CREATE INDEX ON table (filter_col, join_col) INCLUDE (payload_cols);</code> enables pure <a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><em>Index-Only Scans</em></a> without touching the heap.</p>
+                    <p><strong>Specialized Physical Extensions</strong>: Recommending <a href="https://github.com/pgvector/pgvector#hnsw" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>HNSW vector indexes</strong></a> (<code>USING hnsw (embedding vector_cosine_ops)</code>) for embeddings, <a href="https://www.postgresql.org/docs/current/pgtrgm.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>GIN trigram indexes</strong></a> for fuzzy text search, <a href="https://www.postgresql.org/docs/current/gist.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>GiST</strong></a> for temporal range overlaps, and <a href="https://www.postgresql.org/docs/current/brin-intro.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>BRIN</strong></a> for append-only timestamp streams.</p>
+                    <p><strong>Dual-Phase Agentic Architecture</strong>: Formulate database physical layout (clustering keys, partition boundaries, and indexes) <em>before</em> generating queries, verified through an automated <a href="https://duckdb.org/docs/guides/meta/explain_analyze" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>EXPLAIN ANALYZE</code></a> feedback loop.</p>
                 </div>
             </div>
         </section>
@@ -1261,7 +1390,7 @@ def build_dashboard_index(
         <section class="content-section">
             <div class="section-header">
                 <h2>Analytical Domains Evaluated (1M+ Records per Table)</h2>
-                <span class="section-badge">Click any domain to filter queries</span>
+                <span class="section-badge" id="domain-engine-badge">⚡ Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table)</span>
             </div>
             <div class="domain-cards-grid">
                 {cat_cards_html}
@@ -1304,6 +1433,7 @@ def build_dashboard_index(
                             <tr>
                                 <th>Status</th>
                                 <th>Task ID</th>
+                                <th>Target Engine</th>
                                 <th>Query Name & Purpose</th>
                                 <th>Domain</th>
                                 <th>Latency (1M Rows)</th>

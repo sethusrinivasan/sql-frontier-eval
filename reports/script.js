@@ -86,6 +86,11 @@ const ENGINE_CONFIGS = {
     duckdb: {
         name: "DuckDB 2.0 In-Memory (Columnar OLAP)",
         navBadge: "⚡ DuckDB 2.0 In-Memory (1M+ Records/Table)",
+        statusBanner: 'Active Engine: <strong>⚡ DuckDB 2.0 In-Memory Engine</strong> &mdash; 120 benchmark queries evaluated against 108M+ records. Showing columnar vectorized execution plans, SIMD AVX2 acceleration, and in-memory aggregation benchmarks.',
+        domainBadge: "⚡ Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table)",
+        domainPillText: "⚡ DuckDB 2.0",
+        tableBadgeText: "⚡ DuckDB 2.0",
+        tableBadgeClass: "badge-duckdb",
         passRate: "95.8%",
         tasksPassed: "115 Passed • 5 Diverged",
         avgLatency: "232.2 ms",
@@ -97,6 +102,11 @@ const ENGINE_CONFIGS = {
     postgres: {
         name: "PostgreSQL 18.7 (Relational + pgvector + FTS)",
         navBadge: "🐘 PostgreSQL 18.7 + Extensions (Docker Compose)",
+        statusBanner: 'Active Engine: <strong>🐘 PostgreSQL 18.7 + Extensions</strong> &mdash; 120 benchmark queries evaluated in Docker Compose. Showing relational row-store execution plans, pgvector distance indexing, GIN trigram matching, and ACID multi-session isolation.',
+        domainBadge: "🐘 Evaluated on PostgreSQL 18.7 + Extensions (Docker Compose)",
+        domainPillText: "🐘 PostgreSQL 18.7",
+        tableBadgeText: "🐘 PostgreSQL 18.7",
+        tableBadgeClass: "badge-postgres",
         passRate: "93.3%",
         tasksPassed: "112 Passed • 8 Diverged",
         avgLatency: "198.7 ms",
@@ -114,7 +124,7 @@ function switchEngine(engine) {
         localStorage.setItem('sql_frontier_active_engine', engine);
     } catch (e) {}
 
-    // Update switcher pills
+    // Update switcher pills (top nav)
     document.querySelectorAll('.engine-pill').forEach(btn => {
         if (btn.getAttribute('data-engine') === engine) {
             btn.classList.add('active');
@@ -122,6 +132,21 @@ function switchEngine(engine) {
             btn.classList.remove('active');
         }
     });
+
+    // Update prominent engine pivot bar buttons
+    document.querySelectorAll('.engine-pivot-btn').forEach(btn => {
+        if (btn.getAttribute('data-engine') === engine) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Update engine status banner
+    const statusBanner = document.getElementById('engine-status-banner');
+    if (statusBanner) {
+        statusBanner.innerHTML = cfg.statusBanner;
+    }
 
     // Update nav badge
     const navBadge = document.querySelector('.engine-badge');
@@ -159,6 +184,27 @@ function switchEngine(engine) {
             if (badgeEngine) badgeEngine.textContent = 'DuckDB 2.0 Suite (120/120 Tasks)';
         }
     }
+
+    // Update analytical domains badge & domain pills
+    const domainBadge = document.getElementById('domain-engine-badge');
+    if (domainBadge) {
+        domainBadge.textContent = cfg.domainBadge;
+    }
+
+    document.querySelectorAll('.domain-engine-pill').forEach(pill => {
+        pill.textContent = cfg.domainPillText;
+        if (engine === 'postgres') {
+            pill.classList.add('postgres');
+        } else {
+            pill.classList.remove('postgres');
+        }
+    });
+
+    // Update query explorer table engine badges
+    document.querySelectorAll('.engine-table-badge').forEach(badge => {
+        badge.textContent = cfg.tableBadgeText;
+        badge.className = 'engine-table-badge ' + cfg.tableBadgeClass;
+    });
 }
 
 // Restore saved engine preference on load

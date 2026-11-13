@@ -65,6 +65,121 @@
             </div>
         </section>
 
+        <!-- Database Engine Pivot Bar -->
+        <section class="engine-pivot-bar-section">
+            <div class="engine-pivot-card">
+                <div class="engine-pivot-header">
+                    <div class="engine-pivot-title-wrap">
+                        <span class="engine-pivot-label">Interactive Engine Pivot</span>
+                        <h2 class="engine-pivot-title">Select Database Evaluation Engine</h2>
+                    </div>
+                    <span class="engine-pivot-sub">Default view: DuckDB 2.0 In-Memory. Switch engine to update KPIs, leaderboard &amp; plans.</span>
+                </div>
+                <div class="engine-pivot-buttons">
+                    <button class="engine-pivot-btn active" data-engine="duckdb" onclick="switchEngine('duckdb')">
+                        <div class="btn-icon-box">⚡</div>
+                        <div class="btn-info">
+                            <div class="btn-heading">
+                                <span class="btn-name">DuckDB 2.0 In-Memory</span>
+                                <span class="btn-tag btn-tag-default">Default View</span>
+                            </div>
+                            <span class="btn-desc">Columnar OLAP engine with vectorized execution chunks (2,048 tuples), SIMD AVX2 acceleration, and Min-Max Zone Maps.</span>
+                            <div class="btn-specs">
+                                <span>Pass Rate: <strong>95.8%</strong></span>
+                                <span>Avg Latency: <strong>232.2 ms</strong></span>
+                                <span>Volume: <strong>3.04 GiB</strong></span>
+                            </div>
+                        </div>
+                    </button>
+                    <button class="engine-pivot-btn" data-engine="postgres" onclick="switchEngine('postgres')">
+                        <div class="btn-icon-box">🐘</div>
+                        <div class="btn-info">
+                            <div class="btn-heading">
+                                <span class="btn-name">PostgreSQL 18.7 + Extensions</span>
+                                <span class="btn-tag btn-tag-ext">Docker Compose</span>
+                            </div>
+                            <span class="btn-desc">Row-store relational engine running in Docker with pgvector, pg_trgm, btree_gist, ltree, tablefunc &amp; analytical polyfills.</span>
+                            <div class="btn-specs">
+                                <span>Pass Rate: <strong>93.3%</strong></span>
+                                <span>Avg Latency: <strong>198.7 ms</strong></span>
+                                <span>Volume: <strong>3.48 GiB</strong></span>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                <div class="engine-status-banner" id="engine-status-banner">
+                    Active Engine: <strong>⚡ DuckDB 2.0 In-Memory Engine</strong> &mdash; 120 benchmark queries evaluated against 108M+ records. Showing columnar vectorized execution plans, SIMD AVX2 acceleration, and in-memory aggregation benchmarks.
+                </div>
+            </div>
+        </section>
+
+        <!-- TL;DR Executive Summary Section -->
+        <section class="content-section tldr-section">
+            <div class="section-header">
+                <h2>TL;DR &mdash; Benchmark Summary &amp; Frontier Takeaways</h2>
+                <span class="section-badge">At A Glance</span>
+            </div>
+            <div class="card tldr-card">
+                <div class="tldr-intro">
+                    <strong>Quick Summary:</strong> This benchmark evaluates 6 Frontier LLMs across <strong>120 production-grade analytical SQL tasks</strong> scaled to <strong>108,027,582 records (>3.0 GiB)</strong> with &ge;1,000,000 records per table across <strong>DuckDB 2.0</strong> and <strong>PostgreSQL 18.7</strong>. It inspects silent metric corruption, non-SARGable scans, and physical execution plans.
+                </div>
+                <div class="tldr-grid">
+                    <div class="tldr-box">
+                        <div class="tldr-box-header">
+                            <span class="tldr-box-icon">🏆</span>
+                            <span class="tldr-box-title">Model Frontier Standings</span>
+                        </div>
+                        <div class="tldr-box-body">
+                            <ul>
+                                <li><strong>Claude Opus 4.6 (Thinking)</strong> leads the frontier at <strong>98.3% pass rate</strong> (DuckDB) and <strong>96.7%</strong> (PostgreSQL), with flawless window calculations and zero core trap failures.</li>
+                                <li><strong>Gemini 3.8 Flash (Low)</strong> achieves top cost/performance Pareto efficiency: <strong>95.8% pass rate</strong> at a blazing <strong>4.6s inference latency</strong> (3.2x faster than Opus).</li>
+                                <li><strong>GPT-OSS 120B (Medium)</strong> falls to 90.8% / 86.7% due to recursive CTE runaway cycles and unindexed cross-joins.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tldr-box">
+                        <div class="tldr-box-header">
+                            <span class="tldr-box-icon">⚡</span>
+                            <span class="tldr-box-title">Engine Comparison (DuckDB vs PG)</span>
+                        </div>
+                        <div class="tldr-box-body">
+                            <ul>
+                                <li><strong>DuckDB 2.0 (Columnar OLAP)</strong>: In-memory SIMD AVX2 vector chunks scan at memory bus speeds (~0.7 ms / 1M ints). Excels at analytical aggregations and ASOF joins (232.2 ms avg).</li>
+                                <li><strong>PostgreSQL 18.7 + Extensions</strong>: Evaluated in Docker Compose with <code>pgvector</code>, <code>pg_trgm</code>, and <code>btree_gist</code>. Achieves 198.7 ms average execution time with proper composite indexing.</li>
+                                <li><strong>Engine Pivot</strong>: Use the toggle above to instantly pivot scorecards and metrics between DuckDB and PostgreSQL.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tldr-box">
+                        <div class="tldr-box-header">
+                            <span class="tldr-box-icon">🔍</span>
+                            <span class="tldr-box-title">The Physical Indexing Paradox</span>
+                        </div>
+                        <div class="tldr-box-body">
+                            <ul>
+                                <li>Sequential scans represent <strong>only 5.5%</strong> of analytical runtime. <strong>94.5%</strong> is in-memory CPU work (Windowing 30%, Hash Group-By 19.5%, Sorts 15.2%).</li>
+                                <li><strong>The DuckDB Paradox</strong>: Secondary ART/B-Trees are completely bypassed by vector engines; physical data clustering (<code>ORDER BY</code> DDL) and Zone Maps are the true accelerators.</li>
+                                <li><strong>The PostgreSQL Blindspot</strong>: LLMs blindly emit single-column B-Trees instead of Composite Covering Indexes (<code>INCLUDE</code>), HNSW vector indexes, or BRIN for append-only logs.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tldr-box">
+                        <div class="tldr-box-header">
+                            <span class="tldr-box-icon">⚠️</span>
+                            <span class="tldr-box-title">Deadliest Frontier Traps</span>
+                        </div>
+                        <div class="tldr-box-body">
+                            <ul>
+                                <li><strong>Chasm Trap Fan-Out</strong>: Pre-aggregating in CTEs before joining prevents 4x-10x metric inflation.</li>
+                                <li><strong>Default Window Frames</strong>: <code>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</code> silently groups duplicate timestamp peers; models must explicitly declare <code>ROWS</code>.</li>
+                                <li><strong>Three-Valued Anti-Joins</strong>: <code>NOT IN</code> with subquery NULLs returns 0 rows silently; models must use <code>NOT EXISTS</code>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Multi-Model Benchmark Scorecard -->
         <section class="content-section">
             <div class="section-header">
@@ -214,28 +329,28 @@
             <div class="card" style="padding: 24px;">
                 <div class="analysis-finding-box">
                     <h4>1. Empirical Operator Bottleneck Decomposition</h4>
-                    <p>Across all 120 tasks and 108M+ records profiled with <code>EXPLAIN ANALYZE</code>, sequential table scans account for <strong>only 5.5%</strong> of execution time. Over <strong>94.5%</strong> of runtime is consumed in-memory: <strong>Window Functions (30.0%)</strong>, <strong>Hash Group-By (19.5%)</strong>, <strong>Sorts (15.2%)</strong>, and <strong>Projections/Joins (29.8%)</strong>.</p>
+                    <p>Across all 120 tasks and 108M+ records profiled with <a href="https://duckdb.org/docs/guides/meta/explain_analyze" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>EXPLAIN ANALYZE</code></a>, <a href="https://en.wikipedia.org/wiki/Full_table_scan" target="_blank" rel="noopener noreferrer" class="tech-term-link">sequential table scans</a> account for <strong>only 5.5%</strong> of execution time. Over <strong>94.5%</strong> of runtime is consumed in-memory: <a href="https://en.wikipedia.org/wiki/Window_function_(SQL)" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Window Functions (30.0%)</strong></a>, <a href="https://en.wikipedia.org/wiki/Hash_table" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Hash Group-By (19.5%)</strong></a>, <a href="https://en.wikipedia.org/wiki/External_sorting" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Sorts (15.2%)</strong></a>, and <a href="https://en.wikipedia.org/wiki/Hash_join" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Projections/Joins (29.8%)</strong></a>.</p>
                 </div>
 
                 <div class="analysis-finding-box">
                     <h4>2. The Indexing Paradox: Columnar OLAP vs. Row-Store PostgreSQL</h4>
-                    <p><strong>In Columnar Engines (DuckDB)</strong>: Traditional secondary B-Tree/ART indexes are <em>completely bypassed</em> by the optimizer during analytical aggregations and joins. DuckDB scans contiguous columnar vector chunks (2,048 tuples) using AVX2 SIMD instructions at memory bus speeds (~0.7 ms per 1M integers). Maintaining pointer-based tree indexes degrades cache locality without performance gain. The true physical optimization lever in DuckDB is <strong>Physical Ingestion Clustering (<code>ORDER BY</code> DDL)</strong> and <strong>Min-Max Zone Maps</strong>.</p>
-                    <p><strong>In PostgreSQL 18+</strong>: In unindexed tables, PostgreSQL falls back to row-by-row <code>Seq Scan</code> and explosive <code>Nested Loop</code> joins ($O(N^2)$), causing 10x-50x latency regressions. However, generic single-column B-Trees are insufficient for analytical workloads.</p>
+                    <p><strong>In <a href="https://en.wikipedia.org/wiki/Column-oriented_DBMS" target="_blank" rel="noopener noreferrer" class="tech-term-link">Columnar Engines (DuckDB)</a></strong>: Traditional secondary <a href="https://en.wikipedia.org/wiki/B-tree" target="_blank" rel="noopener noreferrer" class="tech-term-link">B-Tree</a> / <a href="https://duckdb.org/2021/08/27/art-indexing.html" target="_blank" rel="noopener noreferrer" class="tech-term-link">Adaptive Radix Tree (ART)</a> indexes are <em>completely bypassed</em> by the optimizer during analytical aggregations and joins. DuckDB scans contiguous columnar <a href="https://duckdb.org/docs/internals/vector" target="_blank" rel="noopener noreferrer" class="tech-term-link">vector chunks</a> (2,048 tuples) using <a href="https://en.wikipedia.org/wiki/Advanced_Vector_Extensions" target="_blank" rel="noopener noreferrer" class="tech-term-link">AVX2 SIMD instructions</a> at memory bus speeds (~0.7 ms per 1M integers). Maintaining pointer-based tree indexes degrades cache locality without performance gain. The true physical optimization lever in DuckDB is <a href="https://duckdb.org/docs/data/partitioning/clustering" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Physical Ingestion Clustering (<code>ORDER BY</code> DDL)</strong></a> and <a href="https://en.wikipedia.org/wiki/Block_Range_Index" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Min-Max Zone Maps</strong></a>.</p>
+                    <p><strong>In <a href="https://www.postgresql.org/docs/current/" target="_blank" rel="noopener noreferrer" class="tech-term-link">PostgreSQL 18+</a></strong>: In unindexed tables, PostgreSQL falls back to row-by-row <a href="https://www.postgresql.org/docs/current/using-explain.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>Seq Scan</code></a> and explosive <a href="https://en.wikipedia.org/wiki/Nested_loop_join" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>Nested Loop</code> joins</a> ($O(N^2)$), causing 10x-50x latency regressions. However, generic single-column B-Trees are insufficient for analytical workloads.</p>
                 </div>
 
                 <div class="analysis-finding-box">
                     <h4>3. Why Frontier LLMs Failed to Recommend the Right Indices</h4>
                     <p><strong>A. The "SELECT-Only" Scoping Blindspot</strong>: Standard text-to-SQL prompts confine the model to emitting a <code>SELECT</code> query, treating schema DDL and indexing as immutable external constants without agency to optimize storage.</p>
                     <p><strong>B. OLTP Textbook Muscle Memory</strong>: Pre-trained largely on web-app CRUD repositories (Django, Rails), LLMs reflexively advise single-column B-Tree indexes on every foreign key, unaware that analytical queries require composite covering indexes or specialized access methods.</p>
-                    <p><strong>C. Cardinality and Skew Blindness</strong>: Models generate SQL in a statistical vacuum without inspecting NDV (distinct values), sort correlations, or null fractions. Joining on non-selective keys triggered up to 250 billion Cartesian comparisons.</p>
-                    <p><strong>D. Absence of EXPLAIN Plan Feedback Loops</strong>: Models operate purely one-shot without observing operator cost percentages, row estimates vs actuals, or disk spill warnings from <code>EXPLAIN ANALYZE</code>.</p>
+                    <p><strong>C. Cardinality and Skew Blindness</strong>: Models generate SQL in a statistical vacuum without inspecting <a href="https://en.wikipedia.org/wiki/Cardinality_(data_modeling)" target="_blank" rel="noopener noreferrer" class="tech-term-link">NDV (distinct values)</a>, sort correlations, or null fractions. Joining on non-selective keys triggered up to 250 billion <a href="https://en.wikipedia.org/wiki/Cartesian_product" target="_blank" rel="noopener noreferrer" class="tech-term-link">Cartesian comparisons</a>.</p>
+                    <p><strong>D. Absence of EXPLAIN Plan Feedback Loops</strong>: Models operate purely one-shot without observing operator cost percentages, row estimates vs actuals, or disk spill warnings from <a href="https://www.postgresql.org/docs/current/using-explain.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>EXPLAIN ANALYZE</code></a>.</p>
                 </div>
 
                 <div class="analysis-finding-box">
                     <h4>4. What Models Could Have Done Better to Optimize the DB Setup</h4>
-                    <p><strong>Composite Covering Indexes (Postgres <code>INCLUDE</code>)</strong>: Emitting <code>CREATE INDEX ON table (filter_col, join_col) INCLUDE (payload_cols);</code> enables pure <em>Index-Only Scans</em> without touching the heap.</p>
-                    <p><strong>Specialized Physical Extensions</strong>: Recommending <strong>HNSW vector indexes</strong> (<code>USING hnsw (embedding vector_cosine_ops)</code>) for embeddings, <strong>GIN trigram indexes</strong> for fuzzy text search, <strong>GiST</strong> for temporal range overlaps, and <strong>BRIN</strong> for append-only timestamp streams.</p>
-                    <p><strong>Dual-Phase Agentic Architecture</strong>: Formulate database physical layout (clustering keys, partition boundaries, and indexes) <em>before</em> generating queries, verified through an automated <code>EXPLAIN ANALYZE</code> feedback loop.</p>
+                    <p><a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>Composite Covering Indexes</strong></a> (Postgres <a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>INCLUDE</code></a>): Emitting <code>CREATE INDEX ON table (filter_col, join_col) INCLUDE (payload_cols);</code> enables pure <a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><em>Index-Only Scans</em></a> without touching the heap.</p>
+                    <p><strong>Specialized Physical Extensions</strong>: Recommending <a href="https://github.com/pgvector/pgvector#hnsw" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>HNSW vector indexes</strong></a> (<code>USING hnsw (embedding vector_cosine_ops)</code>) for embeddings, <a href="https://www.postgresql.org/docs/current/pgtrgm.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>GIN trigram indexes</strong></a> for fuzzy text search, <a href="https://www.postgresql.org/docs/current/gist.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>GiST</strong></a> for temporal range overlaps, and <a href="https://www.postgresql.org/docs/current/brin-intro.html" target="_blank" rel="noopener noreferrer" class="tech-term-link"><strong>BRIN</strong></a> for append-only timestamp streams.</p>
+                    <p><strong>Dual-Phase Agentic Architecture</strong>: Formulate database physical layout (clustering keys, partition boundaries, and indexes) <em>before</em> generating queries, verified through an automated <a href="https://duckdb.org/docs/guides/meta/explain_analyze" target="_blank" rel="noopener noreferrer" class="tech-term-link"><code>EXPLAIN ANALYZE</code></a> feedback loop.</p>
                 </div>
             </div>
         </section>
@@ -244,7 +359,7 @@
         <section class="content-section">
             <div class="section-header">
                 <h2>Analytical Domains Evaluated (1M+ Records per Table)</h2>
-                <span class="section-badge">Click any domain to filter queries</span>
+                <span class="section-badge" id="domain-engine-badge">⚡ Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table)</span>
             </div>
             <div class="domain-cards-grid">
                 
@@ -253,6 +368,7 @@
                 <span class="domain-name">Temporal &amp; Time-Series</span>
                 <span class="badge badge-warn">92.9%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">26/28</span>
@@ -274,6 +390,7 @@
                 <span class="domain-name">Vector &amp; Embeddings</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">25/25</span>
@@ -295,6 +412,7 @@
                 <span class="domain-name">Warehouse &amp; Statistical</span>
                 <span class="badge badge-warn">93.8%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">15/16</span>
@@ -316,6 +434,7 @@
                 <span class="domain-name">Metric Inflation / Chasm Trap</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -337,6 +456,7 @@
                 <span class="domain-name">Sessionization (Gaps &amp; Islands)</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">2/2</span>
@@ -358,6 +478,7 @@
                 <span class="domain-name">SCD Type 2 Point-in-Time Joins</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -379,6 +500,7 @@
                 <span class="domain-name">Three-Valued Logic in Anti-Joins</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -400,6 +522,7 @@
                 <span class="domain-name">Search &amp; Retrieval</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">26/26</span>
@@ -421,6 +544,7 @@
                 <span class="domain-name">Window Frame Default Bounds</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -442,6 +566,7 @@
                 <span class="domain-name">Strict Funnel Precedence</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -463,6 +588,7 @@
                 <span class="domain-name">Graph &amp; Hierarchy</span>
                 <span class="badge badge-warn">85.7%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">12/14</span>
@@ -484,6 +610,7 @@
                 <span class="domain-name">Quadratic Self-Joins vs Range Windows</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -505,6 +632,7 @@
                 <span class="domain-name">Non-SARGable Partition Pruning</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -526,6 +654,7 @@
                 <span class="domain-name">Algorithmic Efficiency / Window Distinct</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -547,6 +676,7 @@
                 <span class="domain-name">Vector &amp; Retrieval</span>
                 <span class="badge badge-pass">100.0%</span>
             </div>
+            <span class="domain-engine-pill">⚡ DuckDB 2.0</span>
             <div class="domain-stats">
                 <div class="domain-stat-item">
                     <span class="ds-val">1/1</span>
@@ -601,6 +731,7 @@
                             <tr>
                                 <th>Status</th>
                                 <th>Task ID</th>
+                                <th>Target Engine</th>
                                 <th>Query Name & Purpose</th>
                                 <th>Domain</th>
                                 <th>Latency (1M Rows)</th>
@@ -613,6 +744,7 @@
         <tr class="task-row" data-id="task_001_Q01_asof_trade_quote_matching" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_001_Q01_asof_trade_quote_matching</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_001_Q01_asof_trade_quote_matching.html" class="task-link">Tick-Level Trade Execution Matching via Native ASOF JOIN</a>
                 <div class="task-subdesc">In algorithmic trading, every buy or sell order must be evaluated against the most recent ...</div>
@@ -629,6 +761,7 @@
         <tr class="task-row" data-id="task_002_Q02_dynamic_point_in_time_fx" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_002_Q02_dynamic_point_in_time_fx</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_002_Q02_dynamic_point_in_time_fx.html" class="task-link">Multi-Currency Point-in-Time FX Conversion via ASOF JOIN</a>
                 <div class="task-subdesc">Global payments systems record transactions in local currencies (EUR, JPY, GBP) that must ...</div>
@@ -645,6 +778,7 @@
         <tr class="task-row" data-id="task_003_Q03_clickstream_sessionization_gaps" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_003_Q03_clickstream_sessionization_gaps</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_003_Q03_clickstream_sessionization_gaps.html" class="task-link">Clickstream Sessionization with Inactivity Timeouts (Gaps &amp; Islands)</a>
                 <div class="task-subdesc">Digital analytics platforms group raw user pageviews into &#x27;sessions&#x27;. If a user is inactiv...</div>
@@ -661,6 +795,7 @@
         <tr class="task-row" data-id="task_004_Q04_dual_bound_session_capping" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_004_Q04_dual_bound_session_capping</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_004_Q04_dual_bound_session_capping.html" class="task-link">Sliding Sessionization with Absolute Maximum Duration Cap</a>
                 <div class="task-subdesc">Real-world web sessions often need dual constraints: a 30-minute inactivity timeout AND a ...</div>
@@ -677,6 +812,7 @@
         <tr class="task-row" data-id="task_005_Q05_iot_sensor_gap_fill_locf" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_005_Q05_iot_sensor_gap_fill_locf</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_005_Q05_iot_sensor_gap_fill_locf.html" class="task-link">IoT Sensor Telemetry Gap-Filling via generate_series and LOCF</a>
                 <div class="task-subdesc">Industrial IoT sensors emit readings intermittently to save bandwidth. Downstream machine ...</div>
@@ -693,6 +829,7 @@
         <tr class="task-row" data-id="task_006_Q06_bitemporal_state_reconstruction" data-domain="Temporal &amp; Time-Series" data-status="fail">
             <td class="td-status"><span class="badge badge-fail">✖ VALUE_MISMATCH</span></td>
             <td class="td-id"><code>task_006_Q06_bitemporal_state_reconstruction</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_006_Q06_bitemporal_state_reconstruction.html" class="task-link">Bitemporal Auditing: Valid-Time vs. Transaction-Time Alignment</a>
                 <div class="task-subdesc">Financial compliance requires knowing: &#x27;What did we believe customer Alice&#x27;s credit limit ...</div>
@@ -709,6 +846,7 @@
         <tr class="task-row" data-id="task_007_Q07_scd2_open_ended_intervals" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_007_Q07_scd2_open_ended_intervals</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_007_Q07_scd2_open_ended_intervals.html" class="task-link">Slowly Changing Dimension Type 2 Join with Open-Ended Future</a>
                 <div class="task-subdesc">Customers change addresses or account tiers over time. Joining historical orders to custom...</div>
@@ -725,6 +863,7 @@
         <tr class="task-row" data-id="task_008_Q08_hopping_sliding_time_buckets" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_008_Q08_hopping_sliding_time_buckets</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_008_Q08_hopping_sliding_time_buckets.html" class="task-link">Hopping / Overlapping Window Aggregations via time_bucket</a>
                 <div class="task-subdesc">Real-time surveillance monitors rolling 15-minute average latency stepped forward every 5 ...</div>
@@ -741,6 +880,7 @@
         <tr class="task-row" data-id="task_009_Q09_ledger_balance_duplicate_timestamps" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_009_Q09_ledger_balance_duplicate_timestamps</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_009_Q09_ledger_balance_duplicate_timestamps.html" class="task-link">Financial Ledger Cumulative Balance with Duplicate Timestamp Ties</a>
                 <div class="task-subdesc">Ledger entries can occur at the exact same millisecond. Financial ledgers must preserve st...</div>
@@ -757,6 +897,7 @@
         <tr class="task-row" data-id="task_010_Q10_peer_exclusion_moving_average" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_010_Q10_peer_exclusion_moving_average</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_010_Q10_peer_exclusion_moving_average.html" class="task-link">Window Frame Exclusion: Peer Period Average via EXCLUDE CURRENT ROW</a>
                 <div class="task-subdesc">To detect anomalous spikes, analysts compare a metric against the average of neighboring d...</div>
@@ -773,6 +914,7 @@
         <tr class="task-row" data-id="task_011_Q11_exclude_ties_ranking" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_011_Q11_exclude_ties_ranking</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_011_Q11_exclude_ties_ranking.html" class="task-link">Excluding Ties in Percentile Ranks via EXCLUDE TIES</a>
                 <div class="task-subdesc">When evaluating employee sales performance, ties should not inflate the percentile score a...</div>
@@ -789,6 +931,7 @@
         <tr class="task-row" data-id="task_012_Q12_microsecond_latency_jitter" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_012_Q12_microsecond_latency_jitter</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_012_Q12_microsecond_latency_jitter.html" class="task-link">Inter-Packet Network Arrival Jitter at Nanosecond Resolution</a>
                 <div class="task-subdesc">High-speed network telemetry measures packet arrival jitter (variance in inter-packet dela...</div>
@@ -805,6 +948,7 @@
         <tr class="task-row" data-id="task_013_Q13_order_book_snapshot_reconstruction" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_013_Q13_order_book_snapshot_reconstruction</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_013_Q13_order_book_snapshot_reconstruction.html" class="task-link">Point-in-Time Limit Order Book (LOB) State Reconstruction</a>
                 <div class="task-subdesc">Market microstructure researchers need to reconstruct the exact bids and asks available at...</div>
@@ -821,6 +965,7 @@
         <tr class="task-row" data-id="task_014_Q14_time_weighted_average_price_twap" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_014_Q14_time_weighted_average_price_twap</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_014_Q14_time_weighted_average_price_twap.html" class="task-link">Time-Weighted Average Price (TWAP) with Variable Interval Weights</a>
                 <div class="task-subdesc">TWAP measures the average price of an asset weighted by the duration of time that each pri...</div>
@@ -837,6 +982,7 @@
         <tr class="task-row" data-id="task_015_Q15_volume_weighted_average_price_vwap" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_015_Q15_volume_weighted_average_price_vwap</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_015_Q15_volume_weighted_average_price_vwap.html" class="task-link">Intraday Volume-Weighted Average Price (VWAP) Resetting Daily</a>
                 <div class="task-subdesc">VWAP provides institutional traders the definitive benchmark price weighted by traded volu...</div>
@@ -853,6 +999,7 @@
         <tr class="task-row" data-id="task_016_Q16_sequential_funnel_precedence" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_016_Q16_sequential_funnel_precedence</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_016_Q16_sequential_funnel_precedence.html" class="task-link">Chronological Multi-Stage Conversion Funnel with Time Boundaries</a>
                 <div class="task-subdesc">In product funnels (Signup -&gt; Verify -&gt; Purchase), events must occur in exact chronologica...</div>
@@ -869,6 +1016,7 @@
         <tr class="task-row" data-id="task_017_Q17_retention_cohort_survival" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_017_Q17_retention_cohort_survival</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_017_Q17_retention_cohort_survival.html" class="task-link">Dynamic User Retention Cohort Matrix by Weekly Milestones</a>
                 <div class="task-subdesc">SaaS analytics track weekly retention curves (Day 0, Day 7, Day 14, Day 30) based on user ...</div>
@@ -885,6 +1033,7 @@
         <tr class="task-row" data-id="task_018_Q18_time_decay_user_affinity" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_018_Q18_time_decay_user_affinity</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_018_Q18_time_decay_user_affinity.html" class="task-link">Exponential Time-Decayed User Affinity Scoring</a>
                 <div class="task-subdesc">Recommendation systems score user interest where recent clicks count significantly more th...</div>
@@ -901,6 +1050,7 @@
         <tr class="task-row" data-id="task_019_Q19_intermittent_inactivity_anomaly" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_019_Q19_intermittent_inactivity_anomaly</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_019_Q19_intermittent_inactivity_anomaly.html" class="task-link">Customer Churn Anomaly Detection vs Historical Purchase Rhythm</a>
                 <div class="task-subdesc">A customer who normally buys every 3 days is at risk if they haven&#x27;t bought in 10 days. Bu...</div>
@@ -917,6 +1067,7 @@
         <tr class="task-row" data-id="task_01_fanout" data-domain="Metric Inflation / Chasm Trap" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_01_fanout</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_01_fanout.html" class="task-link">E-Commerce Financial Aggregation without Join Fan-Out</a>
                 <div class="task-subdesc">Demonstrates the Chasm Trap where joining multiple 1-to-many child tables (discounts and s...</div>
@@ -933,6 +1084,7 @@
         <tr class="task-row" data-id="task_020_Q20_interval_overlap_concurrency" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_020_Q20_interval_overlap_concurrency</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_020_Q20_interval_overlap_concurrency.html" class="task-link">Peak Concurrent Workforce Capacity via Interval Overlap Scan</a>
                 <div class="task-subdesc">Workforce managers must calculate maximum concurrent staffing levels from employee shift s...</div>
@@ -949,6 +1101,7 @@
         <tr class="task-row" data-id="task_021_Q21_temporal_gap_detection" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_021_Q21_temporal_gap_detection</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_021_Q21_temporal_gap_detection.html" class="task-link">Continuous Asset Lease Unallocated Gap Discovery</a>
                 <div class="task-subdesc">Fleet managers track commercial vehicles to find idle &#x27;unrented&#x27; gaps between back-to-back...</div>
@@ -965,6 +1118,7 @@
         <tr class="task-row" data-id="task_022_Q22_linear_interpolation_missing_points" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_022_Q22_linear_interpolation_missing_points</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_022_Q22_linear_interpolation_missing_points.html" class="task-link">Bi-directional Linear Value Interpolation between Observations</a>
                 <div class="task-subdesc">When a sensor drops offline for 30 minutes, data scientists prefer linear interpolation be...</div>
@@ -981,6 +1135,7 @@
         <tr class="task-row" data-id="task_023_Q23_trimmed_mean_rolling_window" data-domain="Temporal &amp; Time-Series" data-status="fail">
             <td class="td-status"><span class="badge badge-fail">✖ VALUE_MISMATCH</span></td>
             <td class="td-id"><code>task_023_Q23_trimmed_mean_rolling_window</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_023_Q23_trimmed_mean_rolling_window.html" class="task-link">Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)</a>
                 <div class="task-subdesc">Financial risk models compute a 7-day rolling average excluding the highest and lowest sin...</div>
@@ -997,6 +1152,7 @@
         <tr class="task-row" data-id="task_024_Q24_sargable_fiscal_partition_prune" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_024_Q24_sargable_fiscal_partition_prune</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_024_Q24_sargable_fiscal_partition_prune.html" class="task-link">SARGable Fiscal Year Date Range Partition Pruning</a>
                 <div class="task-subdesc">Data warehouses partition petabyte event tables by date. Wrapping date columns in function...</div>
@@ -1013,6 +1169,7 @@
         <tr class="task-row" data-id="task_025_Q25_multi_touch_marketing_attribution" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_025_Q25_multi_touch_marketing_attribution</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_025_Q25_multi_touch_marketing_attribution.html" class="task-link">Multi-Touch Marketing Attribution Comparison in a Single Pass</a>
                 <div class="task-subdesc">CMOs need to compare 3 attribution models (First-Touch, Last-Touch, and Uniform Linear) fo...</div>
@@ -1029,6 +1186,7 @@
         <tr class="task-row" data-id="task_026_Q26_cosine_similarity_top_k" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_026_Q26_cosine_similarity_top_k</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_026_Q26_cosine_similarity_top_k.html" class="task-link">Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)</a>
                 <div class="task-subdesc">When a user asks a question in an AI assistant, the query is embedded into a dense vector ...</div>
@@ -1045,6 +1203,7 @@
         <tr class="task-row" data-id="task_027_Q27_euclidean_l2_nearest_neighbors" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_027_Q27_euclidean_l2_nearest_neighbors</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_027_Q27_euclidean_l2_nearest_neighbors.html" class="task-link">L2 Euclidean Distance Nearest Neighbors Search via array_distance</a>
                 <div class="task-subdesc">In computer vision feature retrieval (facial recognition, product image matching), feature...</div>
@@ -1061,6 +1220,7 @@
         <tr class="task-row" data-id="task_028_Q28_inner_product_mips" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_028_Q28_inner_product_mips</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_028_Q28_inner_product_mips.html" class="task-link">Maximum Inner Product Search (MIPS) for Normalized Embeddings</a>
                 <div class="task-subdesc">For unit-normalized vectors (e.g. OpenAI text-embedding-3 or Cohere embeddings), cosine si...</div>
@@ -1077,6 +1237,7 @@
         <tr class="task-row" data-id="task_029_Q29_pre_filter_vs_post_filter_trap" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_029_Q29_pre_filter_vs_post_filter_trap</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_029_Q29_pre_filter_vs_post_filter_trap.html" class="task-link">The Pre-Filtering Trap: Relational Predicates with Vector Top-K</a>
                 <div class="task-subdesc">A user searches for &#x27;cheap mechanical keyboard under $50&#x27;. If you run vector search Top-K ...</div>
@@ -1093,6 +1254,7 @@
         <tr class="task-row" data-id="task_02_sessionization" data-domain="Sessionization (Gaps &amp; Islands)" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_02_sessionization</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_02_sessionization.html" class="task-link">Clickstream Sessionization with Inactivity Gaps</a>
                 <div class="task-subdesc">Groups web analytics events into browsing sessions where an inactivity gap greater than 30...</div>
@@ -1109,6 +1271,7 @@
         <tr class="task-row" data-id="task_030_Q30_adaptive_similarity_threshold" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_030_Q30_adaptive_similarity_threshold</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_030_Q30_adaptive_similarity_threshold.html" class="task-link">Adaptive Similarity Thresholding with Fallback Top-K Guarantee</a>
                 <div class="task-subdesc">RAG systems want high-confidence matches (similarity &gt; 0.85) to avoid hallucinations, but ...</div>
@@ -1125,6 +1288,7 @@
         <tr class="task-row" data-id="task_031_Q31_semantic_deduplication_support_tickets" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_031_Q31_semantic_deduplication_support_tickets</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_031_Q31_semantic_deduplication_support_tickets.html" class="task-link">Semantic Deduplication of IT Incident Tickets via Vector Cosine Threshold</a>
                 <div class="task-subdesc">During service outages, hundreds of users submit identically phrased IT support tickets (&#x27;...</div>
@@ -1141,6 +1305,7 @@
         <tr class="task-row" data-id="task_032_Q32_near_duplicate_product_catalog" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_032_Q32_near_duplicate_product_catalog</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_032_Q32_near_duplicate_product_catalog.html" class="task-link">Multi-Merchant Near-Duplicate Catalog Resolution with Price Consistency</a>
                 <div class="task-subdesc">Marketplaces aggregate catalogs from thousands of sellers. Matching identical items requir...</div>
@@ -1157,6 +1322,7 @@
         <tr class="task-row" data-id="task_033_Q33_colbert_late_interaction_maxsim" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_033_Q33_colbert_late_interaction_maxsim</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_033_Q33_colbert_late_interaction_maxsim.html" class="task-link">ColBERT Multi-Vector Late Interaction (MaxSim) in Pure SQL</a>
                 <div class="task-subdesc">Advanced retrieval models (ColBERT / Sanity) represent queries and documents as collection...</div>
@@ -1173,6 +1339,7 @@
         <tr class="task-row" data-id="task_034_Q34_user_profile_embedding_centroid" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_034_Q34_user_profile_embedding_centroid</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_034_Q34_user_profile_embedding_centroid.html" class="task-link">User Profile Preference Vector Centroid Aggregation</a>
                 <div class="task-subdesc">To personalize feeds, recommendation engines compute a dynamic user preference vector by c...</div>
@@ -1189,6 +1356,7 @@
         <tr class="task-row" data-id="task_035_Q35_kmeans_cluster_assignment_step" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_035_Q35_kmeans_cluster_assignment_step</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_035_Q35_kmeans_cluster_assignment_step.html" class="task-link">K-Means Clustering Assignment and Centroid Update in Pure SQL</a>
                 <div class="task-subdesc">Unsupervised customer segmentation can be run directly inside DuckDB by assigning customer...</div>
@@ -1205,6 +1373,7 @@
         <tr class="task-row" data-id="task_036_Q36_knn_vector_anomaly_detection" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_036_Q36_knn_vector_anomaly_detection</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_036_Q36_knn_vector_anomaly_detection.html" class="task-link">Vector Anomaly Detection via Average K-Nearest Neighbor Distance</a>
                 <div class="task-subdesc">Anomalous sensor readings or fraudulent transaction vectors reside in sparse regions of th...</div>
@@ -1221,6 +1390,7 @@
         <tr class="task-row" data-id="task_037_Q37_hybrid_relational_vector_cohort_join" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_037_Q37_hybrid_relational_vector_cohort_join</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_037_Q37_hybrid_relational_vector_cohort_join.html" class="task-link">Cohort-Constrained Vector Match with Geographical Regionality</a>
                 <div class="task-subdesc">Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personal...</div>
@@ -1237,6 +1407,7 @@
         <tr class="task-row" data-id="task_038_Q38_multimodal_image_text_fusion" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_038_Q38_multimodal_image_text_fusion</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_038_Q38_multimodal_image_text_fusion.html" class="task-link">Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)</a>
                 <div class="task-subdesc">In e-commerce search, users submit a photo and a text clarification (e.g. photo of dress +...</div>
@@ -1253,6 +1424,7 @@
         <tr class="task-row" data-id="task_039_Q39_maximal_marginal_relevance_mmr" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_039_Q39_maximal_marginal_relevance_mmr</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_039_Q39_maximal_marginal_relevance_mmr.html" class="task-link">Maximal Marginal Relevance (MMR) Diversity Reranking in SQL</a>
                 <div class="task-subdesc">Standard vector retrieval often returns 5 virtually identical articles. MMR penalizes redu...</div>
@@ -1269,6 +1441,7 @@
         <tr class="task-row" data-id="task_03_scd2_join" data-domain="SCD Type 2 Point-in-Time Joins" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_03_scd2_join</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_03_scd2_join.html" class="task-link">Historical SCD Type 2 Point-in-Time Currency Conversion</a>
                 <div class="task-subdesc">Joins financial transactions to Slowly Changing Dimension (SCD Type 2) exchange rate table...</div>
@@ -1285,6 +1458,7 @@
         <tr class="task-row" data-id="task_040_Q40_cosine_matrix_cluster_pruning" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_040_Q40_cosine_matrix_cluster_pruning</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_040_Q40_cosine_matrix_cluster_pruning.html" class="task-link">Pairwise Vector Similarity Self-Join with Coarse Cluster Pruning</a>
                 <div class="task-subdesc">Finding all similar document pairs across 100,000 docs is O(N^2) (10 billion checks). Part...</div>
@@ -1301,6 +1475,7 @@
         <tr class="task-row" data-id="task_041_Q41_collaborative_filtering_latent_dot" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_041_Q41_collaborative_filtering_latent_dot</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_041_Q41_collaborative_filtering_latent_dot.html" class="task-link">Latent Factor Matrix Factorization Dot Product Recommendation</a>
                 <div class="task-subdesc">Matrix factorization (SVD / ALS) maps users and movies to latent factor vectors. Predicted...</div>
@@ -1317,6 +1492,7 @@
         <tr class="task-row" data-id="task_042_Q42_negative_prompting_vector_repulsion" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_042_Q42_negative_prompting_vector_repulsion</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_042_Q42_negative_prompting_vector_repulsion.html" class="task-link">Vector Repulsion Scoring (Positive vs Negative Query Guidance)</a>
                 <div class="task-subdesc">In image generation and semantic search, users supply positive and negative prompts (e.g. ...</div>
@@ -1333,6 +1509,7 @@
         <tr class="task-row" data-id="task_043_Q43_best_chunk_pooling_retrieval" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_043_Q43_best_chunk_pooling_retrieval</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_043_Q43_best_chunk_pooling_retrieval.html" class="task-link">Document-Level Aggregation with Best-Chunk Pooling in RAG</a>
                 <div class="task-subdesc">Long PDF manuals are split into 50 chunks each. To avoid returning 5 chunks from the exact...</div>
@@ -1349,6 +1526,7 @@
         <tr class="task-row" data-id="task_044_Q44_token_budget_context_truncation" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_044_Q44_token_budget_context_truncation</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_044_Q44_token_budget_context_truncation.html" class="task-link">Dynamic Context Window Token Budget Packing for LLM RAG</a>
                 <div class="task-subdesc">When assembling retrieved chunks for an LLM prompt, you have a strict token limit (e.g. 1,...</div>
@@ -1365,6 +1543,7 @@
         <tr class="task-row" data-id="task_045_Q45_cross_encoder_candidate_generation" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_045_Q45_cross_encoder_candidate_generation</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_045_Q45_cross_encoder_candidate_generation.html" class="task-link">Two-Stage Retrieval: Bi-Encoder Candidate Generation for Re-ranking</a>
                 <div class="task-subdesc">Modern enterprise search uses a 2-stage pipeline: Fast bi-encoder vector search retrieves ...</div>
@@ -1381,6 +1560,7 @@
         <tr class="task-row" data-id="task_046_Q46_temporal_embedding_drift" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_046_Q46_temporal_embedding_drift</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_046_Q46_temporal_embedding_drift.html" class="task-link">Temporal Semantic Drift Tracking across Document Embedding Centroids</a>
                 <div class="task-subdesc">As companies evolve, the meaning of terms like &#x27;security&#x27; or &#x27;remote work&#x27; shifts. Trackin...</div>
@@ -1397,6 +1577,7 @@
         <tr class="task-row" data-id="task_047_Q47_hierarchical_vector_coarse_fine" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_047_Q47_hierarchical_vector_coarse_fine</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_047_Q47_hierarchical_vector_coarse_fine.html" class="task-link">Hierarchical Coarse-to-Fine Multi-Level Vector Filtering</a>
                 <div class="task-subdesc">In massive enterprise catalogs, searching 100 million items is accelerated by first matchi...</div>
@@ -1413,6 +1594,7 @@
         <tr class="task-row" data-id="task_048_Q48_vector_quantization_distortion" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_048_Q48_vector_quantization_distortion</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_048_Q48_vector_quantization_distortion.html" class="task-link">Vector Quantization Precision Distortion &amp; Reconstruction Error</a>
                 <div class="task-subdesc">To compress embeddings from 32-bit floats to 8-bit integers, engineers evaluate the recons...</div>
@@ -1429,6 +1611,7 @@
         <tr class="task-row" data-id="task_049_Q49_prototype_intent_classification" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_049_Q49_prototype_intent_classification</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_049_Q49_prototype_intent_classification.html" class="task-link">Zero-Shot Query Intent Classification via Prototype Vector Distance</a>
                 <div class="task-subdesc">Instead of training a BERT classifier, user query vectors are compared against pre-compute...</div>
@@ -1445,6 +1628,7 @@
         <tr class="task-row" data-id="task_04_three_valued_logic" data-domain="Three-Valued Logic in Anti-Joins" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_04_three_valued_logic</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_04_three_valued_logic.html" class="task-link">Customer Anti-Join with Three-Valued Null Semantics</a>
                 <div class="task-subdesc">Exposes silent data loss caused by SQL three-valued logic when models use NOT IN over subq...</div>
@@ -1461,6 +1645,7 @@
         <tr class="task-row" data-id="task_050_Q50_contrastive_triplet_loss_evaluation" data-domain="Vector &amp; Embeddings" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_050_Q50_contrastive_triplet_loss_evaluation</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_050_Q50_contrastive_triplet_loss_evaluation.html" class="task-link">Contrastive Triplet Evaluation: Anchor-Positive-Negative Separation</a>
                 <div class="task-subdesc">In embedding model evaluation, high-quality models satisfy the triplet condition: distance...</div>
@@ -1477,6 +1662,7 @@
         <tr class="task-row" data-id="task_051_Q51_fts_bm25_lexical_search" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_051_Q51_fts_bm25_lexical_search</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_051_Q51_fts_bm25_lexical_search.html" class="task-link">DuckDB Full-Text Search (FTS) BM25 Term Relevance Scoring</a>
                 <div class="task-subdesc">Traditional databases use simple `LIKE &#x27;%search%&#x27;` which treats 1 mention the same as 10 m...</div>
@@ -1493,6 +1679,7 @@
         <tr class="task-row" data-id="task_052_Q52_reciprocal_rank_fusion_rrf" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_052_Q52_reciprocal_rank_fusion_rrf</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_052_Q52_reciprocal_rank_fusion_rrf.html" class="task-link">Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)</a>
                 <div class="task-subdesc">Hybrid search combines sparse keyword search (great for exact names and acronyms) with den...</div>
@@ -1509,6 +1696,7 @@
         <tr class="task-row" data-id="task_053_Q53_min_max_convex_hybrid_search" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_053_Q53_min_max_convex_hybrid_search</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_053_Q53_min_max_convex_hybrid_search.html" class="task-link">Min-Max Normalized Convex Combination Hybrid Search</a>
                 <div class="task-subdesc">An alternative to rank-based RRF is score-based fusion: min-max scale lexical scores to [0...</div>
@@ -1525,6 +1713,7 @@
         <tr class="task-row" data-id="task_054_Q54_fuzzy_levenshtein_length_pruning" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_054_Q54_fuzzy_levenshtein_length_pruning</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_054_Q54_fuzzy_levenshtein_length_pruning.html" class="task-link">Typo-Tolerant Search with Levenshtein Edit Distance &amp; Length Bounds</a>
                 <div class="task-subdesc">Users frequently misspell search terms (e.g. &#x27;postgre&#x27; -&gt; &#x27;postgresql&#x27;). Levenshtein dista...</div>
@@ -1541,6 +1730,7 @@
         <tr class="task-row" data-id="task_055_Q55_jaro_winkler_brand_search" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_055_Q55_jaro_winkler_brand_search</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_055_Q55_jaro_winkler_brand_search.html" class="task-link">Brand &amp; Name Fuzzy Search via Jaro-Winkler Prefix Similarity</a>
                 <div class="task-subdesc">In e-commerce, users often mistype the suffixes of brand names (&#x27;Samsumg&#x27; vs &#x27;Samsung&#x27;). J...</div>
@@ -1557,6 +1747,7 @@
         <tr class="task-row" data-id="task_056_Q56_multi_field_weighted_scoring" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_056_Q56_multi_field_weighted_scoring</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_056_Q56_multi_field_weighted_scoring.html" class="task-link">Multi-Field Weighted Full-Text Retrieval (Title 3x, Body 1x)</a>
                 <div class="task-subdesc">A match in a document title or product headline is far more indicative of relevance than a...</div>
@@ -1573,6 +1764,7 @@
         <tr class="task-row" data-id="task_057_Q57_exact_phrase_proximity_boost" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_057_Q57_exact_phrase_proximity_boost</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_057_Q57_exact_phrase_proximity_boost.html" class="task-link">Exact Phrase Proximity Boosting in Keyword Retrieval</a>
                 <div class="task-subdesc">If a user searches for &#x27;machine learning&#x27;, an article containing the exact phrase &#x27;machine...</div>
@@ -1589,6 +1781,7 @@
         <tr class="task-row" data-id="task_058_Q58_stopword_cleansing_normalization" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_058_Q58_stopword_cleansing_normalization</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_058_Q58_stopword_cleansing_normalization.html" class="task-link">Stopword Filtering and Query Token Cleansing in SQL</a>
                 <div class="task-subdesc">Search queries like &#x27;what is the best laptop&#x27; contain stop words (&#x27;what&#x27;, &#x27;is&#x27;, &#x27;the&#x27;) tha...</div>
@@ -1605,6 +1798,7 @@
         <tr class="task-row" data-id="task_059_Q59_faceted_search_json_attributes" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_059_Q59_faceted_search_json_attributes</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_059_Q59_faceted_search_json_attributes.html" class="task-link">Faceted Search Aggregations over Semi-Structured JSON Attributes</a>
                 <div class="task-subdesc">When a customer searches for &#x27;laptops&#x27;, e-commerce search engines return matching items al...</div>
@@ -1621,6 +1815,7 @@
         <tr class="task-row" data-id="task_05_window_frame_bounds" data-domain="Window Frame Default Bounds" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_05_window_frame_bounds</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_05_window_frame_bounds.html" class="task-link">Financial Ledger Running Balance with Duplicate Timestamps</a>
                 <div class="task-subdesc">Tests window frame boundary specification (ROWS vs default RANGE) on duplicate timestamp o...</div>
@@ -1637,6 +1832,7 @@
         <tr class="task-row" data-id="task_060_Q60_ngram_log_signature_search" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_060_Q60_ngram_log_signature_search</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_060_Q60_ngram_log_signature_search.html" class="task-link">Trigram / N-Gram Token Substring Matching for Technical Error Logs</a>
                 <div class="task-subdesc">In observability platforms (Datadog, Splunk), engineers search stack traces with partial e...</div>
@@ -1653,6 +1849,7 @@
         <tr class="task-row" data-id="task_061_Q61_synonym_expansion_reranking" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_061_Q61_synonym_expansion_reranking</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_061_Q61_synonym_expansion_reranking.html" class="task-link">Dynamic Query Synonym Expansion via Relational Thesaurus</a>
                 <div class="task-subdesc">When a customer searches for &#x27;sofa&#x27;, they also expect to see listings titled &#x27;couch&#x27; or &#x27;s...</div>
@@ -1669,6 +1866,7 @@
         <tr class="task-row" data-id="task_062_Q62_autocomplete_prefix_popularity" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_062_Q62_autocomplete_prefix_popularity</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_062_Q62_autocomplete_prefix_popularity.html" class="task-link">Search Autocomplete Suggestion with Popularity Frequency Weighting</a>
                 <div class="task-subdesc">As users type &#x27;air...&#x27;, instant search suggests &#x27;air fryer&#x27; (100k searches) before &#x27;air ma...</div>
@@ -1685,6 +1883,7 @@
         <tr class="task-row" data-id="task_063_Q63_boolean_search_negation" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_063_Q63_boolean_search_negation</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_063_Q63_boolean_search_negation.html" class="task-link">High-Precision Boolean Search with Negation and Grouping</a>
                 <div class="task-subdesc">Legal e-discovery and patent search rely on exact Boolean syntax: (patent AND battery) NOT...</div>
@@ -1701,6 +1900,7 @@
         <tr class="task-row" data-id="task_064_Q64_pure_sql_tfidf_calculation" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_064_Q64_pure_sql_tfidf_calculation</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_064_Q64_pure_sql_tfidf_calculation.html" class="task-link">TF-IDF (Term Frequency - Inverse Document Frequency) in Pure SQL</a>
                 <div class="task-subdesc">TF-IDF is the foundational algorithm of information retrieval. Calculating it directly in ...</div>
@@ -1717,6 +1917,7 @@
         <tr class="task-row" data-id="task_065_Q65_search_position_bias_dcg" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_065_Q65_search_position_bias_dcg</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_065_Q65_search_position_bias_dcg.html" class="task-link">Discounted Cumulative Gain (DCG) with Search Position Bias Discount</a>
                 <div class="task-subdesc">Users are far more likely to click the #1 search result than the #5 result regardless of r...</div>
@@ -1733,6 +1934,7 @@
         <tr class="task-row" data-id="task_066_Q66_alphanumeric_sku_normalization" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_066_Q66_alphanumeric_sku_normalization</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_066_Q66_alphanumeric_sku_normalization.html" class="task-link">Alphanumeric SKU Matching with Punctuation &amp; Case Invariance</a>
                 <div class="task-subdesc">Customers search for model numbers in messy formats: &#x27;wh-1000xm5&#x27;, &#x27;WH1000-XM5&#x27;, &#x27;wh 1000 ...</div>
@@ -1749,6 +1951,7 @@
         <tr class="task-row" data-id="task_067_Q67_search_negation_term_suppression" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_067_Q67_search_negation_term_suppression</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_067_Q67_search_negation_term_suppression.html" class="task-link">Dynamic Negative Keyword Exclusion in E-Commerce Filters</a>
                 <div class="task-subdesc">A user searches &#x27;monitor -curved&#x27; to find flat computer monitors. The engine must extract ...</div>
@@ -1765,6 +1968,7 @@
         <tr class="task-row" data-id="task_068_Q68_multilingual_search_routing" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_068_Q68_multilingual_search_routing</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_068_Q68_multilingual_search_routing.html" class="task-link">Multi-Lingual Catalog Routing by Detected ISO Language Code</a>
                 <div class="task-subdesc">Global portals store titles in multiple localized columns (title_en, title_es, title_fr). ...</div>
@@ -1781,6 +1985,7 @@
         <tr class="task-row" data-id="task_069_Q69_query_relaxation_fallback" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_069_Q69_query_relaxation_fallback</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_069_Q69_query_relaxation_fallback.html" class="task-link">Zero-Result Search Query Relaxation (Strict AND -&gt; Loose OR Fallback)</a>
                 <div class="task-subdesc">If a multi-word search query (e.g. &#x27;ergonomic mechanical wireless split keyboard&#x27;) returns...</div>
@@ -1797,6 +2002,7 @@
         <tr class="task-row" data-id="task_06_funnel_precedence" data-domain="Strict Funnel Precedence" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_06_funnel_precedence</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_06_funnel_precedence.html" class="task-link">Sequential Multi-Stage User Onboarding Conversion Funnel</a>
                 <div class="task-subdesc">Calculates user conversion through a multi-step sequence where events must strictly obey c...</div>
@@ -1813,6 +2019,7 @@
         <tr class="task-row" data-id="task_070_Q70_search_snippet_keyword_extraction" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_070_Q70_search_snippet_keyword_extraction</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_070_Q70_search_snippet_keyword_extraction.html" class="task-link">Search Snippet Extraction: Context Window Around Matching Terms</a>
                 <div class="task-subdesc">Search results show a preview snippet containing the searched keyword with 30 characters o...</div>
@@ -1829,6 +2036,7 @@
         <tr class="task-row" data-id="task_071_Q71_search_journey_order_attribution" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_071_Q71_search_journey_order_attribution</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_071_Q71_search_journey_order_attribution.html" class="task-link">Customer Search-to-Purchase Path Attribution (Session Query Lift)</a>
                 <div class="task-subdesc">E-commerce search product managers need to know which search queries drove actual revenue....</div>
@@ -1845,6 +2053,7 @@
         <tr class="task-row" data-id="task_072_Q72_fuzzy_entity_resolution_dedup" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_072_Q72_fuzzy_entity_resolution_dedup</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_072_Q72_fuzzy_entity_resolution_dedup.html" class="task-link">Fuzzy Customer Entity Resolution across Disparate Data Sources</a>
                 <div class="task-subdesc">Merging CRM and billing databases requires linking customers with slight name and address ...</div>
@@ -1861,6 +2070,7 @@
         <tr class="task-row" data-id="task_073_Q73_search_term_cooccurrence_matrix" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_073_Q73_search_term_cooccurrence_matrix</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_073_Q73_search_term_cooccurrence_matrix.html" class="task-link">Search Term Co-Occurrence Matrix (Market Basket of Search Queries)</a>
                 <div class="task-subdesc">To suggest related searches, engines analyze queries searched together in the same session...</div>
@@ -1877,6 +2087,7 @@
         <tr class="task-row" data-id="task_074_Q74_did_you_mean_spell_suggestion" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_074_Q74_did_you_mean_spell_suggestion</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_074_Q74_did_you_mean_spell_suggestion.html" class="task-link">&#x27;Did You Mean?&#x27; Query Spell-Correction Suggestion Engine</a>
                 <div class="task-subdesc">When a query produces few results, search engines recommend a spell-corrected candidate wo...</div>
@@ -1893,6 +2104,7 @@
         <tr class="task-row" data-id="task_075_Q75_hybrid_search_metadata_soft_boost" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_075_Q75_hybrid_search_metadata_soft_boost</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_075_Q75_hybrid_search_metadata_soft_boost.html" class="task-link">Hybrid Search with Hard Categorical Filter &amp; Soft Merchant Quality Boost</a>
                 <div class="task-subdesc">Top marketplaces enforce strict hard filters (in-stock, prime shipping) while soft-boostin...</div>
@@ -1909,6 +2121,7 @@
         <tr class="task-row" data-id="task_076_Q76_bill_of_materials_recursive_rollup" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_076_Q76_bill_of_materials_recursive_rollup</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_076_Q76_bill_of_materials_recursive_rollup.html" class="task-link">Hierarchical Bill of Materials (BOM) Cost Rollup via Recursive CTE</a>
                 <div class="task-subdesc">Manufacturing an electric vehicle requires thousands of nested parts (Car -&gt; Battery Pack ...</div>
@@ -1925,6 +2138,7 @@
         <tr class="task-row" data-id="task_077_Q77_org_hierarchy_span_of_control" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_077_Q77_org_hierarchy_span_of_control</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_077_Q77_org_hierarchy_span_of_control.html" class="task-link">Organizational Reporting Depth &amp; Management Span of Control</a>
                 <div class="task-subdesc">HR analytics measures how deep the management chain is from the CEO to individual contribu...</div>
@@ -1941,6 +2155,7 @@
         <tr class="task-row" data-id="task_078_Q78_transitive_fraud_sybil_ring" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_078_Q78_transitive_fraud_sybil_ring</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_078_Q78_transitive_fraud_sybil_ring.html" class="task-link">Transitive Fraud Ring &amp; Sybil Account Detection via Device Links</a>
                 <div class="task-subdesc">Financial fraudsters create hundreds of fake accounts linked by shared credit cards, devic...</div>
@@ -1957,6 +2172,7 @@
         <tr class="task-row" data-id="task_079_Q79_graph_cycle_detection_visited_array" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_079_Q79_graph_cycle_detection_visited_array</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_079_Q79_graph_cycle_detection_visited_array.html" class="task-link">Cycle Detection in Directed Dependency Graphs with Visited Array</a>
                 <div class="task-subdesc">In build systems (e.g. Webpack, Bazel) or task scheduling, circular dependencies (Task A -...</div>
@@ -1973,6 +2189,7 @@
         <tr class="task-row" data-id="task_07_quadratic_self_join" data-domain="Quadratic Self-Joins vs Range Windows" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_07_quadratic_self_join</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_07_quadratic_self_join.html" class="task-link">Rolling 7-Day Window Aggregation without Quadratic Self-Joins</a>
                 <div class="task-subdesc">Tests whether models leverage native SQL range window frames over non-equi self-joins that...</div>
@@ -1989,6 +2206,7 @@
         <tr class="task-row" data-id="task_080_Q80_logistics_shortest_path_routing" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_080_Q80_logistics_shortest_path_routing</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_080_Q80_logistics_shortest_path_routing.html" class="task-link">Lowest-Cost Routing across Logistics Hubs via Recursive Dijkstra</a>
                 <div class="task-subdesc">Supply chain networks ship containers through intermediary freight hubs. Finding the cheap...</div>
@@ -2005,6 +2223,7 @@
         <tr class="task-row" data-id="task_081_Q81_incident_root_cause_dependency_chain" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_081_Q81_incident_root_cause_dependency_chain</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_081_Q81_incident_root_cause_dependency_chain.html" class="task-link">Causal Microservice Incident Root-Cause Dependency Chain</a>
                 <div class="task-subdesc">When a user checkout fails, it could be caused by payments, auth, database, or network. Tr...</div>
@@ -2021,6 +2240,7 @@
         <tr class="task-row" data-id="task_082_Q82_connected_components_community_labeling" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_082_Q82_connected_components_community_labeling</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_082_Q82_connected_components_community_labeling.html" class="task-link">Graph Connected Components Labeling via Min-ID Propagation</a>
                 <div class="task-subdesc">Graph connected components partition isolated clusters of customers or machines. Propagati...</div>
@@ -2037,6 +2257,7 @@
         <tr class="task-row" data-id="task_083_Q83_degree_centrality_pagerank_step" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_083_Q83_degree_centrality_pagerank_step</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_083_Q83_degree_centrality_pagerank_step.html" class="task-link">Network Node In-Degree Centrality and Influence Ranking</a>
                 <div class="task-subdesc">Social network influence and API hub criticality are determined by node in-degree centrali...</div>
@@ -2053,6 +2274,7 @@
         <tr class="task-row" data-id="task_084_Q84_critical_path_method_scheduling" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_084_Q84_critical_path_method_scheduling</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_084_Q84_critical_path_method_scheduling.html" class="task-link">Task Scheduling Critical Path Method (CPM) Duration Analysis</a>
                 <div class="task-subdesc">Project managers identify the &#x27;Critical Path&#x27;—the longest sequence of dependent tasks that...</div>
@@ -2069,6 +2291,7 @@
         <tr class="task-row" data-id="task_085_Q85_multilevel_referral_commissions" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_085_Q85_multilevel_referral_commissions</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_085_Q85_multilevel_referral_commissions.html" class="task-link">Multi-Level Affiliate Referral Tree Commission Rollup (Tier 1-3)</a>
                 <div class="task-subdesc">Affiliate programs reward referrals up to 3 tiers deep (Direct referrer gets 10%, Tier 2 g...</div>
@@ -2085,6 +2308,7 @@
         <tr class="task-row" data-id="task_086_Q86_multiparent_allocation_cost_rollup" data-domain="Graph &amp; Hierarchy" data-status="fail">
             <td class="td-status"><span class="badge badge-fail">✖ VALUE_MISMATCH</span></td>
             <td class="td-id"><code>task_086_Q86_multiparent_allocation_cost_rollup</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_086_Q86_multiparent_allocation_cost_rollup.html" class="task-link">Multi-Parent Shared Infrastructure Cost Allocation Rollup</a>
                 <div class="task-subdesc">Cloud infrastructure (e.g. shared Kubernetes cluster) is co-owned by multiple products wit...</div>
@@ -2101,6 +2325,7 @@
         <tr class="task-row" data-id="task_087_Q87_circular_fx_arbitrage_triangle" data-domain="Graph &amp; Hierarchy" data-status="fail">
             <td class="td-status"><span class="badge badge-fail">✖ VALUE_MISMATCH</span></td>
             <td class="td-id"><code>task_087_Q87_circular_fx_arbitrage_triangle</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_087_Q87_circular_fx_arbitrage_triangle.html" class="task-link">Triangular FX Currency Arbitrage Detection (Loop Profitability)</a>
                 <div class="task-subdesc">High-frequency FX trading bots scan for triangular arbitrage where converting USD -&gt; EUR -...</div>
@@ -2117,6 +2342,7 @@
         <tr class="task-row" data-id="task_088_Q88_state_machine_transition_verification" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_088_Q88_state_machine_transition_verification</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_088_Q88_state_machine_transition_verification.html" class="task-link">Transactional State Machine Transition Sequence Verification</a>
                 <div class="task-subdesc">Financial compliance requires payment transactions to strictly follow the state sequence: ...</div>
@@ -2133,6 +2359,7 @@
         <tr class="task-row" data-id="task_089_Q89_chasm_trap_fanout_resolution" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_089_Q89_chasm_trap_fanout_resolution</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_089_Q89_chasm_trap_fanout_resolution.html" class="task-link">Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation</a>
                 <div class="task-subdesc">When an order has multiple discounts AND multiple shipment records, joining both child tab...</div>
@@ -2149,6 +2376,7 @@
         <tr class="task-row" data-id="task_08_sargable_pruning" data-domain="Non-SARGable Partition Pruning" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_08_sargable_pruning</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_08_sargable_pruning.html" class="task-link">SARGable Temporal Partition Pruning and Exact Boundary Range</a>
                 <div class="task-subdesc">Tests SARGable timestamp filtering and strict month boundary conditions, preventing full-s...</div>
@@ -2165,6 +2393,7 @@
         <tr class="task-row" data-id="task_090_Q90_three_valued_logic_safe_anti_join" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_090_Q90_three_valued_logic_safe_anti_join</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_090_Q90_three_valued_logic_safe_anti_join.html" class="task-link">Three-Valued Logic Safe Anti-Join (Eliminating the NOT IN NULL Trap)</a>
                 <div class="task-subdesc">Marketing queries to find active customers who have not churned often use `WHERE id NOT IN...</div>
@@ -2181,6 +2410,7 @@
         <tr class="task-row" data-id="task_091_Q91_dynamic_pivot_monthly_revenue" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_091_Q91_dynamic_pivot_monthly_revenue</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_091_Q91_dynamic_pivot_monthly_revenue.html" class="task-link">Dynamic PIVOT of Monthly Revenue by Product Category</a>
                 <div class="task-subdesc">Financial reporting requires transforming normalized long-form transaction rows into cross...</div>
@@ -2197,6 +2427,7 @@
         <tr class="task-row" data-id="task_092_Q92_dynamic_unpivot_wide_metrics" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_092_Q92_dynamic_unpivot_wide_metrics</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_092_Q92_dynamic_unpivot_wide_metrics.html" class="task-link">Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics</a>
                 <div class="task-subdesc">Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, ...</div>
@@ -2213,6 +2444,7 @@
         <tr class="task-row" data-id="task_093_Q93_list_lambdas_nested_json_arrays" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_093_Q93_list_lambdas_nested_json_arrays</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_093_Q93_list_lambdas_nested_json_arrays.html" class="task-link">List Lambdas for High-Performance Nested Array Transformations</a>
                 <div class="task-subdesc">Modern analytical warehouses store nested array payloads (e.g. array of discount percentag...</div>
@@ -2229,6 +2461,7 @@
         <tr class="task-row" data-id="task_094_Q94_median_absolute_deviation_mad" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_094_Q94_median_absolute_deviation_mad</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_094_Q94_median_absolute_deviation_mad.html" class="task-link">Median Absolute Deviation (MAD) Robust Statistical Outlier Detection</a>
                 <div class="task-subdesc">Traditional standard deviation Z-scores fail in the presence of extreme outliers because t...</div>
@@ -2245,6 +2478,7 @@
         <tr class="task-row" data-id="task_095_Q95_robust_z_score_iqr_normalization" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_095_Q95_robust_z_score_iqr_normalization</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_095_Q95_robust_z_score_iqr_normalization.html" class="task-link">Robust Z-Score Normalization using Median and Interquartile Range (IQR)</a>
                 <div class="task-subdesc">Standardizing skewed metrics (like API response latency) for machine learning feature pipe...</div>
@@ -2261,6 +2495,7 @@
         <tr class="task-row" data-id="task_096_Q96_window_frame_range_vs_rows_ties" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_096_Q96_window_frame_range_vs_rows_ties</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_096_Q96_window_frame_range_vs_rows_ties.html" class="task-link">Financial Ledger Running Total: ROWS vs. RANGE Semantic Contrast</a>
                 <div class="task-subdesc">In financial auditing, understanding the exact behavioral difference between `ROWS BETWEEN...</div>
@@ -2277,6 +2512,7 @@
         <tr class="task-row" data-id="task_097_Q97_sargable_date_boundary_pruning" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_097_Q97_sargable_date_boundary_pruning</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_097_Q97_sargable_date_boundary_pruning.html" class="task-link">SARGable Partition Pruning: Exact Half-Open Date Boundary Ranges</a>
                 <div class="task-subdesc">When filtering analytical partitions for a calendar month, `BETWEEN &#x27;2026-01-01&#x27; AND &#x27;2026...</div>
@@ -2293,6 +2529,7 @@
         <tr class="task-row" data-id="task_098_Q98_window_exclude_group_moving_peer" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_098_Q98_window_exclude_group_moving_peer</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_098_Q98_window_exclude_group_moving_peer.html" class="task-link">Window Peer Frame Exclusion: EXCLUDE GROUP for Clean Cross-Group Contrast</a>
                 <div class="task-subdesc">When comparing sales across product categories or dates, analysts want to compute the aver...</div>
@@ -2309,6 +2546,7 @@
         <tr class="task-row" data-id="task_099_Q99_window_exclude_ties_duplicate_handling" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_099_Q99_window_exclude_ties_duplicate_handling</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_099_Q99_window_exclude_ties_duplicate_handling.html" class="task-link">Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals</a>
                 <div class="task-subdesc">In financial ranking, when multiple entities have the exact same score, evaluating cumulat...</div>
@@ -2325,6 +2563,7 @@
         <tr class="task-row" data-id="task_100_Q100_market_basket_association_rules" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_100_Q100_market_basket_association_rules</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_100_Q100_market_basket_association_rules.html" class="task-link">Market Basket Association Rules: Support, Confidence, and Lift in Pure SQL</a>
                 <div class="task-subdesc">Data miners discover product affinities (&#x27;Customers who buy Item A also buy Item B&#x27;) using...</div>
@@ -2341,6 +2580,7 @@
         <tr class="task-row" data-id="task_101_Q101_kaplan_meier_churn_survival" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_101_Q101_kaplan_meier_churn_survival</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_101_Q101_kaplan_meier_churn_survival.html" class="task-link">Kaplan-Meier Non-Parametric Customer Survival Analysis in SQL</a>
                 <div class="task-subdesc">Actuarial and SaaS subscription models estimate the probability of customer survival past ...</div>
@@ -2357,6 +2597,7 @@
         <tr class="task-row" data-id="task_102_Q102_equi_depth_dynamic_binning_ntile" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_102_Q102_equi_depth_dynamic_binning_ntile</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_102_Q102_equi_depth_dynamic_binning_ntile.html" class="task-link">Dynamic Equi-Depth Histogram Binning via NTILE in Pure SQL</a>
                 <div class="task-subdesc">Creating balanced feature histograms for ML requires equal-depth binning (each bucket cont...</div>
@@ -2373,6 +2614,7 @@
         <tr class="task-row" data-id="task_111_rolling_distinct_active_users" data-domain="Algorithmic Efficiency / Window Distinct" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_111_rolling_distinct_active_users</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_111_rolling_distinct_active_users.html" class="task-link">Rolling 7-Day Distinct Active Users without Triangular Join Explosion</a>
                 <div class="task-subdesc">Calculates rolling 7-day distinct active users per calendar day. SQL window functions forb...</div>
@@ -2389,6 +2631,7 @@
         <tr class="task-row" data-id="task_112_dual_constraint_sessionization" data-domain="Sessionization (Gaps &amp; Islands)" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_112_dual_constraint_sessionization</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_112_dual_constraint_sessionization.html" class="task-link">Dual-Constraint Sessionization: 30-min Inactivity AND 4-Hour Absolute Hard Cap</a>
                 <div class="task-subdesc">Groups web clickstream events into sessions. A new session starts if: 1) more than 30 minu...</div>
@@ -2405,6 +2648,7 @@
         <tr class="task-row" data-id="task_113_vector_prefilter_recall_drop" data-domain="Vector &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_113_vector_prefilter_recall_drop</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_113_vector_prefilter_recall_drop.html" class="task-link">Vector Nearest Neighbors: The Post-Filtering Empty Set Trap</a>
                 <div class="task-subdesc">Demonstrates the classic vector database failure mode where applying relational metadata f...</div>
@@ -2421,6 +2665,7 @@
         <tr class="task-row" data-id="task_114_asof_tolerance_expiry" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_114_asof_tolerance_expiry</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_114_asof_tolerance_expiry.html" class="task-link">ASOF Point-in-Time Quote Matching with 500ms Expiry Tolerance</a>
                 <div class="task-subdesc">Matches executed trades with the prevailing market quote as-of the trade timestamp, but en...</div>
@@ -2437,6 +2682,7 @@
         <tr class="task-row" data-id="task_115_rrf_hybrid_rank_fusion_isolation" data-domain="Search &amp; Retrieval" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_115_rrf_hybrid_rank_fusion_isolation</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_115_rrf_hybrid_rank_fusion_isolation.html" class="task-link">Reciprocal Rank Fusion (RRF) Hybrid Retrieval without Scale Collapse</a>
                 <div class="task-subdesc">Fuses BM25 keyword rankings and vector cosine similarity rankings using rank-based Recipro...</div>
@@ -2453,6 +2699,7 @@
         <tr class="task-row" data-id="task_116_graph_cycle_visited_protection" data-domain="Graph &amp; Hierarchy" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_116_graph_cycle_visited_protection</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_116_graph_cycle_visited_protection.html" class="task-link">Directed Dependency Graph Cycle Protection via Visited Array Path</a>
                 <div class="task-subdesc">Traverses downstream dependencies in a directed acyclic graph that contains an intentional...</div>
@@ -2469,6 +2716,7 @@
         <tr class="task-row" data-id="task_117_bitemporal_retroactive_audit" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_117_bitemporal_retroactive_audit</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_117_bitemporal_retroactive_audit.html" class="task-link">Bitemporal Auditing: Retroactive Policy Revision Point-in-Time State</a>
                 <div class="task-subdesc">Reconstructs historical corporate insurance coverage on an effective business date, as kno...</div>
@@ -2485,6 +2733,7 @@
         <tr class="task-row" data-id="task_118_reversal_interleaved_ledger" data-domain="Warehouse &amp; Statistical" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_118_reversal_interleaved_ledger</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_118_reversal_interleaved_ledger.html" class="task-link">Financial Ledger Running Total with Transaction Reversal Nullification</a>
                 <div class="task-subdesc">Calculates running account balance where REVERSAL records completely void specific prior t...</div>
@@ -2501,6 +2750,7 @@
         <tr class="task-row" data-id="task_119_multitouch_decay_attribution" data-domain="Temporal &amp; Time-Series" data-status="pass">
             <td class="td-status"><span class="badge badge-pass">✔ PASS</span></td>
             <td class="td-id"><code>task_119_multitouch_decay_attribution</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_119_multitouch_decay_attribution.html" class="task-link">Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%</a>
                 <div class="task-subdesc">Calculates exponential time-decay attribution across previous marketing touches (7-day hal...</div>
@@ -2517,6 +2767,7 @@
         <tr class="task-row" data-id="task_120_market_basket_lift_smoothing" data-domain="Warehouse &amp; Statistical" data-status="fail">
             <td class="td-status"><span class="badge badge-fail">✖ SHAPE_MISMATCH</span></td>
             <td class="td-id"><code>task_120_market_basket_lift_smoothing</code></td>
+            <td class="td-engine"><span class="engine-table-badge badge-duckdb">⚡ DuckDB 2.0</span></td>
             <td class="td-title">
                 <a href="queries/task_120_market_basket_lift_smoothing.html" class="task-link">Association Rule Lift Matrix with Directional Pair Evaluation</a>
                 <div class="task-subdesc">Calculates market basket association rule Lift for directional product pairs (A -&gt; B), cor...</div>
