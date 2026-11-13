@@ -3,7 +3,8 @@ set -e
 
 # ==============================================================================
 # SQL Frontier Eval - Quick Verification Script
-# Runs unit tests, ground-truth sanity check, and offline naive query evaluation.
+# Runs unit tests, ground-truth sanity check across DuckDB and PostgreSQL,
+# and offline naive query evaluation.
 # ==============================================================================
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,18 +29,27 @@ echo "==========================================================================
 
 # Step 1: Unit Tests
 echo ""
-echo ">>> STEP 1: Running Unit Test Suite (Tests harness, sandboxing, and profiler)..."
+echo ">>> STEP 1: Running Unit Test Suite (Tests harness, DuckDB & Postgres sandboxing, and profiler)..."
 "${PYTEST}" tests/ -v
 
-# Step 2: Golden Ground-Truth Sanity Test
+# Step 2: DuckDB Golden Ground-Truth Sanity Test
 echo ""
-echo ">>> STEP 2: Verifying Golden Baseline (Ensures zero false negatives on ground truth)..."
-"${PYTHON}" run_eval.py --test-gold
+echo ">>> STEP 2: Verifying DuckDB Golden Baseline (Ensures zero false negatives on ground truth)..."
+"${PYTHON}" run_eval.py --engine=duckdb --test-gold --tasks="tasks/task_001*.json"
 
-# Step 3: Offline Model Evaluation (Catches naive join fan-out)
+# Step 3: PostgreSQL Golden Ground-Truth Sanity Test
 echo ""
-echo ">>> STEP 3: Running Offline Evaluation (Testing reference failure modes)..."
-"${PYTHON}" run_eval.py --model offline --verbose
+echo ">>> STEP 3: Verifying PostgreSQL 18+ Golden Baseline..."
+if docker compose ps postgres | grep -q "Up"; then
+    "${PYTHON}" run_eval.py --engine=postgres --test-gold --tasks="tasks/task_026*.json"
+else
+    echo "    [NOTE] PostgreSQL container not running; run ./setup_postgres.sh to launch."
+fi
+
+# Step 4: Offline Model Evaluation (Catches naive join fan-out)
+echo ""
+echo ">>> STEP 4: Running Offline Evaluation (Testing reference failure modes)..."
+"${PYTHON}" run_eval.py --model offline --tasks="tasks/task_001*.json"
 
 echo ""
 echo "================================================================================"

@@ -1298,3 +1298,65 @@ span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 
 .highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
 .highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
 .highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+
+/* Engine Switcher */
+.engine-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    padding: 3px 6px;
+    border-radius: 24px;
+}
+.switcher-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    padding-left: 6px;
+}
+.engine-pill {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.engine-pill:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+}
+.engine-pill.active {
+    background: rgba(88, 166, 255, 0.18);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    font-weight: 600;
+    box-shadow: 0 0 12px rgba(88, 166, 255, 0.25);
+}
+.analysis-finding-box {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+}
+.analysis-finding-box h4 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: var(--accent-cyan);
+    font-size: 1rem;
+}
+.analysis-finding-box p {
+    margin: 0 0 10px 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+.analysis-finding-box p:last-child {
+    margin-bottom: 0;
+}

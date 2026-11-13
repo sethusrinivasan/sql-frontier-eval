@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-11-13T20:27:41.449117+00:00",
+  "model": "offline",
+  "engine": "duckdb",
+  "is_golden_test": false,
+  "total_tasks": 1,
+  "passed": 1,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_001_Q01_asof_trade_quote_matching",
+      "name": "Tick-Level Trade Execution Matching via Native ASOF JOIN",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Match each executed trade with the latest market quote effective at that exact microsecond\n            SELECT \n                t.trade_id,\n                t.symbol,\n                t.trade_time,\n                t.executed_price,\n                t.shares,\n                q.quote_time AS prevailing_quote_time,\n                q.bid_price,\n                q.ask_price,\n                -- Effective slippage calculation (difference between ask and executed price)\n                ROUND(t.executed_price - q.ask_price, 4) AS slippage\n            FROM trades t\n            ASOF JOIN quotes q\n              ON t.symbol = q.symbol\n             AND t.trade_time >= q.quote_time\n            ORDER BY t.trade_time;",
+      "golden_sql": "-- Match each executed trade with the latest market quote effective at that exact microsecond\n            SELECT \n                t.trade_id,\n                t.symbol,\n                t.trade_time,\n                t.executed_price,\n                t.shares,\n                q.quote_time AS prevailing_quote_time,\n                q.bid_price,\n                q.ask_price,\n                -- Effective slippage calculation (difference between ask and executed price)\n                ROUND(t.executed_price - q.ask_price, 4) AS slippage\n            FROM trades t\n            ASOF JOIN quotes q\n              ON t.symbol = q.symbol\n             AND t.trade_time >= q.quote_time\n            ORDER BY t.trade_time;",
+      "execution_time_ms": 3.9502189902123064,
+      "golden_time_ms": 9.718508998048492,
+      "diagnostics": {
+        "profile_metrics": {},
+        "rows_verified": 3
+      },
+      "llm_metadata": {}
+    }
+  ]
+}

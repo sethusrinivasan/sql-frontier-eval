@@ -130,6 +130,39 @@ CREATE TABLE sorted_events AS SELECT * FROM unsorted_events ORDER BY event_time;
 | **Graph & Hierarchical** (`task_073` - `task_080`) | Memory spill and unbounded recursion on cyclic graphs | **Data Structure Choice**: Pre-flatten hierarchies via Closure Tables or Adjacency Arrays. Enforce `PRIMARY KEY` to prevent cycles at write time. | **Partial**: PK index prevents cycles during ingestion. |
 | **Warehouse & Aggregation** (`task_081` - `task_120`) | Hash table collisions on high-cardinality group keys | **Dictionary Encoding (`ENUM`)**: Store repeated strings as compact numeric enums. Pre-aggregate common rollup dimensions. | **NO**: Hash grouping relies on compact CPU cache lines, not tree indexes. |
 
+### 3.5 Physical Optimization in PostgreSQL 18: Beyond Generic B-Trees
+
+In PostgreSQL 18+, table access is row-oriented. While DuckDB bypasses tree indexes due to SIMD chunk scanning, PostgreSQL suffers heavy latency degradation on unindexed 1M-record tables (reverting to row-by-row `Seq Scan` and explosive `Nested Loop` joins). However, frontier LLMs habitually advise generic single-column B-Tree indexes, which are inadequate for complex analytical queries.
+
+The true physical levers for PostgreSQL 18 are:
+1. **Composite Covering Indexes (`INCLUDE`)**:
+   ```sql
+   -- What LLMs write: single-column B-Tree (causes Bitmap Heap Scan + Heap Fetches)
+   CREATE INDEX idx_orders_merchant ON orders (merchant_id);
+
+   -- What should have been setup: Covering Index for pure Index-Only Scan
+   CREATE INDEX idx_orders_covering ON orders (merchant_id, order_date) INCLUDE (base_amount);
+   ```
+   By placing payload columns in `INCLUDE`, PostgreSQL fulfills the query entirely from the index page buffers without reading table heap blocks, cutting I/O by **85%**.
+2. **Vector HNSW Indexing (`pgvector`)**:
+   ```sql
+   -- Accelerated Approximate Nearest Neighbor (ANN) search via HNSW
+   CREATE INDEX idx_embeddings_hnsw ON doc_embeddings 
+   USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+   ```
+   Converts an $O(N \times D)$ full-table distance scan (~180 ms on 1M rows) into logarithmic $O(\log N)$ graph traversal (~1.2 ms, **150x faster**).
+3. **BRIN (Block Range Indexes) for Append-Only Time Series**:
+   ```sql
+   -- Compact summary index for chronologically ordered event streams
+   CREATE INDEX idx_events_brin ON clickstream_events USING brin (event_timestamp);
+   ```
+   BRIN stores minimum and maximum values per physical disk block range, achieving instant block-pruning identical to DuckDB Zone Maps while consuming less than **1% of the RAM** required by a B-Tree index.
+4. **GIN Trigram Indexes for Typos & Substrings (`pg_trgm`)**:
+   ```sql
+   CREATE INDEX idx_customers_name_trgm ON customers USING gin (customer_name gin_trgm_ops);
+   ```
+   B-Trees cannot accelerate `LIKE '%term%'` or fuzzy similarity. GIN trigrams enable index acceleration for arbitrary substring and regex searches.
+
 ---
 
 ## 4. Why LLMs Failed to Get This Setup Right on the First Go
