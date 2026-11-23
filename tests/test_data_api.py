@@ -80,3 +80,66 @@ def test_csv_files_exist_on_disk():
     assert os.path.isdir("data/golden_results")
     assert len(os.listdir("data/fixtures")) >= 140
     assert len(os.listdir("data/golden_results")) == 120
+
+def test_paginated_endpoint_spec(api_server):
+    headers = {"Origin": "https://bi-us-east-1.alibabacloud.com"}
+    resp = requests.get(f"{api_server}/ai/resource/paginated?page=1&pageSize=1000", headers=headers)
+    assert resp.status_code == 200
+    assert resp.headers.get("Access-Control-Allow-Origin") == "https://bi-us-east-1.alibabacloud.com"
+
+    body = resp.json()
+    assert body["code"] == 200
+    assert body["message"] == "success"
+    data = body["data"]
+    assert data["total"] == 1_000_000
+    assert data["page"] == 1
+    assert data["pageSize"] == 1000
+    assert data["totalPages"] == 1000
+    assert data["hasNext"] is True
+    assert data["hasPrev"] is False
+    assert len(data["records"]) == 1000
+
+    rec = data["records"][0]
+    assert "date" in rec
+    assert "gross_usd" in rec
+    assert "color_class" in rec
+    assert "status_label" in rec
+    assert "top_5_services" in rec
+    assert "raw_services" in rec
+    assert isinstance(rec["top_5_services"], list)
+    assert len(rec["top_5_services"]) <= 5
+    for s in rec["top_5_services"]:
+        assert "service" in s
+        assert "acronym" in s
+        assert "amount" in s
+        assert "percent" in s
+        assert "short_display" in s
+
+def test_paginated_edge_cases(api_server):
+    # Page beyond totalPages
+    resp = requests.get(f"{api_server}/ai/resource/paginated?page=1001&pageSize=1000")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["records"] == []
+    assert data["pageSize"] == 0
+    assert data["hasNext"] is False
+
+    # PageSize > 10000 capped
+    resp = requests.get(f"{api_server}/ai/resource/paginated?page=1&pageSize=20000")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["pageSize"] == 10000
+    assert len(data["records"]) == 10000
+
+    # PageSize <= 0 returns error 400
+    resp = requests.get(f"{api_server}/ai/resource/paginated?page=1&pageSize=0")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["message"] == "pageSize must be >= 1"
+
+    # Invalid sort_by returns error 400
+    resp = requests.get(f"{api_server}/ai/resource/paginated?sort_by=invalid_field")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert "Unknown sort field: invalid_field" in body["message"]
+

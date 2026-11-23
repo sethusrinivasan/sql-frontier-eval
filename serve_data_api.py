@@ -29,7 +29,28 @@ ALLOWED_ORIGINS = [
 
 def load_dataset(resource: str, table_name: Optional[str] = None) -> List[Dict[str, Any]]:
     """Loads records for the requested resource."""
-    if resource == "leaderboard":
+    if resource in ("aws_daily", "real_aws_daily", "aws_usage", "costs", "usage"):
+        csv_path = os.path.join(DATA_DIR, "real_aws_usage_daily.csv")
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
+            return df.fillna("").to_dict(orient="records")
+        return []
+
+    elif resource in ("aws_services", "real_aws_services", "services"):
+        csv_path = os.path.join(DATA_DIR, "real_aws_usage_services.csv")
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
+            return df.fillna("").to_dict(orient="records")
+        return []
+
+    elif resource in ("aws_summary", "real_aws_summary"):
+        csv_path = os.path.join(DATA_DIR, "real_aws_usage_summary.csv")
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
+            return df.fillna("").to_dict(orient="records")
+        return []
+
+    elif resource == "leaderboard":
         csv_path = os.path.join(DATA_DIR, "benchmark_leaderboard.csv")
         if os.path.exists(csv_path):
             df = pd.read_csv(csv_path)
@@ -135,10 +156,12 @@ class AlibabaCloudDataAPIHandler(BaseHTTPRequestHandler):
             return
 
         # Check endpoints
-        # Supports /ai/resource, /api/resource, /api/data, /api/tasks, /api/leaderboard, etc.
+        # Supports /ai/resource, /ai/resource/paginated, /api/resource, /api/resource/paginated, /api/data, etc.
         valid_endpoints = [
             "/ai/resource",
+            "/ai/resource/paginated",
             "/api/resource",
+            "/api/resource/paginated",
             "/api/data",
             "/api/v1/data",
             "/api/tasks",
@@ -154,9 +177,59 @@ class AlibabaCloudDataAPIHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({
                 "code": 404,
-                "message": f"Endpoint {path} not found. Valid endpoints include /ai/resource, /api/resource, /api/data",
+                "message": f"Endpoint {path} not found. Valid endpoints include /ai/resource, /ai/resource/paginated, /api/resource, /api/data",
                 "data": None
             }).encode("utf-8"))
+            return
+
+        # Paginated REST API endpoint serving 1M+ records per specification
+        if path in ("/ai/resource/paginated", "/api/resource/paginated"):
+            try:
+                page_val = int(query_params.get("page", [1])[0])
+            except (ValueError, TypeError):
+                page_val = 1
+
+            try:
+                raw_page_size = query_params.get("pageSize", [None])[0]
+                page_size_val = int(raw_page_size) if raw_page_size is not None else 1000
+            except (ValueError, TypeError):
+                page_size_val = 1000
+
+            sort_by = query_params.get("sort_by", ["date"])[0]
+            sort_order = query_params.get("sort_order", ["desc"])[0]
+
+            from paginator import get_paginated_records
+
+            paginated_data, err_msg = get_paginated_records(
+                page=page_val,
+                page_size=page_size_val,
+                sort_by=sort_by,
+                sort_order=sort_order,
+            )
+
+            if err_msg:
+                err_bytes = json.dumps({"code": 400, "message": err_msg}).encode("utf-8")
+                self.send_response(400)
+                self._set_cors_headers()
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(err_bytes)))
+                self.end_headers()
+                self.wfile.write(err_bytes)
+                return
+
+            res_payload = {
+                "code": 200,
+                "message": "success",
+                "data": paginated_data,
+            }
+            response_bytes = json.dumps(res_payload, indent=2, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self._set_cors_headers()
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(response_bytes)))
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.end_headers()
+            self.wfile.write(response_bytes)
             return
 
         # Parse query options
