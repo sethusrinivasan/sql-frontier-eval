@@ -1,0 +1,10 @@
+service_name,30_day_total_usd,percent_of_total,avg_daily_usd
+Amazon Relational Database Service,40.1904,84.26,1.3397
+AmazonCloudWatch,4.1426,8.68,0.1381
+AWS Cost Explorer,3.0,6.29,0.1
+Amazon Bedrock,0.1591,0.33,0.0053
+Amazon Simple Storage Service,0.1034,0.22,0.0034
+Amazon EC2 Container Registry (ECR),0.095,0.2,0.0032
+Amazon DynamoDB,0.0081,0.02,0.0003
+AWS Secrets Manager,0.0,0.0,0.0
+AWS Lambda,0.0,0.0,0.0

@@ -1,0 +1,1224 @@
+{
+  "window_days": 30,
+  "days_recorded": 30,
+  "window_gross_usd": 47.6988,
+  "window_net_usd": 0.0,
+  "currency": "USD",
+  "credit": {
+    "plan_type": "FREE",
+    "credits_granted_usd": 200.0,
+    "credits_remaining_usd": 140.28,
+    "credits_consumed_usd": 58.58,
+    "credits_expiry": "2027-04-17",
+    "projection": {
+      "binding_limit": "exhaustion",
+      "days_until_expiry": 145,
+      "avg_daily_gross_usd": 1.8992,
+      "days_until_exhaustion": 73,
+      "credit_waste_if_expiry_binds_usd": null
+    }
+  },
+  "resource_count": 78,
+  "resources_by_application": {
+    "CloudFrugality": 5,
+    "Observability-Demo": 27,
+    "RealityChecker": 46
+  },
+  "daily": [
+    {
+      "date": "2026-11-22",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.8992,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "Amazon Bedrock": 0.0062,
+        "AmazonCloudWatch": 0.2729,
+        "AWS Cost Explorer": 0.03,
+        "Amazon Simple Storage Service": 0.0037,
+        "Amazon Relational Database Service": 1.581,
+        "Amazon EC2 Container Registry (ECR)": 0.0053
+      },
+      "applications": {
+        "RealityChecker": 1.487747
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-21",
+      "application_name": "RealityChecker",
+      "gross_usd": 0.907183,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.00518,
+        "Amazon DynamoDB": 3e-06,
+        "AmazonCloudWatch": 0.195,
+        "AWS Cost Explorer": 0.03,
+        "Amazon Simple Storage Service": 0.001882,
+        "Amazon Relational Database Service": 0.672286,
+        "Amazon EC2 Container Registry (ECR)": 0.002832
+      },
+      "applications": {
+        "RealityChecker": 0.907183
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-20",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.305316,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005956,
+        "Amazon DynamoDB": 1e-06,
+        "AmazonCloudWatch": 0.229583,
+        "AWS Cost Explorer": 0.03,
+        "Amazon Simple Storage Service": 0.002017,
+        "Amazon Relational Database Service": 1.034478,
+        "Amazon EC2 Container Registry (ECR)": 0.003279
+      },
+      "applications": {
+        "RealityChecker": 1.305316
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-19",
+      "application_name": "RealityChecker",
+      "gross_usd": 0.908926,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005684,
+        "Amazon DynamoDB": 1e-06,
+        "AmazonCloudWatch": 0.219167,
+        "AWS Cost Explorer": 0.03,
+        "Amazon Simple Storage Service": 0.002015,
+        "Amazon Relational Database Service": 0.649032,
+        "Amazon EC2 Container Registry (ECR)": 0.003026
+      },
+      "applications": {
+        "RealityChecker": 0.908926
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-18",
+      "application_name": "RealityChecker",
+      "gross_usd": 0.77831,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.003637,
+        "Amazon DynamoDB": 3e-06,
+        "AmazonCloudWatch": 0.126667,
+        "AWS Cost Explorer": 0.03,
+        "Amazon Simple Storage Service": 0.00081,
+        "Amazon Relational Database Service": 0.615256,
+        "Amazon EC2 Container Registry (ECR)": 0.001938
+      },
+      "applications": {
+        "RealityChecker": 0.77831
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-17",
+      "application_name": "RealityChecker",
+      "gross_usd": 0.68413,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.00364,
+        "Amazon DynamoDB": 3e-06,
+        "AmazonCloudWatch": 0.126667,
+        "AWS Cost Explorer": 0.03,
+        "Amazon Simple Storage Service": 0.00085,
+        "Amazon Relational Database Service": 0.521033,
+        "Amazon EC2 Container Registry (ECR)": 0.001938
+      },
+      "applications": {
+        "RealityChecker": 0.68413
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-16",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.866534,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.00523,
+        "Amazon DynamoDB": 5.6e-05,
+        "AmazonCloudWatch": 0.2305,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003417,
+        "Amazon Relational Database Service": 1.50411,
+        "Amazon EC2 Container Registry (ECR)": 0.003221
+      },
+      "applications": {
+        "RealityChecker": 1.866534
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-15",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.857318,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005469,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.2825,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.00351,
+        "Amazon Relational Database Service": 1.4422,
+        "Amazon EC2 Container Registry (ECR)": 0.003279
+      },
+      "applications": {
+        "RealityChecker": 1.857318
+      },
+      "change_details": "Option A Cost Optimization: CDC schedule 1x/day, CE queries consolidated, Aurora 0 ACU pause unblocked, DR Parquet backups",
+      "change_url": "https://github.com/sethusrinivasan/box_hackathon/commit/09b574a"
+    },
+    {
+      "date": "2026-11-14",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.958238,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005369,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.323333,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003519,
+        "Amazon Relational Database Service": 1.502078,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.958238
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-13",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.954311,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.00542,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.321667,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.00352,
+        "Amazon Relational Database Service": 1.499767,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.954311
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-12",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.958748,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005813,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.323333,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003616,
+        "Amazon Relational Database Service": 1.502047,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.958748
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-11",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.956541,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005616,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.321667,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003536,
+        "Amazon Relational Database Service": 1.501784,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.956541
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-10",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.544701,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.00524,
+        "Amazon DynamoDB": 0.00033,
+        "AmazonCloudWatch": 0.159166,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003372,
+        "Amazon Relational Database Service": 1.253605,
+        "Amazon EC2 Container Registry (ECR)": 0.002987
+      },
+      "applications": {
+        "RealityChecker": 1.544701
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-09",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.635305,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005651,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.00359,
+        "Amazon Relational Database Service": 1.502126,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.635305
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-08",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.650989,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005501,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003551,
+        "Amazon Relational Database Service": 1.518,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.650989
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-07",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.70737,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005404,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003553,
+        "Amazon Relational Database Service": 1.574475,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.70737
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-06",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.63456,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005568,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003586,
+        "Amazon Relational Database Service": 1.501469,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.63456
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-05",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.63552,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005712,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003573,
+        "Amazon Relational Database Service": 1.502297,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.63552
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-04",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.633522,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005573,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003576,
+        "Amazon Relational Database Service": 1.500434,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.633522
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-03",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.63448,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005469,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003548,
+        "Amazon Relational Database Service": 1.501524,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.63448
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-02",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.689812,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005318,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003507,
+        "Amazon Relational Database Service": 1.557049,
+        "Amazon EC2 Container Registry (ECR)": 0.003577
+      },
+      "applications": {
+        "RealityChecker": 1.689812
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-11-01",
+      "application_name": "RealityChecker",
+      "gross_usd": 0.693567,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.002495,
+        "Amazon DynamoDB": 0.000165,
+        "AWS Cost Explorer": 0.06,
+        "Amazon Simple Storage Service": 0.001326,
+        "Amazon Relational Database Service": 0.62809,
+        "Amazon EC2 Container Registry (ECR)": 0.001491
+      },
+      "applications": {
+        "RealityChecker": 0.693567
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-10-31",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.849085,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005454,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.27379,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.004638,
+        "Amazon Relational Database Service": 1.441668,
+        "Amazon EC2 Container Registry (ECR)": 0.003174
+      },
+      "applications": {
+        "RealityChecker": 1.849085
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-10-30",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.944768,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005451,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.312097,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003573,
+        "Amazon Relational Database Service": 1.499825,
+        "Amazon EC2 Container Registry (ECR)": 0.003462
+      },
+      "applications": {
+        "RealityChecker": 1.944768
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-10-29",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.947501,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005416,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.31129,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.005082,
+        "Amazon Relational Database Service": 1.502096,
+        "Amazon EC2 Container Registry (ECR)": 0.003255
+      },
+      "applications": {
+        "RealityChecker": 1.947501
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-10-28",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.748562,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005426,
+        "Amazon DynamoDB": 0.00036,
+        "AmazonCloudWatch": 0.113306,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.005266,
+        "Amazon Relational Database Service": 1.50225,
+        "Amazon EC2 Container Registry (ECR)": 0.001954
+      },
+      "applications": {
+        "RealityChecker": 1.748562
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-10-27",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.674203,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005662,
+        "Amazon DynamoDB": 0.000361,
+        "AWS Cost Explorer": 0.12,
+        "AWS Secrets Manager": 5e-06,
+        "Amazon Simple Storage Service": 0.008807,
+        "Amazon Relational Database Service": 1.536635,
+        "Amazon EC2 Container Registry (ECR)": 0.002733
+      },
+      "applications": {
+        "RealityChecker": 1.674203
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-10-26",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.669516,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005467,
+        "Amazon DynamoDB": 0.000361,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003466,
+        "Amazon Relational Database Service": 1.537487,
+        "Amazon EC2 Container Registry (ECR)": 0.002733
+      },
+      "applications": {
+        "RealityChecker": 1.669516
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-10-25",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.664618,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.005604,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003508,
+        "Amazon Relational Database Service": 1.532413,
+        "Amazon EC2 Container Registry (ECR)": 0.002733
+      },
+      "applications": {
+        "RealityChecker": 1.664618
+      },
+      "change_details": null,
+      "change_url": null
+    },
+    {
+      "date": "2026-10-24",
+      "application_name": "RealityChecker",
+      "gross_usd": 1.705949,
+      "net_usd": 0.0,
+      "currency": "USD",
+      "services": {
+        "AWS Lambda": 0.0,
+        "Amazon Bedrock": 0.0055,
+        "Amazon DynamoDB": 0.00036,
+        "AWS Cost Explorer": 0.12,
+        "Amazon Simple Storage Service": 0.003461,
+        "Amazon Relational Database Service": 1.573894,
+        "Amazon EC2 Container Registry (ECR)": 0.002733
+      },
+      "applications": {
+        "RealityChecker": 1.705949
+      },
+      "change_details": null,
+      "change_url": null
+    }
+  ],
+  "gross_trend": [
+    1.7059,
+    1.6646,
+    1.6695,
+    1.6742,
+    1.7486,
+    1.9475,
+    1.9448,
+    1.8491,
+    0.6936,
+    1.6898,
+    1.6345,
+    1.6335,
+    1.6355,
+    1.6346,
+    1.7074,
+    1.651,
+    1.6353,
+    1.5447,
+    1.9565,
+    1.9587,
+    1.9543,
+    1.9582,
+    1.8573,
+    1.8665,
+    0.6841,
+    0.7783,
+    0.9089,
+    1.3053,
+    0.9072,
+    1.8992
+  ],
+  "top_applications": [
+    {
+      "application_name": "RealityChecker",
+      "gross_usd": 47.2873,
+      "net_usd": 0.0,
+      "resource_count": 46,
+      "percent": 99.1,
+      "trend": [
+        1.705949,
+        1.664618,
+        1.669516,
+        1.674203,
+        1.748562,
+        1.947501,
+        1.944768,
+        1.849085,
+        0.693567,
+        1.689812,
+        1.63448,
+        1.633522,
+        1.63552,
+        1.63456,
+        1.70737,
+        1.650989,
+        1.635305,
+        1.544701,
+        1.956541,
+        1.958748,
+        1.954311,
+        1.958238,
+        1.857318,
+        1.866534,
+        0.68413,
+        0.77831,
+        0.908926,
+        1.305316,
+        0.907183,
+        1.487747
+      ]
+    },
+    {
+      "application_name": "CloudFrugality",
+      "gross_usd": 0.0,
+      "net_usd": 0.0,
+      "resource_count": 5,
+      "percent": 0.0,
+      "trend": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "application_name": "Observability-Demo",
+      "gross_usd": 0.0,
+      "net_usd": 0.0,
+      "resource_count": 27,
+      "percent": 0.0,
+      "trend": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "top_services": [
+    {
+      "service": "Amazon Relational Database Service",
+      "usd": 40.1904,
+      "trend": [
+        1.573894,
+        1.532413,
+        1.537487,
+        1.536635,
+        1.50225,
+        1.502096,
+        1.499825,
+        1.441668,
+        0.62809,
+        1.557049,
+        1.501524,
+        1.500434,
+        1.502297,
+        1.501469,
+        1.574475,
+        1.518,
+        1.502126,
+        1.253605,
+        1.501784,
+        1.502047,
+        1.499767,
+        1.502078,
+        1.4422,
+        1.50411,
+        0.521033,
+        0.615256,
+        0.649032,
+        1.034478,
+        0.672286,
+        1.581
+      ]
+    },
+    {
+      "service": "AmazonCloudWatch",
+      "usd": 4.1426,
+      "trend": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.113306,
+        0.31129,
+        0.312097,
+        0.27379,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.159166,
+        0.321667,
+        0.323333,
+        0.321667,
+        0.323333,
+        0.2825,
+        0.2305,
+        0.126667,
+        0.126667,
+        0.219167,
+        0.229583,
+        0.195,
+        0.2729
+      ]
+    },
+    {
+      "service": "AWS Cost Explorer",
+      "usd": 3.0,
+      "trend": [
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.06,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.03,
+        0.03,
+        0.03,
+        0.03,
+        0.03,
+        0.03
+      ]
+    },
+    {
+      "service": "Amazon Bedrock",
+      "usd": 0.1591,
+      "trend": [
+        0.0055,
+        0.005604,
+        0.005467,
+        0.005662,
+        0.005426,
+        0.005416,
+        0.005451,
+        0.005454,
+        0.002495,
+        0.005318,
+        0.005469,
+        0.005573,
+        0.005712,
+        0.005568,
+        0.005404,
+        0.005501,
+        0.005651,
+        0.00524,
+        0.005616,
+        0.005813,
+        0.00542,
+        0.005369,
+        0.005469,
+        0.00523,
+        0.00364,
+        0.003637,
+        0.005684,
+        0.005956,
+        0.00518,
+        0.0062
+      ]
+    },
+    {
+      "service": "Amazon Simple Storage Service",
+      "usd": 0.1034,
+      "trend": [
+        0.003461,
+        0.003508,
+        0.003466,
+        0.008807,
+        0.005266,
+        0.005082,
+        0.003573,
+        0.004638,
+        0.001326,
+        0.003507,
+        0.003548,
+        0.003576,
+        0.003573,
+        0.003586,
+        0.003553,
+        0.003551,
+        0.00359,
+        0.003372,
+        0.003536,
+        0.003616,
+        0.00352,
+        0.003519,
+        0.00351,
+        0.003417,
+        0.00085,
+        0.00081,
+        0.002015,
+        0.002017,
+        0.001882,
+        0.0037
+      ]
+    },
+    {
+      "service": "Amazon EC2 Container Registry (ECR)",
+      "usd": 0.095,
+      "trend": [
+        0.002733,
+        0.002733,
+        0.002733,
+        0.002733,
+        0.001954,
+        0.003255,
+        0.003462,
+        0.003174,
+        0.001491,
+        0.003577,
+        0.003577,
+        0.003577,
+        0.003577,
+        0.003577,
+        0.003577,
+        0.003577,
+        0.003577,
+        0.002987,
+        0.003577,
+        0.003577,
+        0.003577,
+        0.003577,
+        0.003279,
+        0.003221,
+        0.001938,
+        0.001938,
+        0.003026,
+        0.003279,
+        0.002832,
+        0.0053
+      ]
+    },
+    {
+      "service": "Amazon DynamoDB",
+      "usd": 0.0081,
+      "trend": [
+        0.00036,
+        0.00036,
+        0.000361,
+        0.000361,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.000165,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00033,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00036,
+        0.00036,
+        5.6e-05,
+        3e-06,
+        3e-06,
+        1e-06,
+        1e-06,
+        3e-06,
+        0.0
+      ]
+    },
+    {
+      "service": "AWS Secrets Manager",
+      "usd": 0.0,
+      "trend": [
+        0.0,
+        0.0,
+        0.0,
+        5e-06,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "service": "AWS Lambda",
+      "usd": 0.0,
+      "trend": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "latency_breakdown": {
+    "total_ms": 198.8,
+    "total_calls": 6,
+    "cold_resume": false,
+    "database_status": "Aurora Serverless v2 (Warm)",
+    "services": [
+      {
+        "service": "Amazon Aurora PostgreSQL",
+        "calls": 5,
+        "total_ms": 198.3,
+        "percent": 99.7,
+        "operations": {
+          "psycopg:connect [TCP connect]": 1,
+          "psycopg:connect [TLS handshake - TLSv1.3]": 1,
+          "psycopg:connect [Server IAM auth]": 1,
+          "Query daily_cost (30 days)": 1,
+          "Query resource_inventory count": 1
+        },
+        "sub_operations": [
+          {
+            "operation": "psycopg:connect [Server IAM auth]",
+            "calls": 1,
+            "total_ms": 108.9,
+            "percent_of_service": 54.9
+          },
+          {
+            "operation": "psycopg:connect [TLS handshake - TLSv1.3]",
+            "calls": 1,
+            "total_ms": 59.1,
+            "percent_of_service": 29.8
+          },
+          {
+            "operation": "psycopg:connect [TCP connect]",
+            "calls": 1,
+            "total_ms": 20.1,
+            "percent_of_service": 10.1
+          },
+          {
+            "operation": "Query daily_cost (30 days)",
+            "calls": 1,
+            "total_ms": 6.0,
+            "percent_of_service": 3.0
+          },
+          {
+            "operation": "Query resource_inventory count",
+            "calls": 1,
+            "total_ms": 4.2,
+            "percent_of_service": 2.1
+          }
+        ]
+      },
+      {
+        "service": "AWS RDS",
+        "calls": 1,
+        "total_ms": 0.5,
+        "percent": 0.3,
+        "operations": {
+          "rds:generate_db_auth_token": 1
+        },
+        "sub_operations": [
+          {
+            "operation": "rds:generate_db_auth_token",
+            "calls": 1,
+            "total_ms": 0.5,
+            "percent_of_service": 100.0
+          }
+        ]
+      }
+    ],
+    "tls_version": "TLSv1.3",
+    "tls_cipher": "TLS_AES_256_GCM_SHA384"
+  }
+}

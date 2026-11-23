@@ -1,0 +1,16 @@
+metric,value,notes
+Window Days,30,Rolling trailing calendar days
+Days Recorded,30,Complete daily collection runs
+Window Gross Spend (USD),47.6988,Pre-credit AWS consumption
+Window Net Spend (USD),0.0,Actual billed cost ($0.00 covered by AWS promotional credits)
+Currency,USD,United States Dollar
+Promotional Credits Granted (USD),200.0,AWS Promotional Credit Grant
+Promotional Credits Remaining (USD),140.28,Active remaining balance
+Promotional Credits Consumed (USD),58.58,Total consumed credits to date
+Credits Expiry Date,2027-04-17,145 days remaining runway
+Days Until Exhaustion,73,Estimated days before credit balance reaches $0
+Average Daily Gross (USD),1.8992,Daily burn rate
+Total Active Tracked Resources,78,Resources across 3 tagged applications
+Resources: RealityChecker,46,"Contract review agent, Aurora Postgres, Bedrock"
+Resources: Observability-Demo,27,CloudWatch synthetic canaries & OpenTelemetry
+Resources: CloudFrugality,5,Cost tracking Lambda & S3 data lake
