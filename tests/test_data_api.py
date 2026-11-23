@@ -143,3 +143,84 @@ def test_paginated_edge_cases(api_server):
     body = resp.json()
     assert "Unknown sort field: invalid_field" in body["message"]
 
+def test_multi_region_diversity(api_server):
+    resp = requests.get(f"{api_server}/ai/resource/paginated?page=1&pageSize=1000")
+    assert resp.status_code == 200
+    records = resp.json()["data"]["records"]
+    regions = set(r.get("region") for r in records)
+    workloads = set(r.get("workload_type") for r in records)
+
+    # Must contain multiple AWS regions
+    assert "us-east-1" in regions
+    assert "us-east-2" in regions
+    assert "eu-west-1" in regions
+    assert len(regions) >= 5
+
+    # Must contain multiple workload archetypes
+    assert "serverless_frugal" in workloads
+    assert "enterprise_microservices" in workloads
+    assert "ai_analytics_pipeline" in workloads
+    assert "global_web_edge" in workloads
+
+def test_1m_dataset_parquet_and_csv_files():
+    import duckdb
+    parquet_path = "data/aws_1m_usage.parquet"
+    csv_gz_path = "data/aws_1m_usage.csv.gz"
+    sample_csv_path = "data/aws_1m_sample.csv"
+
+    assert os.path.exists(parquet_path), "Parquet 1M dataset missing"
+    assert os.path.exists(csv_gz_path), "Gzipped CSV 1M dataset missing"
+    assert os.path.exists(sample_csv_path), "Sample CSV dataset missing"
+
+    # Query 1M parquet with DuckDB
+    con = duckdb.connect()
+    count = con.execute(f"SELECT COUNT(*) FROM '{parquet_path}'").fetchone()[0]
+    assert count == 1_000_000, f"Expected 1,000,000 rows in Parquet, got {count}"
+
+    # Verify multi-region distribution in Parquet
+    region_counts = con.execute(f"SELECT region, COUNT(*) FROM '{parquet_path}' GROUP BY region").fetchall()
+    assert len(region_counts) >= 9, f"Expected at least 9 regions, got {len(region_counts)}"
+
+def test_date_range_filtering_and_segmented_retrieval(api_server):
+    # Test 4 distinct quarterly/monthly time ranges
+    ranges = [
+        ("2026-10-01", "2026-10-31"),
+        ("2026-07-01", "2026-07-31"),
+        ("2026-04-01", "2026-04-30"),
+        ("2026-01-01", "2026-01-31"),
+    ]
+
+    all_dates = []
+    for start_d, end_d in ranges:
+        resp = requests.get(f"{api_server}/ai/resource/paginated?startDate={start_d}&endDate={end_d}&pageSize=100")
+        assert resp.status_code == 200
+        body = resp.json()
+        data = body["data"]
+        records = data["records"]
+        assert len(records) > 0
+
+        # Assert all records are strictly within the requested window
+        for r in records:
+            assert start_d <= r["date"] <= end_d, f"Record date {r['date']} outside [{start_d}, {end_d}]"
+            all_dates.append(r["date"])
+
+    # Across four distinct month ranges, date sets must have ZERO overlap (resolving feedback issue)
+    oct_dates = set(d for d in all_dates if d.startswith("2026-10"))
+    jul_dates = set(d for d in all_dates if d.startswith("2026-07"))
+    apr_dates = set(d for d in all_dates if d.startswith("2026-04"))
+    jan_dates = set(d for d in all_dates if d.startswith("2026-01"))
+
+    assert len(oct_dates.intersection(jul_dates)) == 0
+    assert len(jul_dates.intersection(apr_dates)) == 0
+    assert len(apr_dates.intersection(jan_dates)) == 0
+
+def test_sql_where_clause_filter(api_server):
+    resp = requests.get(f"{api_server}/ai/resource/paginated?where=date >= '2025-05-01' AND date <= '2025-05-31'&pageSize=50")
+    assert resp.status_code == 200
+    records = resp.json()["data"]["records"]
+    assert len(records) > 0
+    for r in records:
+        assert "2025-05-01" <= r["date"] <= "2025-05-31"
+
+
+

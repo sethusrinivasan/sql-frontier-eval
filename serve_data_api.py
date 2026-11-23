@@ -10,6 +10,7 @@ Supports CORS origins including https://bi-us-east-1.alibabacloud.com.
 import argparse
 import glob
 import json
+import math
 import os
 import sys
 import urllib.parse
@@ -29,7 +30,21 @@ ALLOWED_ORIGINS = [
 
 def load_dataset(resource: str, table_name: Optional[str] = None) -> List[Dict[str, Any]]:
     """Loads records for the requested resource."""
-    if resource in ("aws_daily", "real_aws_daily", "aws_usage", "costs", "usage"):
+    if resource in ("aws_1m", "1m", "multi_region", "aws_usage_1m"):
+        parquet_path = os.path.join(DATA_DIR, "aws_1m_usage.parquet")
+        sample_path = os.path.join(DATA_DIR, "aws_1m_sample.csv")
+        if os.path.exists(parquet_path):
+            try:
+                import duckdb
+                return duckdb.query(f"SELECT * FROM '{parquet_path}' LIMIT 10000").df().fillna("").to_dict(orient="records")
+            except Exception:
+                pass
+        if os.path.exists(sample_path):
+            df = pd.read_csv(sample_path)
+            return df.fillna("").to_dict(orient="records")
+        return []
+
+    elif resource in ("aws_daily", "real_aws_daily", "aws_usage", "costs", "usage"):
         csv_path = os.path.join(DATA_DIR, "real_aws_usage_daily.csv")
         if os.path.exists(csv_path):
             df = pd.read_csv(csv_path)
@@ -182,30 +197,148 @@ class AlibabaCloudDataAPIHandler(BaseHTTPRequestHandler):
             }).encode("utf-8"))
             return
 
-        # Paginated REST API endpoint serving 1M+ records per specification
+        # Paginated REST API endpoint serving 1M+ records per specification with Date Filtering
         if path in ("/ai/resource/paginated", "/api/resource/paginated"):
+            qp = {k.lower(): v for k, v in query_params.items()}
+
+            # Date range filters
+            start_date = None
+            end_date = None
+            for k in ("startdate", "start_date", "date_from", "from", "start", "min_date"):
+                if k in qp:
+                    start_date = qp[k][0].split("T")[0].split(" ")[0].strip()
+                    break
+            for k in ("enddate", "end_date", "date_to", "to", "end", "max_date"):
+                if k in qp:
+                    end_date = qp[k][0].split("T")[0].split(" ")[0].strip()
+                    break
+            if "date" in qp:
+                d_val = qp["date"][0].strip()
+                if "," in d_val:
+                    parts = d_val.split(",")
+                    start_date, end_date = parts[0].strip(), parts[1].strip()
+                else:
+                    start_date, end_date = d_val, d_val
+
+            # SQL WHERE clause parsing if passed
+            raw_filter = qp.get("where", qp.get("filter", [""]))[0]
+            if raw_filter:
+                import re
+                m_start = re.search(r"date\s*(?:>=|>|=)\s*['\"]?(\d{4}-\d{2}-\d{2})['\"]?", raw_filter, re.I)
+                if m_start:
+                    start_date = m_start.group(1)
+                m_end = re.search(r"date\s*(?:<=|<|=)\s*['\"]?(\d{4}-\d{2}-\d{2})['\"]?", raw_filter, re.I)
+                if m_end:
+                    end_date = m_end.group(1)
+
+            region_filter = qp.get("region", [None])[0]
+
             try:
-                page_val = int(query_params.get("page", [1])[0])
+                page_val = int(qp.get("page", qp.get("pagenum", [1]))[0])
             except (ValueError, TypeError):
                 page_val = 1
 
             try:
-                raw_page_size = query_params.get("pageSize", [None])[0]
+                raw_page_size = qp.get("pagesize", qp.get("page_size", qp.get("limit", [None])))[0]
                 page_size_val = int(raw_page_size) if raw_page_size is not None else 1000
             except (ValueError, TypeError):
                 page_size_val = 1000
 
-            sort_by = query_params.get("sort_by", ["date"])[0]
-            sort_order = query_params.get("sort_order", ["desc"])[0]
+            if "offset" in qp:
+                try:
+                    off_val = int(qp["offset"][0])
+                    page_val = (off_val // max(1, page_size_val)) + 1
+                except (ValueError, TypeError):
+                    pass
 
-            from paginator import get_paginated_records
+            sort_by = qp.get("sort_by", ["date"])[0]
+            sort_order = qp.get("sort_order", ["desc"])[0]
 
-            paginated_data, err_msg = get_paginated_records(
-                page=page_val,
-                page_size=page_size_val,
-                sort_by=sort_by,
-                sort_order=sort_order,
-            )
+            parquet_path = os.path.join(DATA_DIR, "aws_1m_usage.parquet")
+            paginated_data = None
+            err_msg = None
+
+            if page_size_val <= 0:
+                err_msg = "pageSize must be >= 1"
+            elif sort_by not in ("date", "gross_usd", "region", "workload_type"):
+                err_msg = f"Unknown sort field: {sort_by}"
+            elif os.path.exists(parquet_path):
+                try:
+                    import duckdb
+                    effective_page_size = min(page_size_val, 10000)
+                    where_clauses = []
+                    if start_date:
+                        where_clauses.append(f"date >= '{start_date}'")
+                    if end_date:
+                        where_clauses.append(f"date <= '{end_date}'")
+                    if region_filter:
+                        where_clauses.append(f"region = '{region_filter}'")
+
+                    where_str = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+                    con = duckdb.connect()
+
+                    if where_str:
+                        total = con.execute(f"SELECT COUNT(*) FROM '{parquet_path}' {where_str}").fetchone()[0]
+                    else:
+                        total = 1_000_000
+
+                    total_pages = math.ceil(total / effective_page_size) if total > 0 else 0
+                    if page_val > total_pages:
+                        paginated_data = {
+                            "total": total,
+                            "page": page_val,
+                            "pageSize": 0,
+                            "totalPages": total_pages,
+                            "hasNext": False,
+                            "hasPrev": page_val > 1,
+                            "records": [],
+                        }
+                    else:
+                        offset = (page_val - 1) * effective_page_size
+                        order_dir = sort_order.upper() if sort_order.lower() in ("asc", "desc") else "DESC"
+                        data_sql = f"""
+                            SELECT date, region, workload_type, gross_usd, color_class, status_label, top_5_services_json, raw_services_json
+                            FROM '{parquet_path}'
+                            {where_str}
+                            ORDER BY {sort_by} {order_dir}
+                            LIMIT {effective_page_size} OFFSET {offset}
+                        """
+                        rows = con.execute(data_sql).fetchall()
+                        records = []
+                        for r in rows:
+                            top5 = json.loads(r[6]) if isinstance(r[6], str) else r[6]
+                            raw = json.loads(r[7]) if isinstance(r[7], str) else r[7]
+                            records.append({
+                                "date": r[0],
+                                "region": r[1],
+                                "workload_type": r[2],
+                                "gross_usd": float(r[3]),
+                                "color_class": r[4],
+                                "status_label": r[5],
+                                "top_5_services": top5,
+                                "raw_services": raw,
+                            })
+                        paginated_data = {
+                            "total": total,
+                            "page": page_val,
+                            "pageSize": len(records),
+                            "totalPages": total_pages,
+                            "hasNext": page_val < total_pages,
+                            "hasPrev": page_val > 1,
+                            "records": records,
+                        }
+                except Exception as exc:
+                    err_msg = None
+                    paginated_data = None
+
+            if paginated_data is None and err_msg is None:
+                from paginator import get_paginated_records
+                paginated_data, err_msg = get_paginated_records(
+                    page=page_val,
+                    page_size=page_size_val,
+                    sort_by=sort_by,
+                    sort_order=sort_order,
+                )
 
             if err_msg:
                 err_bytes = json.dumps({"code": 400, "message": err_msg}).encode("utf-8")
@@ -250,7 +383,11 @@ class AlibabaCloudDataAPIHandler(BaseHTTPRequestHandler):
 
         # If direct CSV requested
         if fmt == "csv":
-            if resource == "leaderboard":
+            if resource in ("aws_1m", "1m", "multi_region", "aws_usage_1m"):
+                csv_file = os.path.join(DATA_DIR, "aws_1m_sample.csv")
+            elif resource in ("aws_daily", "real_aws_daily", "costs", "usage"):
+                csv_file = os.path.join(DATA_DIR, "real_aws_usage_daily.csv")
+            elif resource == "leaderboard":
                 csv_file = os.path.join(DATA_DIR, "benchmark_leaderboard.csv")
             elif resource == "fixtures" and table_name:
                 csv_file = os.path.join(FIXTURES_DIR, f"{table_name}.csv")
