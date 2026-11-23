@@ -1,0 +1,2 @@
+depth,service,upstream_service,upstream_status,upstream_error_rate
+3,fraud-evaluator,redis-cache,CRITICAL_DOWN,1.0

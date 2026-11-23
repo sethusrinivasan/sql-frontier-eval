@@ -1,0 +1,5 @@
+event_id,event_timestamp,payload
+1,2025-12-31 23:59:59,old
+2,2026-01-01 00:00:00,target_start
+3,2026-06-15 12:00:00,target_mid
+4,2027-01-01 00:00:00,out_of_bounds

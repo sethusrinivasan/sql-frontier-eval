@@ -1,0 +1,5 @@
+item_a,item_b,support,confidence,lift
+Bread,Butter,0.5,0.6667,1.3333
+Bread,Milk,0.5,0.6667,1.3333
+Butter,Bread,0.5,1.0,1.3333
+Milk,Bread,0.5,1.0,1.3333

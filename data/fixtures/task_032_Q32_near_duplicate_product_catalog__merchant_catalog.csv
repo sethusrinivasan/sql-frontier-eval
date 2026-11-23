@@ -1,0 +1,4 @@
+sku_id,merchant,title,price,vector
+1,Merchant A,Sony WH-1000XM5 Noise-Cancelling Headphones,349.99,[0.95 0.1  0.05]
+2,Merchant B,Sony WH1000XM5 Wireless Headset - Black,339.0,[0.94 0.12 0.04]
+3,Merchant C,Sony Headphone Replacement Ear Cushions,29.99,[0.88 0.2  0.1 ]

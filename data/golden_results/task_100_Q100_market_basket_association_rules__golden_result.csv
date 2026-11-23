@@ -1,0 +1,5 @@
+item_a,item_b,pair_baskets,support,confidence,lift
+Bread,Butter,2,0.5,0.667,1.333
+Bread,Milk,2,0.5,0.667,1.333
+Butter,Bread,2,0.5,1.0,1.333
+Milk,Bread,2,0.5,1.0,1.333

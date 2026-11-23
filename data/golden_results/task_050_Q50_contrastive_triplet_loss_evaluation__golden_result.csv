@@ -1,0 +1,3 @@
+triplet_id,dist_pos,dist_neg,triplet_margin_loss,evaluation_status
+1,0.0707,1.2728,0.0,SATISFIED
+2,0.7071,0.1414,0.7657,VIOLATION

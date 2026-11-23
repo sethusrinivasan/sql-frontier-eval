@@ -240,6 +240,32 @@ python generate_reports.py \
     --target-rows 1000000
 ```
 
+### 4. CSV Dataset & Alibaba Cloud Quick BI Compatible Data API
+
+All generated fixture tables, golden execution outputs, and model leaderboards are tracked in CSV format in the [`data/`](data/) folder:
+* **[`data/benchmark_leaderboard.csv`](data/benchmark_leaderboard.csv)**: Multi-model evaluation scores across DuckDB 2.0 and PostgreSQL 18.7.
+* **[`data/benchmark_tasks.csv`](data/benchmark_tasks.csv)**: Full catalog of all 120 analytical benchmark tasks and trap descriptions.
+* **[`data/fixtures/`](data/fixtures/)**: 148 CSV datasets containing all underlying table fixtures generated across the benchmark suite.
+* **[`data/golden_results/`](data/golden_results/)**: 120 CSV reference outputs produced by ground-truth golden queries.
+
+To refresh or regenerate the CSV datasets:
+```bash
+python scripts/export_csv_data.py
+```
+
+To expose the benchmark datasets via an HTTP service compliant with **Alibaba Cloud Quick BI Custom Data API specifications** (including CORS support for `https://bi-us-east-1.alibabacloud.com/ai/resource`):
+```bash
+python serve_data_api.py --port 8088
+```
+
+Key Endpoints:
+* **`GET /ai/resource`**: Connect directly from Alibaba Cloud Quick BI with standard `{ code: 200, message: "success", data: { total, records } }` payload.
+* **`GET /api/leaderboard`**: Returns model scorecards and engine latencies.
+* **`GET /api/tasks`**: Returns all 120 analytical benchmark tasks.
+* **`GET /ai/resource?resource=fixtures&table=<table_name>`**: Returns records for any specific fixture table.
+* **`GET /ai/resource?format=csv`**: Returns raw CSV format.
+* **`OPTIONS /ai/resource`**: Automatic CORS preflight with full headers for `https://bi-us-east-1.alibabacloud.com`.
+
 ---
 
 ## 🛠️ Running the Test Suite

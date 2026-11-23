@@ -1,0 +1,4 @@
+doc_id,title,norm_bm25,norm_vec,convex_hybrid_score
+101,Data Warehousing Fundamentals,1.0,0.6818,0.8409
+102,Columnar Storage Internals,0.25,1.0,0.625
+103,SQL Query Optimization,0.0,0.0,0.0

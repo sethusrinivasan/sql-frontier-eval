@@ -1,0 +1,4 @@
+curr_start,curr_mid1,curr_mid2,curr_end,loop_multiplier,profit_margin_pct
+JPY,USD,EUR,JPY,1.0157,1.57
+USD,EUR,JPY,USD,1.0157,1.57
+EUR,JPY,USD,EUR,1.0157,1.57

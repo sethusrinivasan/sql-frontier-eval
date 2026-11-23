@@ -1,0 +1,2 @@
+kb_id,content,sim_score,rank_pos,match_type
+2,DuckDB vector execution engine,0.9271,1,CONFIDENT_MATCH

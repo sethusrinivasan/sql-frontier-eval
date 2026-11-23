@@ -1,0 +1,4 @@
+service,depends_on
+checkout-api,payment-gateway
+payment-gateway,fraud-evaluator
+fraud-evaluator,redis-cache

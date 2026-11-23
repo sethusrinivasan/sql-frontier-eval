@@ -1,0 +1,9 @@
+event_id,user_id,event_name,event_time
+1,1,view_item,2025-01-01 10:00:00
+2,1,add_to_cart,2025-01-01 10:05:00
+3,1,purchase,2025-01-01 10:10:00
+4,2,view_item,2025-01-01 11:00:00
+5,2,add_to_cart,2025-01-01 11:15:00
+6,3,view_item,2025-01-01 12:00:00
+7,4,purchase,2025-01-01 08:00:00
+8,4,view_item,2025-01-01 09:00:00

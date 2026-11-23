@@ -1,0 +1,4 @@
+txn_id,currency,amount,rate_to_usd,amount_usd
+1,EUR,100.0,1.05,105.0
+2,EUR,200.0,1.08,216.0
+3,GBP,50.0,1.25,62.5

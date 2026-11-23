@@ -1,0 +1,5 @@
+entry_id,account_id,action,reverses_entry_id,amount
+1,100,PAYMENT,,500.0
+2,100,PAYMENT,,200.0
+3,100,PAYMENT,,150.0
+4,100,REVERSAL,2,-200.0

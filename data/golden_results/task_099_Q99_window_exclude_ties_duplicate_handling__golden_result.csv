@@ -1,0 +1,5 @@
+player_id,score,cumulative_score_excluding_tied_peers
+1,500,500.0
+2,450,950.0
+3,450,950.0
+4,300,1700.0

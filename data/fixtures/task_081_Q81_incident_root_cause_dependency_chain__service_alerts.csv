@@ -1,0 +1,5 @@
+service,status,error_rate
+checkout-api,DEGRADED,0.15
+payment-gateway,DEGRADED,0.2
+fraud-evaluator,DEGRADED,0.85
+redis-cache,CRITICAL_DOWN,1.0

@@ -1,0 +1,6 @@
+emp_id,emp_name,manager_id
+1,Alice (CEO),
+2,Bob (VP Eng),1
+3,Charlie (VP Sales),1
+4,David (Staff Eng),2
+5,Eve (Senior Eng),4

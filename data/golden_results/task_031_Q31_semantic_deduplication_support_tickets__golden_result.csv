@@ -1,0 +1,4 @@
+primary_ticket_id,primary_subject,duplicate_ticket_id,duplicate_subject,similarity
+1,Cannot log into customer portal,2,Portal login failing with 500 error,0.9997
+1,Cannot log into customer portal,4,Unable to authenticate on website,0.9997
+2,Portal login failing with 500 error,4,Unable to authenticate on website,0.9993

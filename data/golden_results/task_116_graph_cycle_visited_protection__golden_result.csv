@@ -1,0 +1,4 @@
+task_id,min_depth
+COMPILE_LIB,1
+TEST_SUITE,2
+PACKAGE_APP,3

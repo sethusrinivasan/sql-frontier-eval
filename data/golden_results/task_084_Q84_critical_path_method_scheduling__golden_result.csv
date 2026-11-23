@@ -1,0 +1,2 @@
+task_code,critical_path_duration,path_str
+DEPLOY,40,START -> DESIGN -> BUILD_BACKEND -> DEPLOY

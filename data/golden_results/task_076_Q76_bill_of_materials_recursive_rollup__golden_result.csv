@@ -1,0 +1,5 @@
+child_part,total_qty,depth
+BATTERY_PACK,1,1
+CHASSIS,1,1
+BATTERY_MODULE,4,2
+LITHIUM_CELL,400,3

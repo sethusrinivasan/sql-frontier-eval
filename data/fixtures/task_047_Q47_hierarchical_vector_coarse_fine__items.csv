@@ -1,0 +1,4 @@
+item_id,dept_id,item_name,item_vector
+101,1,Noise-canceling earphones,[0.92 0.08]
+102,1,USB-C Cable,[0.85 0.15]
+201,2,Lawn Mower,[0.12 0.88]

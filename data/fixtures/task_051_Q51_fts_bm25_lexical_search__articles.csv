@@ -1,0 +1,4 @@
+doc_id,title,body
+1,Fast Columnar Databases,DuckDB is a vectorized analytical database designed for fast analytics.
+2,Postgres Tuning Guide,Relational database indexing and buffer pool optimization.
+3,Vector Search Frontiers,Combining dense vector embeddings with sparse BM25 indexing.

@@ -1,0 +1,4 @@
+article_id,headline,query_relevance,redundancy_with_top1,mmr_score
+1,Fed cuts interest rates by 25 bps,0.9987,1.0,0.3991
+2,Central bank lowers benchmark 25 bps,0.9981,0.9999,0.3987
+3,Tech stock rally follows monetary shift,0.8716,0.8952,0.3415

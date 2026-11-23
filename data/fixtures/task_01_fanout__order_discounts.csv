@@ -1,0 +1,3 @@
+discount_id,order_id,amount
+1,101,10.0
+2,101,5.0

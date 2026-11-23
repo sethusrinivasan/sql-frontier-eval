@@ -1,0 +1,2 @@
+origin,destination,total_cost,route_path,hops
+SEA,JFK,650.0,SEA -> DEN -> JFK,2

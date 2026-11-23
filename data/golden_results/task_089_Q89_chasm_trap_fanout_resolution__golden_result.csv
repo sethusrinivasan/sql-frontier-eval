@@ -1,0 +1,2 @@
+customer_id,total_gross_sales,total_discount_amount,total_shipping_fees,net_revenue
+1,100.0,15.0,10.0,95.0

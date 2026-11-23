@@ -1,0 +1,4 @@
+host_id,captured_date,metric_name,metric_value
+srv-01,2026-03-01,cpu_metric,45.2
+srv-01,2026-03-01,mem_metric,78.5
+srv-01,2026-03-01,disk_metric,92.1

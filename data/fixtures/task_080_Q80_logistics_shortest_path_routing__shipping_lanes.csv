@@ -1,0 +1,5 @@
+origin,destination,cost
+SEA,ORD,400.0
+ORD,JFK,300.0
+SEA,DEN,200.0
+DEN,JFK,450.0

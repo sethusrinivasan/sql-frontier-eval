@@ -1,0 +1,5 @@
+tx_id,outlier_score,classification
+4,14.0997,ANOMALOUS_OUTLIER
+2,0.0404,NORMAL
+1,0.0335,NORMAL
+3,0.0292,NORMAL

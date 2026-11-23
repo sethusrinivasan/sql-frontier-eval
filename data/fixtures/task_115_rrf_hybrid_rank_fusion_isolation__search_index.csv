@@ -1,0 +1,4 @@
+doc_id,title,bm25_raw,vec
+1,PostgreSQL Manual,450.0,[0.1 0.9]
+2,DuckDB Architecture,80.0,[0.95 0.05]
+3,Vector Search Guide,60.0,[0.99 0.01]

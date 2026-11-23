@@ -1,0 +1,4 @@
+product_id,product_name,norm_vector
+1,Ultra Laptop,[0.8 0.6 0. ]
+2,Smart Phone,[0.6 0.8 0. ]
+3,Coffee Maker,[0. 0. 1.]

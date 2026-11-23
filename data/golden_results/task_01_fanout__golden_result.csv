@@ -1,0 +1,2 @@
+merchant_id,merchant_name,total_gross_sales,total_discount_amount,total_shipping_fees
+1,Acme Electronics,100.0,15.0,10.0

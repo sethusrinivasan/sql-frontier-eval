@@ -1,0 +1,4 @@
+chunk_id,doc_id,doc_title,chunk_text,vec
+101,1,Manual A,Setup guide section 1,[0.95 0.1 ]
+102,1,Manual A,Setup guide section 2,[0.92 0.15]
+103,2,Manual B,Troubleshooting section 1,[0.88 0.2 ]

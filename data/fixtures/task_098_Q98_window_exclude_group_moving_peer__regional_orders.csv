@@ -1,0 +1,5 @@
+region,order_id,sale_amount
+North,1,100.0
+North,2,120.0
+South,3,200.0
+East,4,150.0

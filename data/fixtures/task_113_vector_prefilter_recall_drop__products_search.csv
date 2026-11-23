@@ -1,0 +1,6 @@
+item_id,category,price,in_stock,vec
+1,electronics,150.0,True,[0.99 0.01]
+2,clothing,20.0,True,[0.98 0.02]
+3,electronics,45.0,False,[0.95 0.05]
+4,electronics,35.0,True,[0.7 0.3]
+5,electronics,25.0,True,[0.65 0.35]

@@ -1,0 +1,4 @@
+article_id,category,vec
+1,tech,[0.9 0.1]
+2,tech,[0.8 0.2]
+3,hr,[0.1 0.9]

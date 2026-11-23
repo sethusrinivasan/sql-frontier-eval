@@ -1,0 +1,4 @@
+item_id,title,img_sim,txt_sim,joint_multimodal_score
+1,Silk Floral Summer Dress,0.9996,0.9997,0.9996
+2,Cotton Floral Blouse,0.9944,0.877,0.9474
+3,Leather Biker Jacket,0.321,0.0866,0.2272

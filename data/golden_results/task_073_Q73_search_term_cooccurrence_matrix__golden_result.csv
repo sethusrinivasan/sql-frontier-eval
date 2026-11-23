@@ -1,0 +1,5 @@
+term_a,term_b,cooccurrence_count
+laptop,mouse,2
+backpack,laptop,1
+backpack,mouse,1
+keyboard,laptop,1

@@ -1,0 +1,5 @@
+item_id,title,specs
+1,MacBook Pro 16,"{""brand"": ""Apple"", ""ram"": ""32GB"", ""screen"": 16}"
+2,MacBook Air 13,"{""brand"": ""Apple"", ""ram"": ""16GB"", ""screen"": 13}"
+3,XPS 15 Laptop,"{""brand"": ""Dell"",  ""ram"": ""16GB"", ""screen"": 15}"
+4,ThinkPad X1,"{""brand"": ""Lenovo"",""ram"": ""16GB"", ""screen"": 14}"

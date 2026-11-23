@@ -1,0 +1,4 @@
+from_curr,to_curr,exchange_rate
+USD,EUR,0.92
+EUR,JPY,160.0
+JPY,USD,0.0069

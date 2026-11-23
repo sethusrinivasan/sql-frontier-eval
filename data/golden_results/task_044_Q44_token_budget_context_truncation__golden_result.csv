@@ -1,0 +1,3 @@
+chunk_id,token_count,cumulative_tokens,similarity_score
+1,400,400.0,0.9986
+2,350,750.0,0.9939

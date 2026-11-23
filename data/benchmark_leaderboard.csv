@@ -1,0 +1,15 @@
+model,engine,pass_rate_pct,tasks_passed,total_tasks,avg_model_latency_s,engine_exec_latency_ms,primary_failure_modes
+Claude Opus 4.6 (Thinking),DuckDB 2.0,98.3,118,120,14.8,219.4,Recursive cycle boundary edge cases
+Gemini 3.8 Flash (Medium),DuckDB 2.0,96.7,116,120,12.4,224.1,"Sliding window trimmed mean, graph recursion guard"
+Gemini 3.8 Flash (Low),DuckDB 2.0,95.8,115,120,4.6,232.2,"Bitemporal limit, FX arbitrage edge cases"
+Claude Sonnet 4.6 (Thinking),DuckDB 2.0,94.2,113,120,9.1,228.6,"Strict funnel scalar join precedence, linear interpolation"
+Gemini 3.8 Flash (High),DuckDB 2.0,92.5,111,120,38.6,236.4,Reasoning timeouts on microsecond ASOF bounds
+GPT-OSS 120B (Medium),DuckDB 2.0,90.8,109,120,8.2,245.8,Unbounded recursive CTE cycles & quadratic non-equi joins
+Golden Ground Truth Baseline,DuckDB 2.0,100.0,120,120,0.0,217.8,None (0% False Negatives)
+Claude Opus 4.6 (Thinking),PostgreSQL 18.7,96.7,116,120,15.2,184.2,"Window frame default exclusions, strict funnel scalar join precedence"
+Gemini 3.8 Flash (Medium),PostgreSQL 18.7,95.0,114,120,12.8,192.5,"Rolling distinct interval merge, recursive path string format normalization"
+Gemini 3.8 Flash (Low),PostgreSQL 18.7,93.3,112,120,4.8,198.7,"Bracket array syntax divergences, bitemporal point-in-time join precision"
+Claude Sonnet 4.6 (Thinking),PostgreSQL 18.7,91.7,110,120,9.4,205.1,Missing covering indexes causing nested loop degradation
+Gemini 3.8 Flash (High),PostgreSQL 18.7,89.2,107,120,39.1,211.2,Timeout on Cartesian nested loop scans
+GPT-OSS 120B (Medium),PostgreSQL 18.7,87.5,105,120,8.5,219.8,Infinite recursion in recursive CTEs lacking CYCLE clause
+Golden Ground Truth Baseline,PostgreSQL 18.7,100.0,120,120,0.0,178.4,None (0% False Negatives)

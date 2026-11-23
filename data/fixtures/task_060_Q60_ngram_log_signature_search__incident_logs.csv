@@ -1,0 +1,4 @@
+log_id,error_message
+1,java.lang.NullPointerException at com.app.auth.LoginService.verify
+2,org.postgresql.util.PSQLException: Connection refused
+3,java.lang.OutOfMemoryError: Java heap space

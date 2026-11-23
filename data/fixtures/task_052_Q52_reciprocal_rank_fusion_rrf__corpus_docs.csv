@@ -1,0 +1,4 @@
+doc_id,title,lexical_score,vec
+1,DuckDB Vector Search Guide,12.5,[0.95 0.05]
+2,Postgres HNSW Extension,14.2,[0.7 0.3]
+3,Deep Learning Embeddings,2.1,[0.92 0.1 ]

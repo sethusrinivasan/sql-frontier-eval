@@ -1,0 +1,4 @@
+channel,first_touch_revenue,last_touch_revenue,linear_touch_revenue
+Email Promo,0.0,300.0,100.0
+Facebook Ad,0.0,0.0,100.0
+Google Search,300.0,0.0,100.0

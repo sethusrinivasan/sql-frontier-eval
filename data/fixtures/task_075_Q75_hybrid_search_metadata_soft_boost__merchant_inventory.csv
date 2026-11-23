@@ -1,0 +1,4 @@
+item_id,category,title,merchant_rating,is_available
+1,Audio,Pro Studio Monitor Headphones,4.9,True
+2,Audio,Budget Studio Headphones,3.8,True
+3,Audio,Discontinued Vintage Headphones,4.8,False

@@ -1,0 +1,3 @@
+doc_id,doc_title,chunk_id,chunk_text,chunk_score
+1,Manual A,101,Setup guide section 1,0.9945
+2,Manual B,103,Troubleshooting section 1,0.9751

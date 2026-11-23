@@ -1,0 +1,4 @@
+asset_id,name,pos_sim,neg_sim,net_guided_score
+1,Sharp Neon Skyline,0.9939,0.1104,0.9387
+2,Blurry Neon Streetscape,0.7526,0.6585,0.4233
+3,Rustic Wooden Cabin,0.0,1.0,-0.5

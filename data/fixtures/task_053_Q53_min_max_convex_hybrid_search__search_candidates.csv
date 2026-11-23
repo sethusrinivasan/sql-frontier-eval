@@ -1,0 +1,4 @@
+doc_id,title,raw_bm25,vector_sim
+101,Data Warehousing Fundamentals,25.0,0.85
+102,Columnar Storage Internals,10.0,0.92
+103,SQL Query Optimization,5.0,0.7

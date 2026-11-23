@@ -1,0 +1,3 @@
+query_id,query_text,query_vector
+1,where to purchase macbook pro,[0.88 0.15]
+2,how does duckdb storage work,[0.15 0.85]

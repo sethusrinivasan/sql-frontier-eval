@@ -1,0 +1,5 @@
+user_id,event_time,action,raw_session_id,minutes_since_session_start
+1,2026-03-01 00:00:00,ping,1.0,0
+1,2026-03-01 02:00:00,ping,2.0,0
+1,2026-03-01 04:30:00,ping,3.0,0
+1,2026-03-01 04:45:00,ping,3.0,15

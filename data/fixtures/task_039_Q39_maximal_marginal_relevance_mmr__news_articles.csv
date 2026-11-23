@@ -1,0 +1,4 @@
+article_id,headline,vec
+1,Fed cuts interest rates by 25 bps,[0.99 0.05]
+2,Central bank lowers benchmark 25 bps,[0.98 0.06]
+3,Tech stock rally follows monetary shift,[0.8  0.45]

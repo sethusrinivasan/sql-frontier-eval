@@ -1,0 +1,4 @@
+rate_id,currency,rate_to_usd,valid_from,valid_to
+10,EUR,1.05,2025-01-01,2025-01-15
+11,EUR,1.08,2025-01-15,
+12,GBP,1.25,2025-01-01,

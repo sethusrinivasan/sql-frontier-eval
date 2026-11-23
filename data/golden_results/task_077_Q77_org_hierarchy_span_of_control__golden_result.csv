@@ -1,0 +1,6 @@
+emp_id,emp_name,hierarchy_level,reporting_path
+1,Alice (CEO),1,Alice (CEO)
+2,Bob (VP Eng),2,Alice (CEO) -> Bob (VP Eng)
+3,Charlie (VP Sales),2,Alice (CEO) -> Charlie (VP Sales)
+4,David (Staff Eng),3,Alice (CEO) -> Bob (VP Eng) -> David (Staff Eng)
+5,Eve (Senior Eng),4,Alice (CEO) -> Bob (VP Eng) -> David (Staff Eng) -> Eve (Senior Eng)

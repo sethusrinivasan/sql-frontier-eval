@@ -1,0 +1,3 @@
+parent_node,child_node,allocation_pct,raw_parent_cost,allocated_cost
+K8S_SHARED,PRODUCT_SEARCH,0.6,10000.0,6000.0
+K8S_SHARED,PRODUCT_CHECKOUT,0.4,10000.0,4000.0

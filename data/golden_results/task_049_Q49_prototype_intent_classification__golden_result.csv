@@ -1,0 +1,3 @@
+query_id,query_text,predicted_intent,confidence
+1,where to purchase macbook pro,TRANSACTIONAL_BUY,0.9983
+2,how does duckdb storage work,INFORMATIONAL_FAQ,0.998

@@ -1,0 +1,4 @@
+doc_id,d_token_id,token_text,vec
+10,1,quick,[0.9 0.1]
+10,2,relational,[0.1  0.85]
+10,3,store,[0.2 0.7]

@@ -1,0 +1,3 @@
+post_id,content
+1,In this tutorial we demonstrate high performance data analysis. The key feature of DuckDB is vectorized execution which processes data in columnar chunks for maximum CPU cache locality.
+2,PostgreSQL is an advanced open source relational database with robust ACID transaction support.

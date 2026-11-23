@@ -1,0 +1,4 @@
+tenure_months,number_at_risk,churn_count,interval_survival_rate
+1,3,1.0,0.6667
+2,2,1.0,0.5
+3,1,0.0,1.0

@@ -1,0 +1,3 @@
+cart_id,discounts_applied,item_prices
+1,[ 5 15 25],[100.  50.  20.]
+2,[ 0 10],[200.  80.]
