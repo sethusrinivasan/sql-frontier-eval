@@ -79,6 +79,10 @@ def adapt_to_databricks(sql: str) -> str:
     # Convert unparameterized VARCHAR and TEXT to STRING
     res = re.sub(r"\bVARCHAR\b(?!\s*\()", "STRING", res, flags=re.IGNORECASE)
     res = re.sub(r"\bTEXT\b", "STRING", res, flags=re.IGNORECASE)
+    # Convert fixed-size or bracketed array types FLOAT[N] -> ARRAY<FLOAT>
+    res = re.sub(r"\bFLOAT\[\d+\]", "ARRAY<FLOAT>", res, flags=re.IGNORECASE)
+    res = re.sub(r"\bDOUBLE\[\d+\]", "ARRAY<DOUBLE>", res, flags=re.IGNORECASE)
+    res = re.sub(r"\bINT(EGER)?\[\d*\]", "ARRAY<INT>", res, flags=re.IGNORECASE)
     # Convert square-bracket float/number array literals [0.1, 0.2] to array(0.1, 0.2)
     res = re.sub(r"(?<![A-Za-z0-9_])\[\s*([0-9\.\,\s\-]+)\s*\]", r"array(\1)", res)
     # Databricks date_diff expects unquoted unit: date_diff('second', a, b) -> date_diff(SECOND, a, b)

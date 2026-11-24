@@ -47,7 +47,8 @@ Modern text-to-SQL benchmarks (such as Spider and BIRD) predominantly evaluate t
 | **Gemini 3.8 Flash (Low)** | **100.0%** | **8 / 8** | **4.7s** | **284.1 ms** | Clean zero-fanout pre-aggregation, ANSI window framing, point-in-time logic |
 | **Gemini 3.8 Flash (Medium)** | **87.5%** | **7 / 8** | 27.4s | **265.4 ms** | 1 failure on sessionization inactivity gap syntax on Spark SQL |
 | **GPT-OSS 120B (Medium)** | **87.5%** | **7 / 8** | 12.0s | **251.8 ms** | 1 failure on sequential funnel conversion step precedence syntax |
-| **Golden Ground Truth Baseline** | **100.0%** | **8 / 8** | N/A | **245.3 ms** | Verified on Databricks Serverless Warehouse with dialect adapter (`VARCHAR` -> `STRING`, `explode(sequence(...))`) |
+| **Core Traps Baseline** | **100.0%** | **8 / 8** | N/A | **245.3 ms** | Verified on Databricks Serverless Warehouse with dialect adapter (`VARCHAR` -> `STRING`, `explode(sequence(...))`) |
+| **Full 120-Task Suite Audit** | **59.2%** | **71 / 120** | N/A | **468.2 ms** | 71/120 tasks passed natively; 49 tasks isolated Spark SQL dialect boundaries (27 vector math UDFs, 4 window `EXCLUDE`, 3 serverless ASOF joins, 2 recursive CTE paths, 2 PIVOT/UNPIVOT) |
 
 ---
 
