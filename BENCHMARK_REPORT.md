@@ -42,7 +42,11 @@ Modern text-to-SQL benchmarks (such as Spider and BIRD) predominantly evaluate t
 
 | Model / Baseline | Pass Rate | Correct / Total | Avg Model Latency | Engine Exec Latency | Primary Analytical Failure Modes & Dialect Notes |
 |---|:---:|:---:|:---:|:---:|---|
+| **Claude Opus 4.6 (Thinking)** | **100.0%** | **8 / 8** | 12.0s | **238.2 ms** | Flawless analytical translation; correctly synthesized CTE pre-aggregations & ANSI window frames |
+| **Claude Sonnet 4.6 (Thinking)** | **100.0%** | **8 / 8** | 12.5s | **242.6 ms** | Robust point-in-time joins, anti-joins, and non-SARGable date predicate handling |
 | **Gemini 3.8 Flash (Low)** | **100.0%** | **8 / 8** | **4.7s** | **284.1 ms** | Clean zero-fanout pre-aggregation, ANSI window framing, point-in-time logic |
+| **Gemini 3.8 Flash (Medium)** | **87.5%** | **7 / 8** | 27.4s | **265.4 ms** | 1 failure on sessionization inactivity gap syntax on Spark SQL |
+| **GPT-OSS 120B (Medium)** | **87.5%** | **7 / 8** | 12.0s | **251.8 ms** | 1 failure on sequential funnel conversion step precedence syntax |
 | **Golden Ground Truth Baseline** | **100.0%** | **8 / 8** | N/A | **245.3 ms** | Verified on Databricks Serverless Warehouse with dialect adapter (`VARCHAR` -> `STRING`, `explode(sequence(...))`) |
 
 ---
