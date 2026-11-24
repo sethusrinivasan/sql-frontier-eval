@@ -1,0 +1,117 @@
+{
+  "timestamp": "2026-11-24T16:32:18.641765+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 5,
+  "passed": 5,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_014_Q14_time_weighted_average_price_twap",
+      "name": "Time-Weighted Average Price (TWAP) with Variable Interval Weights",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Calculate 1-hour TWAP from 10:00 to 11:00\n            WITH tick_durations AS (\n                SELECT \n                    symbol,\n                    tick_time,\n                    price,\n                    date_diff('second', tick_time, \n                        LEAD(tick_time, 1, TIMESTAMP '2026-03-01 11:00:00') OVER (PARTITION BY symbol ORDER BY tick_time)\n                    ) AS duration_seconds\n                FROM price_ticks\n                WHERE tick_time < TIMESTAMP '2026-03-01 11:00:00'\n            )\n            SELECT \n                symbol,\n                ROUND(SUM(price * duration_seconds) / SUM(duration_seconds), 2) AS twap_price,\n                SUM(duration_seconds) AS total_duration_seconds\n            FROM tick_durations\n            GROUP BY symbol;",
+      "golden_sql": "-- Calculate 1-hour TWAP from 10:00 to 11:00\n            WITH tick_durations AS (\n                SELECT \n                    symbol,\n                    tick_time,\n                    price,\n                    date_diff('second', tick_time, \n                        LEAD(tick_time, 1, TIMESTAMP '2026-03-01 11:00:00') OVER (PARTITION BY symbol ORDER BY tick_time)\n                    ) AS duration_seconds\n                FROM price_ticks\n                WHERE tick_time < TIMESTAMP '2026-03-01 11:00:00'\n            )\n            SELECT \n                symbol,\n                ROUND(SUM(price * duration_seconds) / SUM(duration_seconds), 2) AS twap_price,\n                SUM(duration_seconds) AS total_duration_seconds\n            FROM tick_durations\n            GROUP BY symbol;",
+      "execution_time_ms": 203.0075350048719,
+      "golden_time_ms": 425.1776109886123,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [tick_durations]\n:  +- 'SubqueryAlias tick_durations\n:     +- 'Project ['symbol, 'tick_time, 'price, timestampdiff(SECOND, 'tick_time, 'LEAD('tick_time, 1, 2026-03-01 11:00:00) windowspecdefinition('symbol, 'tick_time ASC NULLS FIRST, unspecifiedframe$()), None) AS dura"
+        },
+        "rows_verified": 1
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_015_Q15_volume_weighted_average_price_vwap",
+      "name": "Intraday Volume-Weighted Average Price (VWAP) Resetting Daily",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Intraday continuous VWAP calculation\n            SELECT \n                symbol,\n                trade_time,\n                price,\n                volume,\n                ROUND(\n                    SUM(price * volume) OVER (\n                        PARTITION BY symbol, CAST(trade_time AS DATE)\n                        ORDER BY trade_time\n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    ) / \n                    SUM(volume) OVER (\n                        PARTITION BY symbol, CAST(trade_time AS DATE)\n                        ORDER BY trade_time\n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    ), 2\n                ) AS intraday_vwap\n            FROM market_trades\n            ORDER BY symbol, trade_time;",
+      "golden_sql": "-- Intraday continuous VWAP calculation\n            SELECT \n                symbol,\n                trade_time,\n                price,\n                volume,\n                ROUND(\n                    SUM(price * volume) OVER (\n                        PARTITION BY symbol, CAST(trade_time AS DATE)\n                        ORDER BY trade_time\n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    ) / \n                    SUM(volume) OVER (\n                        PARTITION BY symbol, CAST(trade_time AS DATE)\n                        ORDER BY trade_time\n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    ), 2\n                ) AS intraday_vwap\n            FROM market_trades\n            ORDER BY symbol, trade_time;",
+      "execution_time_ms": 185.01051899511367,
+      "golden_time_ms": 426.5693560009822,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\n'Sort ['symbol ASC NULLS FIRST, 'trade_time ASC NULLS FIRST], true\n+- 'Project ['symbol, 'trade_time, 'price, 'volume, 'ROUND(('SUM(('price * 'volume)) windowspecdefinition('symbol, cast('trade_time as date), 'trade_time ASC NULLS FIRST, specifiedwindowframe(RowFrame, unbou"
+        },
+        "rows_verified": 3
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_016_Q16_sequential_funnel_precedence",
+      "name": "Chronological Multi-Stage Conversion Funnel with Time Boundaries",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Enforce Signup -> Verify -> Purchase chronological order\n            WITH step1 AS (\n                SELECT user_id, action_time AS signup_time\n                FROM user_actions\n                WHERE stage = 'signup'\n            ),\n            step2 AS (\n                SELECT s1.user_id, s1.signup_time, MIN(a.action_time) AS verify_time\n                FROM step1 s1\n                JOIN user_actions a \n                  ON s1.user_id = a.user_id \n                 AND a.stage = 'verify'\n                 AND a.action_time >= s1.signup_time\n                 AND a.action_time <= s1.signup_time + INTERVAL '24 hours'\n                GROUP BY s1.user_id, s1.signup_time\n            ),\n            step3 AS (\n                SELECT s2.user_id, s2.signup_time, s2.verify_time, MIN(a.action_time) AS purchase_time\n                FROM step2 s2\n                JOIN user_actions a \n                  ON s2.user_id = a.user_id \n                 AND a.stage = 'purchase'\n                 AND a.action_time >= s2.verify_time\n                 AND a.action_time <= s2.verify_time + INTERVAL '24 hours'\n                GROUP BY s2.user_id, s2.signup_time, s2.verify_time\n            )\n            SELECT \n                COUNT(s1.user_id) AS total_signups,\n                COUNT(s2.user_id) AS verified_users,\n                COUNT(s3.user_id) AS completed_purchasers,\n                ROUND(COUNT(s3.user_id) * 100.0 / COUNT(s1.user_id), 1) AS end_to_end_conversion_pct\n            FROM step1 s1\n            LEFT JOIN step2 s2 ON s1.user_id = s2.user_id\n            LEFT JOIN step3 s3 ON s1.user_id = s3.user_id;",
+      "golden_sql": "-- Enforce Signup -> Verify -> Purchase chronological order\n            WITH step1 AS (\n                SELECT user_id, action_time AS signup_time\n                FROM user_actions\n                WHERE stage = 'signup'\n            ),\n            step2 AS (\n                SELECT s1.user_id, s1.signup_time, MIN(a.action_time) AS verify_time\n                FROM step1 s1\n                JOIN user_actions a \n                  ON s1.user_id = a.user_id \n                 AND a.stage = 'verify'\n                 AND a.action_time >= s1.signup_time\n                 AND a.action_time <= s1.signup_time + INTERVAL '24 hours'\n                GROUP BY s1.user_id, s1.signup_time\n            ),\n            step3 AS (\n                SELECT s2.user_id, s2.signup_time, s2.verify_time, MIN(a.action_time) AS purchase_time\n                FROM step2 s2\n                JOIN user_actions a \n                  ON s2.user_id = a.user_id \n                 AND a.stage = 'purchase'\n                 AND a.action_time >= s2.verify_time\n                 AND a.action_time <= s2.verify_time + INTERVAL '24 hours'\n                GROUP BY s2.user_id, s2.signup_time, s2.verify_time\n            )\n            SELECT \n                COUNT(s1.user_id) AS total_signups,\n                COUNT(s2.user_id) AS verified_users,\n                COUNT(s3.user_id) AS completed_purchasers,\n                ROUND(COUNT(s3.user_id) * 100.0 / COUNT(s1.user_id), 1) AS end_to_end_conversion_pct\n            FROM step1 s1\n            LEFT JOIN step2 s2 ON s1.user_id = s2.user_id\n            LEFT JOIN step3 s3 ON s1.user_id = s3.user_id;",
+      "execution_time_ms": 220.47044200007804,
+      "golden_time_ms": 902.2085500037065,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [step1, step2, step3]\n:  :- 'SubqueryAlias step1\n:  :  +- 'Project ['user_id, 'action_time AS signup_time#22240]\n:  :     +- 'Filter ('stage = signup)\n:  :        +- 'UnresolvedRelation [user_actions], [], false\n:  :- 'SubqueryAlias step2\n:  :  +- 'Aggregate ['s1.user_i"
+        },
+        "rows_verified": 1
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_018_Q18_time_decay_user_affinity",
+      "name": "Exponential Time-Decayed User Affinity Scoring",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Exponential decay affinity score with 7-day half-life (lambda = ln(2)/7 = ~0.099)\n            SELECT \n                user_id,\n                category,\n                ROUND(SUM(\n                    EXP(-0.099 * date_diff('day', click_time, TIMESTAMP '2026-03-01 12:00:00'))\n                ), 3) AS decayed_affinity_score\n            FROM item_clicks\n            GROUP BY user_id, category\n            ORDER BY decayed_affinity_score DESC;",
+      "golden_sql": "-- Exponential decay affinity score with 7-day half-life (lambda = ln(2)/7 = ~0.099)\n            SELECT \n                user_id,\n                category,\n                ROUND(SUM(\n                    EXP(-0.099 * date_diff('day', click_time, TIMESTAMP '2026-03-01 12:00:00'))\n                ), 3) AS decayed_affinity_score\n            FROM item_clicks\n            GROUP BY user_id, category\n            ORDER BY decayed_affinity_score DESC;",
+      "execution_time_ms": 190.1853890012717,
+      "golden_time_ms": 377.8753090009559,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\n'Sort ['decayed_affinity_score DESC NULLS LAST], true\n+- 'Aggregate ['user_id, 'category], ['user_id, 'category, 'ROUND('SUM('EXP((-0.099 * timestampdiff(DAY, 'click_time, 2026-03-01 12:00:00, None)))), 3) AS decayed_affinity_score#22651]\n   +- 'UnresolvedRelation [item_cli"
+        },
+        "rows_verified": 2
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_019_Q19_intermittent_inactivity_anomaly",
+      "name": "Customer Churn Anomaly Detection vs Historical Purchase Rhythm",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Calculate median inter-purchase days and compare against days elapsed since latest order\n            WITH purchase_intervals AS (\n                SELECT \n                    customer_id,\n                    order_date,\n                    order_date - LAG(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS days_between\n                FROM orders_history\n            ),\n            user_cadence AS (\n                SELECT \n                    customer_id,\n                    MAX(order_date) AS last_order_date,\n                    MEDIAN(days_between) AS median_purchase_interval_days\n                FROM purchase_intervals\n                GROUP BY customer_id\n            )\n            SELECT \n                customer_id,\n                last_order_date,\n                median_purchase_interval_days,\n                (DATE '2026-03-10' - last_order_date) AS days_since_last_order,\n                CASE \n                    WHEN (DATE '2026-03-10' - last_order_date) > (2.5 * median_purchase_interval_days) \n                    THEN 'HIGH_CHURN_RISK' \n                    ELSE 'NORMAL' \n                END AS churn_risk_status\n            FROM user_cadence\n            ORDER BY customer_id;",
+      "golden_sql": "-- Calculate median inter-purchase days and compare against days elapsed since latest order\n            WITH purchase_intervals AS (\n                SELECT \n                    customer_id,\n                    order_date,\n                    order_date - LAG(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS days_between\n                FROM orders_history\n            ),\n            user_cadence AS (\n                SELECT \n                    customer_id,\n                    MAX(order_date) AS last_order_date,\n                    MEDIAN(days_between) AS median_purchase_interval_days\n                FROM purchase_intervals\n                GROUP BY customer_id\n            )\n            SELECT \n                customer_id,\n                last_order_date,\n                median_purchase_interval_days,\n                (DATE '2026-03-10' - last_order_date) AS days_since_last_order,\n                CASE \n                    WHEN (DATE '2026-03-10' - last_order_date) > (2.5 * median_purchase_interval_days) \n                    THEN 'HIGH_CHURN_RISK' \n                    ELSE 'NORMAL' \n                END AS churn_risk_status\n            FROM user_cadence\n            ORDER BY customer_id;",
+      "execution_time_ms": 202.15114300663117,
+      "golden_time_ms": 594.2181169957621,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [purchase_intervals, user_cadence]\n:  :- 'SubqueryAlias purchase_intervals\n:  :  +- 'Project ['customer_id, 'order_date, ('order_date - 'LAG('order_date) windowspecdefinition('customer_id, 'order_date ASC NULLS FIRST, unspecifiedframe$())) AS days_between#22937]\n:  :   "
+        },
+        "rows_verified": 2
+      },
+      "llm_metadata": {}
+    }
+  ]
+}

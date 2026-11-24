@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-11-24T16:28:00.002104+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 0,
+  "passed": 0,
+  "failed": 0,
+  "pass_rate_pct": 0.0,
+  "tasks": []
+}

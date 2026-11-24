@@ -1,0 +1,117 @@
+{
+  "timestamp": "2026-11-24T16:29:41.104766+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 5,
+  "passed": 5,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_003_Q03_clickstream_sessionization_gaps",
+      "name": "Clickstream Sessionization with Inactivity Timeouts (Gaps & Islands)",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Detect session breaks (>30 min inactivity) and assign deterministic session UUIDs\n            WITH event_lags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Compare against preceding event timestamp for this user\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_event_time\n                FROM user_events\n            ),\n            session_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Mark 1 if first event or gap exceeds 30 minutes, else 0\n                    CASE \n                        WHEN prev_event_time IS NULL THEN 1\n                        WHEN date_diff('second', prev_event_time, event_time) > 1800 THEN 1 \n                        ELSE 0 \n                    END AS is_new_session\n                FROM event_lags\n            )\n            SELECT \n                user_id,\n                event_time,\n                page_url,\n                -- Cumulative sum over flags establishes monotonically increasing session ID\n                SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY event_time) AS session_id\n            FROM session_flags\n            ORDER BY user_id, event_time;",
+      "golden_sql": "-- Detect session breaks (>30 min inactivity) and assign deterministic session UUIDs\n            WITH event_lags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Compare against preceding event timestamp for this user\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_event_time\n                FROM user_events\n            ),\n            session_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Mark 1 if first event or gap exceeds 30 minutes, else 0\n                    CASE \n                        WHEN prev_event_time IS NULL THEN 1\n                        WHEN date_diff('second', prev_event_time, event_time) > 1800 THEN 1 \n                        ELSE 0 \n                    END AS is_new_session\n                FROM event_lags\n            )\n            SELECT \n                user_id,\n                event_time,\n                page_url,\n                -- Cumulative sum over flags establishes monotonically increasing session ID\n                SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY event_time) AS session_id\n            FROM session_flags\n            ORDER BY user_id, event_time;",
+      "execution_time_ms": 212.632909999229,
+      "golden_time_ms": 500.1322860043729,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [event_lags, session_flags]\n:  :- 'SubqueryAlias event_lags\n:  :  +- 'Project ['user_id, 'event_time, 'page_url, 'LAG('event_time) windowspecdefinition('user_id, 'event_time ASC NULLS FIRST, unspecifiedframe$()) AS prev_event_time#15190]\n:  :     +- 'UnresolvedRelation "
+        },
+        "rows_verified": 4
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_004_Q04_dual_bound_session_capping",
+      "name": "Sliding Sessionization with Absolute Maximum Duration Cap",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Partition sessions by inactivity (>30m) OR exceeding 4 hours from session start\n            WITH ranked_events AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    action,\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time\n                FROM bot_events\n            ),\n            step_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    action,\n                    CASE \n                        WHEN prev_time IS NULL THEN 1\n                        WHEN date_diff('minute', prev_time, event_time) > 30 THEN 1\n                        ELSE 0\n                    END AS gap_split\n                FROM ranked_events\n            ),\n            base_sessions AS (\n                SELECT \n                    *,\n                    SUM(gap_split) OVER (PARTITION BY user_id ORDER BY event_time) AS raw_session_id\n                FROM step_flags\n            )\n            SELECT \n                user_id,\n                event_time,\n                action,\n                raw_session_id,\n                -- Measure elapsed minutes from session genesis\n                date_diff('minute', \n                    FIRST_VALUE(event_time) OVER (PARTITION BY user_id, raw_session_id ORDER BY event_time),\n                    event_time\n                ) AS minutes_since_session_start\n            FROM base_sessions\n            ORDER BY user_id, event_time;",
+      "golden_sql": "-- Partition sessions by inactivity (>30m) OR exceeding 4 hours from session start\n            WITH ranked_events AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    action,\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time\n                FROM bot_events\n            ),\n            step_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    action,\n                    CASE \n                        WHEN prev_time IS NULL THEN 1\n                        WHEN date_diff('minute', prev_time, event_time) > 30 THEN 1\n                        ELSE 0\n                    END AS gap_split\n                FROM ranked_events\n            ),\n            base_sessions AS (\n                SELECT \n                    *,\n                    SUM(gap_split) OVER (PARTITION BY user_id ORDER BY event_time) AS raw_session_id\n                FROM step_flags\n            )\n            SELECT \n                user_id,\n                event_time,\n                action,\n                raw_session_id,\n                -- Measure elapsed minutes from session genesis\n                date_diff('minute', \n                    FIRST_VALUE(event_time) OVER (PARTITION BY user_id, raw_session_id ORDER BY event_time),\n                    event_time\n                ) AS minutes_since_session_start\n            FROM base_sessions\n            ORDER BY user_id, event_time;",
+      "execution_time_ms": 212.1022789942799,
+      "golden_time_ms": 459.94453100138344,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [ranked_events, step_flags, base_sessions]\n:  :- 'SubqueryAlias ranked_events\n:  :  +- 'Project ['user_id, 'event_time, 'action, 'LAG('event_time) windowspecdefinition('user_id, 'event_time ASC NULLS FIRST, unspecifiedframe$()) AS prev_time#15486]\n:  :     +- 'Unresolve"
+        },
+        "rows_verified": 4
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_006_Q06_bitemporal_state_reconstruction",
+      "name": "Bitemporal Auditing: Valid-Time vs. Transaction-Time Alignment",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Query credit limit effective on 2026-05-20 as known to the system on 2026-05-25 (before retroactive update)\n            SELECT \n                customer_id,\n                credit_limit AS limit_as_known_then,\n                valid_from,\n                valid_to,\n                system_from,\n                system_to\n            FROM credit_limits_audit\n            WHERE customer_id = 501\n              -- As-of Business Date: 2026-05-20\n              AND DATE '2026-05-20' >= valid_from \n              AND DATE '2026-05-20' < valid_to\n              -- As-of System State: 2026-05-25\n              AND TIMESTAMP '2026-05-25 00:00:00' >= system_from \n              AND TIMESTAMP '2026-05-25 00:00:00' < system_to;",
+      "golden_sql": "-- Query credit limit effective on 2026-05-20 as known to the system on 2026-05-25 (before retroactive update)\n            SELECT \n                customer_id,\n                credit_limit AS limit_as_known_then,\n                valid_from,\n                valid_to,\n                system_from,\n                system_to\n            FROM credit_limits_audit\n            WHERE customer_id = 501\n              -- As-of Business Date: 2026-05-20\n              AND DATE '2026-05-20' >= valid_from \n              AND DATE '2026-05-20' < valid_to\n              -- As-of System State: 2026-05-25\n              AND TIMESTAMP '2026-05-25 00:00:00' >= system_from \n              AND TIMESTAMP '2026-05-25 00:00:00' < system_to;",
+      "execution_time_ms": 196.85111699800473,
+      "golden_time_ms": 477.8081810072763,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\n'Project ['customer_id, 'credit_limit AS limit_as_known_then#16066, 'valid_from, 'valid_to, 'system_from, 'system_to]\n+- 'Filter (((('customer_id = 501) AND (2026-05-20 >= 'valid_from)) AND (2026-05-20 < 'valid_to)) AND ((2026-05-25 00:00:00 >= 'system_from) AND (2026-05-25"
+        },
+        "rows_verified": 1
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_007_Q07_scd2_open_ended_intervals",
+      "name": "Slowly Changing Dimension Type 2 Join with Open-Ended Future",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Join fact orders to historical customer dimension without dropping active records\n            SELECT \n                o.order_id,\n                o.customer_id,\n                o.order_date,\n                o.amount,\n                c.tier AS customer_tier_at_purchase\n            FROM fact_orders o\n            JOIN dim_customer_scd c\n              ON o.customer_id = c.customer_id\n             AND o.order_date >= c.valid_from\n             AND o.order_date < COALESCE(c.valid_to, DATE '9999-12-31')\n            ORDER BY o.order_id;",
+      "golden_sql": "-- Join fact orders to historical customer dimension without dropping active records\n            SELECT \n                o.order_id,\n                o.customer_id,\n                o.order_date,\n                o.amount,\n                c.tier AS customer_tier_at_purchase\n            FROM fact_orders o\n            JOIN dim_customer_scd c\n              ON o.customer_id = c.customer_id\n             AND o.order_date >= c.valid_from\n             AND o.order_date < COALESCE(c.valid_to, DATE '9999-12-31')\n            ORDER BY o.order_id;",
+      "execution_time_ms": 205.01031300227623,
+      "golden_time_ms": 785.7449459988857,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\n'Sort ['o.order_id ASC NULLS FIRST], true\n+- 'Project ['o.order_id, 'o.customer_id, 'o.order_date, 'o.amount, 'c.tier AS customer_tier_at_purchase#16592]\n   +- 'Join Inner, ((('o.customer_id = 'c.customer_id) AND ('o.order_date >= 'c.valid_from)) AND ('o.order_date < 'COALE"
+        },
+        "rows_verified": 2
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_009_Q09_ledger_balance_duplicate_timestamps",
+      "name": "Financial Ledger Cumulative Balance with Duplicate Timestamp Ties",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Calculate strict running ledger balance using ROWS frame to prevent peer bunching\n            SELECT \n                entry_id,\n                account_id,\n                posted_time,\n                amount,\n                -- ROWS frame evaluates row-by-row even when posted_time is identical\n                SUM(amount) OVER (\n                    PARTITION BY account_id\n                    ORDER BY posted_time, entry_id\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                ) AS running_balance\n            FROM ledger\n            ORDER BY posted_time, entry_id;",
+      "golden_sql": "-- Calculate strict running ledger balance using ROWS frame to prevent peer bunching\n            SELECT \n                entry_id,\n                account_id,\n                posted_time,\n                amount,\n                -- ROWS frame evaluates row-by-row even when posted_time is identical\n                SUM(amount) OVER (\n                    PARTITION BY account_id\n                    ORDER BY posted_time, entry_id\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                ) AS running_balance\n            FROM ledger\n            ORDER BY posted_time, entry_id;",
+      "execution_time_ms": 190.90592699649278,
+      "golden_time_ms": 394.4295859982958,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\n'Sort ['posted_time ASC NULLS FIRST, 'entry_id ASC NULLS FIRST], true\n+- 'Project ['entry_id, 'account_id, 'posted_time, 'amount, 'SUM('amount) windowspecdefinition('account_id, 'posted_time ASC NULLS FIRST, 'entry_id ASC NULLS FIRST, specifiedwindowframe(RowFrame, unbounde"
+        },
+        "rows_verified": 3
+      },
+      "llm_metadata": {}
+    }
+  ]
+}

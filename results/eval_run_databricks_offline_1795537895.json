@@ -1,0 +1,96 @@
+{
+  "timestamp": "2026-11-24T16:31:35.061577+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 4,
+  "passed": 4,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_012_Q12_microsecond_latency_jitter",
+      "name": "Inter-Packet Network Arrival Jitter at Nanosecond Resolution",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Compute inter-packet arrival delta in microseconds and identify variance\n            WITH deltas AS (\n                SELECT \n                    packet_id,\n                    captured_at,\n                    date_diff('microsecond', \n                        LAG(captured_at) OVER (ORDER BY captured_at), \n                        captured_at\n                    ) AS delta_microseconds\n                FROM packet_stream\n            )\n            SELECT \n                packet_id,\n                captured_at,\n                delta_microseconds,\n                -- Measure moving jitter variance over last 3 packets\n                ROUND(STDDEV(delta_microseconds) OVER (\n                    ORDER BY captured_at \n                    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\n                ), 2) AS rolling_jitter_stddev\n            FROM deltas\n            ORDER BY captured_at;",
+      "golden_sql": "-- Compute inter-packet arrival delta in microseconds and identify variance\n            WITH deltas AS (\n                SELECT \n                    packet_id,\n                    captured_at,\n                    date_diff('microsecond', \n                        LAG(captured_at) OVER (ORDER BY captured_at), \n                        captured_at\n                    ) AS delta_microseconds\n                FROM packet_stream\n            )\n            SELECT \n                packet_id,\n                captured_at,\n                delta_microseconds,\n                -- Measure moving jitter variance over last 3 packets\n                ROUND(STDDEV(delta_microseconds) OVER (\n                    ORDER BY captured_at \n                    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\n                ), 2) AS rolling_jitter_stddev\n            FROM deltas\n            ORDER BY captured_at;",
+      "execution_time_ms": 187.36415599414613,
+      "golden_time_ms": 459.5566369971493,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [deltas]\n:  +- 'SubqueryAlias deltas\n:     +- 'Project ['packet_id, 'captured_at, timestampdiff(MICROSECOND, 'LAG('captured_at) windowspecdefinition('captured_at ASC NULLS FIRST, unspecifiedframe$()), 'captured_at, None) AS delta_microseconds#18411]\n:        +- 'Unresol"
+        },
+        "rows_verified": 4
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_013_Q13_order_book_snapshot_reconstruction",
+      "name": "Point-in-Time Limit Order Book (LOB) State Reconstruction",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Reconstruct order book state at exactly 09:30:05\n            WITH snapshot_events AS (\n                SELECT *\n                FROM order_events\n                WHERE event_time <= TIMESTAMP '2026-03-01 09:30:05'\n            ),\n            active_orders AS (\n                SELECT \n                    order_id,\n                    side,\n                    price,\n                    -- Net quantity remaining after cancellations/fills\n                    SUM(CASE WHEN event_type = 'INSERT' THEN quantity ELSE -quantity END) AS remaining_qty\n                FROM snapshot_events\n                GROUP BY order_id, side, price\n                HAVING SUM(CASE WHEN event_type = 'INSERT' THEN quantity ELSE -quantity END) > 0\n            )\n            SELECT \n                side,\n                price,\n                SUM(remaining_qty) AS aggregate_depth\n            FROM active_orders\n            GROUP BY side, price\n            ORDER BY price DESC;",
+      "golden_sql": "-- Reconstruct order book state at exactly 09:30:05\n            WITH snapshot_events AS (\n                SELECT *\n                FROM order_events\n                WHERE event_time <= TIMESTAMP '2026-03-01 09:30:05'\n            ),\n            active_orders AS (\n                SELECT \n                    order_id,\n                    side,\n                    price,\n                    -- Net quantity remaining after cancellations/fills\n                    SUM(CASE WHEN event_type = 'INSERT' THEN quantity ELSE -quantity END) AS remaining_qty\n                FROM snapshot_events\n                GROUP BY order_id, side, price\n                HAVING SUM(CASE WHEN event_type = 'INSERT' THEN quantity ELSE -quantity END) > 0\n            )\n            SELECT \n                side,\n                price,\n                SUM(remaining_qty) AS aggregate_depth\n            FROM active_orders\n            GROUP BY side, price\n            ORDER BY price DESC;",
+      "execution_time_ms": 193.19068199547473,
+      "golden_time_ms": 512.6764879969414,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [snapshot_events, active_orders]\n:  :- 'SubqueryAlias snapshot_events\n:  :  +- 'Project [*]\n:  :     +- 'Filter ('event_time <= 2026-03-01 09:30:05)\n:  :        +- 'UnresolvedRelation [order_events], [], false\n:  +- 'SubqueryAlias active_orders\n:     +- 'UnresolvedHavin"
+        },
+        "rows_verified": 1
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_017_Q17_retention_cohort_survival",
+      "name": "Dynamic User Retention Cohort Matrix by Weekly Milestones",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Generate dynamic cohort retention matrix\n            SELECT \n                date_trunc('week', u.signup_date) AS cohort_week,\n                COUNT(DISTINCT u.user_id) AS cohort_size,\n                COUNT(DISTINCT CASE WHEN a.activity_date = u.signup_date THEN u.user_id END) AS day_0_active,\n                COUNT(DISTINCT CASE WHEN a.activity_date >= u.signup_date + 7 AND a.activity_date < u.signup_date + 14 THEN u.user_id END) AS day_7_active,\n                COUNT(DISTINCT CASE WHEN a.activity_date >= u.signup_date + 14 AND a.activity_date < u.signup_date + 21 THEN u.user_id END) AS day_14_active\n            FROM app_users u\n            LEFT JOIN activity_log a ON u.user_id = a.user_id\n            GROUP BY cohort_week\n            ORDER BY cohort_week;",
+      "golden_sql": "-- Generate dynamic cohort retention matrix\n            SELECT \n                date_trunc('week', u.signup_date) AS cohort_week,\n                COUNT(DISTINCT u.user_id) AS cohort_size,\n                COUNT(DISTINCT CASE WHEN a.activity_date = u.signup_date THEN u.user_id END) AS day_0_active,\n                COUNT(DISTINCT CASE WHEN a.activity_date >= u.signup_date + 7 AND a.activity_date < u.signup_date + 14 THEN u.user_id END) AS day_7_active,\n                COUNT(DISTINCT CASE WHEN a.activity_date >= u.signup_date + 14 AND a.activity_date < u.signup_date + 21 THEN u.user_id END) AS day_14_active\n            FROM app_users u\n            LEFT JOIN activity_log a ON u.user_id = a.user_id\n            GROUP BY cohort_week\n            ORDER BY cohort_week;",
+      "execution_time_ms": 200.13287400070112,
+      "golden_time_ms": 689.4933120056521,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\n'Sort ['cohort_week ASC NULLS FIRST], true\n+- 'Aggregate ['cohort_week], ['date_trunc(week, 'u.signup_date) AS cohort_week#19880, 'COUNT(distinct 'u.user_id) AS cohort_size#19881, 'COUNT(distinct CASE WHEN ('a.activity_date = 'u.signup_date) THEN 'u.user_id END) AS day_0_ac"
+        },
+        "rows_verified": 2
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_01_fanout",
+      "name": "E-Commerce Financial Aggregation without Join Fan-Out",
+      "category": "Metric Inflation / Chasm Trap",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "WITH agg_discounts AS (\n    SELECT order_id, SUM(amount) AS total_discount\n    FROM order_discounts\n    GROUP BY order_id\n),\nagg_shipments AS (\n    SELECT order_id, SUM(shipping_fee) AS total_shipping\n    FROM order_shipments\n    GROUP BY order_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    SUM(o.base_amount) AS total_gross_sales,\n    COALESCE(SUM(d.total_discount), 0.00) AS total_discount_amount,\n    COALESCE(SUM(s.total_shipping), 0.00) AS total_shipping_fees\nFROM merchants m\nJOIN orders o ON m.merchant_id = o.merchant_id\nLEFT JOIN agg_discounts d ON o.order_id = d.order_id\nLEFT JOIN agg_shipments s ON o.order_id = s.order_id\nGROUP BY m.merchant_id, m.merchant_name;",
+      "golden_sql": "WITH agg_discounts AS (\n    SELECT order_id, SUM(amount) AS total_discount\n    FROM order_discounts\n    GROUP BY order_id\n),\nagg_shipments AS (\n    SELECT order_id, SUM(shipping_fee) AS total_shipping\n    FROM order_shipments\n    GROUP BY order_id\n)\nSELECT\n    m.merchant_id,\n    m.merchant_name,\n    SUM(o.base_amount) AS total_gross_sales,\n    COALESCE(SUM(d.total_discount), 0.00) AS total_discount_amount,\n    COALESCE(SUM(s.total_shipping), 0.00) AS total_shipping_fees\nFROM merchants m\nJOIN orders o ON m.merchant_id = o.merchant_id\nLEFT JOIN agg_discounts d ON o.order_id = d.order_id\nLEFT JOIN agg_shipments s ON o.order_id = s.order_id\nGROUP BY m.merchant_id, m.merchant_name;",
+      "execution_time_ms": 215.58721399924252,
+      "golden_time_ms": 1034.6862279984634,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [agg_discounts, agg_shipments]\n:  :- 'SubqueryAlias agg_discounts\n:  :  +- 'Aggregate ['order_id], ['order_id, 'SUM('amount) AS total_discount#21091]\n:  :     +- 'UnresolvedRelation [order_discounts], [], false\n:  +- 'SubqueryAlias agg_shipments\n:     +- 'Aggregate ['or"
+        },
+        "rows_verified": 1
+      },
+      "llm_metadata": {}
+    }
+  ]
+}

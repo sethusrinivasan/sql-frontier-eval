@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-11-24T16:30:22.121038+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 2,
+  "passed": 2,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_005_Q05_iot_sensor_gap_fill_locf",
+      "name": "IoT Sensor Telemetry Gap-Filling via generate_series and LOCF",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Resample sparse telemetry into continuous 1-minute intervals with Last Observation Carried Forward\n            WITH time_grid AS (\n                SELECT UNNEST(generate_series(\n                    TIMESTAMP '2026-03-01 08:00:00',\n                    TIMESTAMP '2026-03-01 08:05:00',\n                    INTERVAL '1 minute'\n                )) AS bucket_time\n            ),\n            aligned_readings AS (\n                SELECT \n                    grid.bucket_time,\n                    42 AS device_id,\n                    st.temperature\n                FROM time_grid grid\n                LEFT JOIN sensor_telemetry st\n                  ON grid.bucket_time = st.recorded_at\n                 AND st.device_id = 42\n            )\n            SELECT \n                bucket_time,\n                device_id,\n                temperature AS raw_reading,\n                -- Forward fill the most recent non-null temperature\n                COALESCE(\n                    temperature,\n                    LAST_VALUE(temperature IGNORE NULLS) OVER (\n                        PARTITION BY device_id \n                        ORDER BY bucket_time \n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    )\n                ) AS filled_temperature\n            FROM aligned_readings\n            ORDER BY bucket_time;",
+      "golden_sql": "-- Resample sparse telemetry into continuous 1-minute intervals with Last Observation Carried Forward\n            WITH time_grid AS (\n                SELECT UNNEST(generate_series(\n                    TIMESTAMP '2026-03-01 08:00:00',\n                    TIMESTAMP '2026-03-01 08:05:00',\n                    INTERVAL '1 minute'\n                )) AS bucket_time\n            ),\n            aligned_readings AS (\n                SELECT \n                    grid.bucket_time,\n                    42 AS device_id,\n                    st.temperature\n                FROM time_grid grid\n                LEFT JOIN sensor_telemetry st\n                  ON grid.bucket_time = st.recorded_at\n                 AND st.device_id = 42\n            )\n            SELECT \n                bucket_time,\n                device_id,\n                temperature AS raw_reading,\n                -- Forward fill the most recent non-null temperature\n                COALESCE(\n                    temperature,\n                    LAST_VALUE(temperature IGNORE NULLS) OVER (\n                        PARTITION BY device_id \n                        ORDER BY bucket_time \n                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    )\n                ) AS filled_temperature\n            FROM aligned_readings\n            ORDER BY bucket_time;",
+      "execution_time_ms": 393.89129099436104,
+      "golden_time_ms": 519.8774939926807,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [time_grid, aligned_readings]\n:  :- 'SubqueryAlias time_grid\n:  :  +- 'Project ['explode('sequence(2026-03-01 08:00:00, 2026-03-01 08:05:00, INTERVAL '01' MINUTE)) AS bucket_time#17339]\n:  :     +- OneRowRelation\n:  +- 'SubqueryAlias aligned_readings\n:     +- 'Project ["
+        },
+        "rows_verified": 6
+      },
+      "llm_metadata": {}
+    },
+    {
+      "task_id": "task_008_Q08_hopping_sliding_time_buckets",
+      "name": "Hopping / Overlapping Window Aggregations via time_bucket",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Generate 15-minute sliding windows stepped every 5 minutes (hopping window)\n            WITH window_steps AS (\n                SELECT UNNEST(generate_series(\n                    TIMESTAMP '2026-03-01 10:00:00',\n                    TIMESTAMP '2026-03-01 10:15:00',\n                    INTERVAL '5 minutes'\n                )) AS window_start\n            )\n            SELECT \n                w.window_start,\n                w.window_start + INTERVAL '15 minutes' AS window_end,\n                m.server_id,\n                COUNT(m.cpu_utilization) AS sample_count,\n                ROUND(AVG(m.cpu_utilization), 2) AS avg_cpu,\n                MAX(m.cpu_utilization) AS peak_cpu\n            FROM window_steps w\n            JOIN server_metrics m\n              ON m.metric_time >= w.window_start\n             AND m.metric_time < w.window_start + INTERVAL '15 minutes'\n            GROUP BY w.window_start, m.server_id\n            ORDER BY w.window_start;",
+      "golden_sql": "-- Generate 15-minute sliding windows stepped every 5 minutes (hopping window)\n            WITH window_steps AS (\n                SELECT UNNEST(generate_series(\n                    TIMESTAMP '2026-03-01 10:00:00',\n                    TIMESTAMP '2026-03-01 10:15:00',\n                    INTERVAL '5 minutes'\n                )) AS window_start\n            )\n            SELECT \n                w.window_start,\n                w.window_start + INTERVAL '15 minutes' AS window_end,\n                m.server_id,\n                COUNT(m.cpu_utilization) AS sample_count,\n                ROUND(AVG(m.cpu_utilization), 2) AS avg_cpu,\n                MAX(m.cpu_utilization) AS peak_cpu\n            FROM window_steps w\n            JOIN server_metrics m\n              ON m.metric_time >= w.window_start\n             AND m.metric_time < w.window_start + INTERVAL '15 minutes'\n            GROUP BY w.window_start, m.server_id\n            ORDER BY w.window_start;",
+      "execution_time_ms": 501.8834109941963,
+      "golden_time_ms": 535.026473007747,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [window_steps]\n:  +- 'SubqueryAlias window_steps\n:     +- 'Project ['explode('sequence(2026-03-01 10:00:00, 2026-03-01 10:15:00, INTERVAL '05' MINUTE)) AS window_start#17689]\n:        +- OneRowRelation\n+- 'Sort ['w.window_start ASC NULLS FIRST], true\n   +- 'Aggregate ['"
+        },
+        "rows_verified": 4
+      },
+      "llm_metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-11-24T16:27:42.102080+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 1,
+  "passed": 1,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_003_Q03_clickstream_sessionization_gaps",
+      "name": "Clickstream Sessionization with Inactivity Timeouts (Gaps & Islands)",
+      "category": "Temporal & Time-Series",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Detect session breaks (>30 min inactivity) and assign deterministic session UUIDs\n            WITH event_lags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Compare against preceding event timestamp for this user\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_event_time\n                FROM user_events\n            ),\n            session_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Mark 1 if first event or gap exceeds 30 minutes, else 0\n                    CASE \n                        WHEN prev_event_time IS NULL THEN 1\n                        WHEN date_diff('second', prev_event_time, event_time) > 1800 THEN 1 \n                        ELSE 0 \n                    END AS is_new_session\n                FROM event_lags\n            )\n            SELECT \n                user_id,\n                event_time,\n                page_url,\n                -- Cumulative sum over flags establishes monotonically increasing session ID\n                SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY event_time) AS session_id\n            FROM session_flags\n            ORDER BY user_id, event_time;",
+      "golden_sql": "-- Detect session breaks (>30 min inactivity) and assign deterministic session UUIDs\n            WITH event_lags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Compare against preceding event timestamp for this user\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_event_time\n                FROM user_events\n            ),\n            session_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Mark 1 if first event or gap exceeds 30 minutes, else 0\n                    CASE \n                        WHEN prev_event_time IS NULL THEN 1\n                        WHEN date_diff('second', prev_event_time, event_time) > 1800 THEN 1 \n                        ELSE 0 \n                    END AS is_new_session\n                FROM event_lags\n            )\n            SELECT \n                user_id,\n                event_time,\n                page_url,\n                -- Cumulative sum over flags establishes monotonically increasing session ID\n                SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY event_time) AS session_id\n            FROM session_flags\n            ORDER BY user_id, event_time;",
+      "execution_time_ms": 209.49494300293736,
+      "golden_time_ms": 881.5861420007423,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [event_lags, session_flags]\n:  :- 'SubqueryAlias event_lags\n:  :  +- 'Project ['user_id, 'event_time, 'page_url, 'LAG('event_time) windowspecdefinition('user_id, 'event_time ASC NULLS FIRST, unspecifiedframe$()) AS prev_event_time#14491]\n:  :     +- 'UnresolvedRelation "
+        },
+        "rows_verified": 4
+      },
+      "llm_metadata": {}
+    }
+  ]
+}

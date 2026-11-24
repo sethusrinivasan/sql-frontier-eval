@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-11-24T16:39:08.768563+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 1,
+  "passed": 1,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_03_scd2_join",
+      "name": "Historical SCD Type 2 Point-in-Time Currency Conversion",
+      "category": "SCD Type 2 Point-in-Time Joins",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "SELECT\n    t.txn_id,\n    t.currency,\n    t.amount,\n    r.rate_to_usd,\n    ROUND(t.amount * r.rate_to_usd, 2) AS amount_usd\nFROM transactions t\nJOIN exchange_rates r\n  ON t.currency = r.currency\n AND t.txn_time >= r.valid_from\n AND (t.txn_time < r.valid_to OR r.valid_to IS NULL)\nORDER BY t.txn_id ASC;",
+      "golden_sql": "SELECT\n    t.txn_id,\n    t.currency,\n    t.amount,\n    r.rate_to_usd,\n    ROUND(t.amount * r.rate_to_usd, 2) AS amount_usd\nFROM transactions t\nJOIN exchange_rates r\n  ON t.currency = r.currency\n AND t.txn_time >= r.valid_from\n AND (t.txn_time < r.valid_to OR r.valid_to IS NULL)\nORDER BY t.txn_id ASC;",
+      "execution_time_ms": 197.1112280007219,
+      "golden_time_ms": 324.7777939977823,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\n'Sort ['t.txn_id ASC NULLS FIRST], true\n+- 'Project ['t.txn_id, 't.currency, 't.amount, 'r.rate_to_usd, 'ROUND(('t.amount * 'r.rate_to_usd), 2) AS amount_usd#26967]\n   +- 'Join Inner, ((('t.currency = 'r.currency) AND ('t.txn_time >= 'r.valid_from)) AND (('t.txn_time < 'r.v"
+        },
+        "rows_verified": 0
+      },
+      "llm_metadata": {}
+    }
+  ]
+}
