@@ -120,3 +120,35 @@ def test_postgres_engine_profiling_and_operators():
     operators = engine.extract_operators(profile)
     op_types = [op["type"] for op in operators]
     assert any("SCAN" in op or "AGGREGATE" in op for op in op_types)
+
+
+def test_databricks_engine_credentials_validation():
+    """Ensures Databricks engine cleanly validates missing connection parameters."""
+    with pytest.raises(ValueError, match="Databricks credentials missing"):
+        SQLEvalEngine(
+            engine_type="databricks",
+            databricks_conn_params={"server_hostname": None, "access_token": None}
+        )
+
+
+def test_databricks_plan_parsing_and_anti_patterns():
+    """Tests parsing and anti-pattern detection on Databricks / Spark SQL physical plan output."""
+    sample_spark_plan = {
+        "plan_text": """== Physical Plan ==
+AdaptiveSparkPlan isFinalPlan=true
++- == Final Plan ==
+   *(3) HashAggregate(keys=[user_id#10], functions=[sum(is_new_session#11)])
+      +- BroadcastNestedLoopJoin BuildRight, Cross
+         +- *(1) FileScan csv [user_id#10, event_time#11]
+         +- BroadcastExchange
+"""
+    }
+    operators = SQLEvalEngine.extract_operators(sample_spark_plan)
+    op_types = [op["type"] for op in operators]
+    assert "HASH_GROUP_BY" in op_types
+    assert "CROSS_PRODUCT" in op_types
+    assert "TABLE_SCAN" in op_types
+
+    anti_patterns = SQLEvalEngine.detect_anti_patterns(sample_spark_plan)
+    assert any("CROSS_PRODUCT" in ap for ap in anti_patterns)
+

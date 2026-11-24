@@ -3,7 +3,7 @@ set -e
 
 # ==============================================================================
 # SQL Frontier Eval - PostgreSQL Docker Compose Setup Script
-# Builds and launches the latest PostgreSQL 18 container with pgvector, pg_trgm,
+# Builds and launches the latest PostgreSQL 19 container with pgvector, pg_trgm,
 # fuzzystrmatch, btree_gist, and analytical compatibility extensions.
 # ==============================================================================
 
@@ -11,7 +11,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${PROJECT_ROOT}"
 
 echo "================================================================================"
-echo "SQL FRONTIER EVAL: POSTGRESQL 18 DOCKER COMPOSE INITIALIZATION"
+echo "SQL FRONTIER EVAL: POSTGRESQL 19 DOCKER COMPOSE INITIALIZATION"
 echo "================================================================================"
 
 # Verify Docker and Docker Compose availability
@@ -25,7 +25,7 @@ if ! docker compose version &> /dev/null; then
     exit 1
 fi
 
-echo ">>> Building and starting PostgreSQL 18 container..."
+echo ">>> Building and starting PostgreSQL 19 container..."
 docker compose up -d --build
 
 echo ">>> Waiting for PostgreSQL service to become healthy..."
@@ -49,6 +49,6 @@ SELECT extname, extversion FROM pg_extension ORDER BY extname;
 
 echo ""
 echo "================================================================================"
-echo "✔ PostgreSQL 18.7 instance is healthy and ready for benchmark evaluations!"
+echo "✔ PostgreSQL 19.0 instance is healthy and ready for benchmark evaluations!"
 echo "Connection String: postgresql://postgres:postgrespassword@localhost:5432/sql_frontier_eval"
 echo "================================================================================"

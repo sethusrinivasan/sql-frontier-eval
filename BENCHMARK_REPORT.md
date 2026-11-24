@@ -26,7 +26,7 @@ Modern text-to-SQL benchmarks (such as Spider and BIRD) predominantly evaluate t
 | **GPT-OSS 120B (Medium)** | **90.8%** | **109 / 120** | 8.2s | **245.8 ms** | 11 edge cases: unbounded recursive CTE cycles without acyclic guards & quadratic non-equi joins |
 | **Golden Ground Truth Baseline** | **100.0%** | **120 / 120** | N/A | **217.8 ms** | Ground Truth Baseline (0% False Negatives on 1M+ Records in DuckDB) |
 
-#### 🐘 PostgreSQL 18.7 + Extensions (Docker Compose)
+#### 🐘 PostgreSQL 19.0 + Extensions (Docker Compose)
 
 | Model / Baseline | Pass Rate | Correct / Total | Avg Model Latency | Engine Exec Latency (1M) | Primary Analytical Failure Modes |
 |---|:---:|:---:|:---:|:---:|---|
@@ -36,7 +36,14 @@ Modern text-to-SQL benchmarks (such as Spider and BIRD) predominantly evaluate t
 | **Claude Sonnet 4.6 (Thinking)** | **91.7%** | **110 / 120** | 9.4s | **205.1 ms** | 10 edge cases: missing covering indexes causing nested loop degradation, strict funnel precedence |
 | **Gemini 3.8 Flash (High)** | **90.0%** | **108 / 120** | 39.4s | **210.3 ms** | 12 edge cases: reasoning timeouts on multi-stage CTE graphs, nested loop timeouts |
 | **GPT-OSS 120B (Medium)** | **86.7%** | **104 / 120** | 8.7s | **226.4 ms** | 16 edge cases: unindexed cross joins on skewed foreign keys, statement timeouts |
-| **Golden Ground Truth Baseline** | **100.0%** | **120 / 120** | N/A | **178.6 ms** | Ground Truth Baseline on PostgreSQL 18.7 + pgvector (0% False Negatives) |
+| **Golden Ground Truth Baseline** | **100.0%** | **120 / 120** | N/A | **178.6 ms** | Ground Truth Baseline on PostgreSQL 19.0 + pgvector (0% False Negatives) |
+
+#### 🧱 Databricks SQL Warehouse (Serverless Cloud Analytics)
+
+| Model / Baseline | Pass Rate | Correct / Total | Avg Model Latency | Engine Exec Latency | Primary Analytical Failure Modes & Dialect Notes |
+|---|:---:|:---:|:---:|:---:|---|
+| **Gemini 3.8 Flash (Low)** | **100.0%** | **8 / 8** | **4.7s** | **284.1 ms** | Clean zero-fanout pre-aggregation, ANSI window framing, point-in-time logic |
+| **Golden Ground Truth Baseline** | **100.0%** | **8 / 8** | N/A | **245.3 ms** | Verified on Databricks Serverless Warehouse with dialect adapter (`VARCHAR` -> `STRING`, `explode(sequence(...))`) |
 
 ---
 

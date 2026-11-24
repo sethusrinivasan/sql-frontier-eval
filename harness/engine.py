@@ -5,6 +5,7 @@ import os
 import re
 import time
 import threading
+import sqlparse
 from typing import Optional, Tuple, Dict, Any, List
 
 try:
@@ -13,6 +14,31 @@ try:
     PSYCOPG2_AVAILABLE = True
 except ImportError:
     PSYCOPG2_AVAILABLE = False
+
+try:
+    from databricks import sql as dbsql
+    DATABRICKS_AVAILABLE = True
+except ImportError:
+    DATABRICKS_AVAILABLE = False
+
+
+def load_env_file(filepath: str = ".env"):
+    """Loads key=value pairs from .env into os.environ if not already set."""
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+        except Exception:
+            pass
+
+load_env_file()
 
 
 def adapt_to_postgres(sql: str) -> str:
@@ -37,11 +63,47 @@ def adapt_to_postgres(sql: str) -> str:
     return res
 
 
+def adapt_to_databricks(sql: str) -> str:
+    """
+    Adapts DuckDB-centric benchmark queries and DDL to Databricks SQL / Spark SQL:
+    1. Strips DuckDB engine pragma/extension commands (INSTALL, LOAD, PRAGMA)
+    2. Converts unparameterized VARCHAR and TEXT to STRING
+    3. Converts square-bracket array literals [1.0, 2.0] to array(1.0, 2.0)
+    4. Converts date_diff('unit', ...) to date_diff(UNIT, ...)
+    5. Converts DuckDB ASOF JOIN ON ... AND condition to Databricks MATCH_CONDITION
+    """
+    if not sql:
+        return ""
+    res = re.sub(r"INSTALL\s+\w+;\s*LOAD\s+\w+;?", "", sql, flags=re.IGNORECASE)
+    res = re.sub(r"PRAGMA\s+[^;]+;?", "", res, flags=re.IGNORECASE)
+    # Convert unparameterized VARCHAR and TEXT to STRING
+    res = re.sub(r"\bVARCHAR\b(?!\s*\()", "STRING", res, flags=re.IGNORECASE)
+    res = re.sub(r"\bTEXT\b", "STRING", res, flags=re.IGNORECASE)
+    # Convert square-bracket float/number array literals [0.1, 0.2] to array(0.1, 0.2)
+    res = re.sub(r"(?<![A-Za-z0-9_])\[\s*([0-9\.\,\s\-]+)\s*\]", r"array(\1)", res)
+    # Databricks date_diff expects unquoted unit: date_diff('second', a, b) -> date_diff(SECOND, a, b)
+    res = re.sub(r"\bdate_diff\s*\(\s*['\"](\w+)['\"]\s*,", lambda m: f"date_diff({m.group(1).upper()},", res, flags=re.IGNORECASE)
+    # Databricks ASOF JOIN: convert ON ... AND t1.ts >= t2.ts to ON ... MATCH_CONDITION ( t1.ts >= t2.ts )
+    res = re.sub(
+        r"ASOF\s+JOIN\s+([A-Za-z0-9_]+(?:\s+(?:AS\s+)?[A-Za-z0-9_]+)?)\s+ON\s+(.+?)\s+AND\s+([A-Za-z0-9_\.]+\s*(?:>=|<=|>|<)\s*[A-Za-z0-9_\.]+)",
+        r"ASOF JOIN \1 ON \2 MATCH_CONDITION ( \3 )",
+        res,
+        flags=re.IGNORECASE | re.DOTALL
+    )
+    # Convert UNNEST(generate_series(start, end, step)) to explode(sequence(start, end, step))
+    res = re.sub(r"\bUNNEST\s*\(\s*generate_series\s*\(", "explode(sequence(", res, flags=re.IGNORECASE)
+    # Convert LAST_VALUE/FIRST_VALUE(expr IGNORE NULLS) -> last_value/first_value(expr, true)
+    res = re.sub(r"LAST_VALUE\s*\(\s*([^,\)]+?)\s+IGNORE\s+NULLS\s*\)", r"last_value(\1, true)", res, flags=re.IGNORECASE)
+    res = re.sub(r"FIRST_VALUE\s*\(\s*([^,\)]+?)\s+IGNORE\s+NULLS\s*\)", r"first_value(\1, true)", res, flags=re.IGNORECASE)
+    return res.strip()
+
+
 class SQLEvalEngine:
     """
     Unified analytical SQL execution sandbox supporting:
     - DuckDB (In-Memory Columnar OLAP engine)
-    - PostgreSQL 18+ (Relational, Vector with pgvector, Full-Text & Analytical Extensions)
+    - PostgreSQL 19+ (Relational, Vector with pgvector, Full-Text & Analytical Extensions)
+    - Databricks SQL (Serverless Warehouse / Unity Catalog Compute Cluster)
     Provides query execution, statement timeout watchdog, physical execution plan profiling,
     operator tree decomposition, and anti-pattern detection.
     """
@@ -49,12 +111,15 @@ class SQLEvalEngine:
         self,
         engine_type: str = "duckdb",
         threads: int = 4,
-        pg_conn_params: Optional[Dict[str, Any]] = None
+        pg_conn_params: Optional[Dict[str, Any]] = None,
+        databricks_conn_params: Optional[Dict[str, Any]] = None,
     ):
         self.engine_type = engine_type.lower()
         self.threads = threads
         self.con: Optional[duckdb.DuckDBPyConnection] = None
         self.pg_conn: Optional[Any] = None
+        self.databricks_conn: Optional[Any] = None
+
         self.pg_conn_params = pg_conn_params or {
             "dbname": os.environ.get("PGDATABASE", "sql_frontier_eval"),
             "user": os.environ.get("PGUSER", "postgres"),
@@ -62,6 +127,17 @@ class SQLEvalEngine:
             "host": os.environ.get("PGHOST", "127.0.0.1"),
             "port": int(os.environ.get("PGPORT", "5432")),
         }
+
+        self.databricks_conn_params = databricks_conn_params or {
+            "server_hostname": os.environ.get("DATABRICKS_SERVER_HOSTNAME"),
+            "http_path": os.environ.get("DATABRICKS_HTTP_PATH"),
+            "access_token": os.environ.get("DATABRICKS_TOKEN"),
+            "client_id": os.environ.get("DATABRICKS_CLIENT_ID"),
+            "client_secret": os.environ.get("DATABRICKS_CLIENT_SECRET"),
+            "catalog": os.environ.get("DATABRICKS_CATALOG", "main"),
+            "schema": os.environ.get("DATABRICKS_SCHEMA", "eval_sandbox"),
+        }
+
         self.reset_sandbox()
 
     def reset_sandbox(self):
@@ -69,6 +145,7 @@ class SQLEvalEngine:
         Reinitializes a clean database environment to prevent cross-task data leakage.
         - For DuckDB: recreates an isolated in-memory catalog (:memory:).
         - For PostgreSQL: recreates and sets search_path to an isolated 'eval_sandbox' schema.
+        - For Databricks: isolates into configured sandbox schema and drops previous tables.
         """
         if self.engine_type == "postgres":
             if not PSYCOPG2_AVAILABLE:
@@ -78,6 +155,48 @@ class SQLEvalEngine:
                 self.pg_conn.autocommit = True
             with self.pg_conn.cursor() as cur:
                 cur.execute("DROP SCHEMA IF EXISTS eval_sandbox CASCADE; CREATE SCHEMA eval_sandbox; SET search_path TO eval_sandbox, public;")
+
+        elif self.engine_type == "databricks":
+            if not DATABRICKS_AVAILABLE:
+                raise RuntimeError("databricks-sql-connector is required for Databricks execution. Install via pip install databricks-sql-connector.")
+            if not self.databricks_conn_params.get("server_hostname") or not self.databricks_conn_params.get("http_path"):
+                raise ValueError(
+                    "Databricks credentials missing. Please set DATABRICKS_SERVER_HOSTNAME and "
+                    "DATABRICKS_HTTP_PATH in your environment or .env file."
+                )
+            if self.databricks_conn is None:
+                conn_kwargs = {
+                    "server_hostname": self.databricks_conn_params["server_hostname"],
+                    "http_path": self.databricks_conn_params["http_path"],
+                    "catalog": self.databricks_conn_params.get("catalog", "workspace"),
+                    "schema": self.databricks_conn_params.get("schema", "sql_frontier_eval_sandbox"),
+                }
+                if self.databricks_conn_params.get("access_token"):
+                    conn_kwargs["access_token"] = self.databricks_conn_params["access_token"]
+                elif self.databricks_conn_params.get("client_id") and self.databricks_conn_params.get("client_secret"):
+                    conn_kwargs["client_id"] = self.databricks_conn_params["client_id"]
+                    conn_kwargs["client_secret"] = self.databricks_conn_params["client_secret"]
+                    conn_kwargs["auth_type"] = "databricks-oauth"
+                else:
+                    # Default to native Databricks OAuth U2M
+                    conn_kwargs["auth_type"] = "databricks-oauth"
+
+                self.databricks_conn = dbsql.connect(**conn_kwargs)
+            catalog = self.databricks_conn_params.get("catalog", "workspace")
+            schema = self.databricks_conn_params.get("schema", "sql_frontier_eval_sandbox")
+            with self.databricks_conn.cursor() as cur:
+                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
+                cur.execute(f"USE CATALOG {catalog}")
+                cur.execute(f"USE SCHEMA {schema}")
+                try:
+                    cur.execute("SHOW TABLES")
+                    tables = cur.fetchall()
+                    for row in tables:
+                        tname = row[1] if len(row) > 1 else row[0]
+                        cur.execute(f"DROP TABLE IF EXISTS {tname}")
+                except Exception:
+                    pass
+
         else:
             if self.con is not None:
                 try:
@@ -102,6 +221,17 @@ class SQLEvalEngine:
                 adapted_sql = adapt_to_postgres(setup_sql)
                 with self.pg_conn.cursor() as cur:
                     cur.execute(adapted_sql)
+            elif self.engine_type == "databricks":
+                adapted_sql = adapt_to_databricks(setup_sql)
+                with self.databricks_conn.cursor() as cur:
+                    statements = [
+                        stmt.strip() for stmt in sqlparse.split(adapted_sql)
+                        if stmt.strip() and not stmt.strip().startswith("--")
+                    ]
+                    for stmt in statements:
+                        clean_stmt = stmt.rstrip(";").strip()
+                        if clean_stmt:
+                            cur.execute(clean_stmt)
             else:
                 self.con.execute(setup_sql)
             return None
@@ -136,6 +266,24 @@ class SQLEvalEngine:
                 if "canceling statement due to statement timeout" in err_msg.lower():
                     err_msg = f"Execution timed out (> {timeout_sec:.1f}s) - runaway query terminated safely."
                 return None, err_msg, elapsed_ms
+
+        elif self.engine_type == "databricks":
+            adapted_query = adapt_to_databricks(query)
+            try:
+                with self.databricks_conn.cursor() as cur:
+                    cur.execute(adapted_query)
+                    if cur.description is not None:
+                        cols = [d[0] for d in cur.description]
+                        rows = cur.fetchall()
+                        df = pd.DataFrame(rows, columns=cols)
+                    else:
+                        df = pd.DataFrame()
+                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                return df, None, elapsed_ms
+            except Exception as e:
+                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                return None, str(e), elapsed_ms
+
         else:
             timer = threading.Timer(timeout_sec, self.con.interrupt)
             timer.start()
@@ -157,6 +305,7 @@ class SQLEvalEngine:
         Runs execution plan profiling:
         - DuckDB: EXPLAIN (FORMAT JSON)
         - PostgreSQL: EXPLAIN (ANALYZE, FORMAT JSON, VERBOSE)
+        - Databricks: EXPLAIN EXTENDED
         """
         if self.engine_type == "postgres":
             adapted_query = adapt_to_postgres(query)
@@ -171,6 +320,18 @@ class SQLEvalEngine:
                     return profile_json, None
             except Exception as e:
                 return None, str(e)
+
+        elif self.engine_type == "databricks":
+            adapted_query = adapt_to_databricks(query)
+            try:
+                with self.databricks_conn.cursor() as cur:
+                    cur.execute(f"EXPLAIN EXTENDED {adapted_query}")
+                    rows = cur.fetchall()
+                    plan_text = "\n".join([str(r[0]) for r in rows if r])
+                    return {"plan_text": plan_text}, None
+            except Exception as e:
+                return None, str(e)
+
         else:
             # DuckDB Primary: EXPLAIN (FORMAT JSON)
             try:
@@ -205,7 +366,7 @@ class SQLEvalEngine:
     def extract_operators(profile_tree: Any) -> List[Dict[str, Any]]:
         """
         Recursively extracts all operators from execution plan trees.
-        Supports both DuckDB (JSON tree) and PostgreSQL (EXPLAIN JSON tree).
+        Supports DuckDB (JSON tree), PostgreSQL (EXPLAIN JSON tree), and Databricks (Plan text).
         """
         operators = []
 
@@ -262,7 +423,37 @@ class SQLEvalEngine:
             for child in plan_node.get("Plans", []):
                 _traverse_postgres(child)
 
-        if isinstance(profile_tree, list) and len(profile_tree) > 0 and isinstance(profile_tree[0], dict) and "Plan" in profile_tree[0]:
+        def _traverse_databricks(plan_text: str):
+            lines = plan_text.splitlines()
+            for line in lines:
+                line_str = line.strip()
+                if not line_str or line_str.startswith("=="):
+                    continue
+                m = re.search(r"(\w+Join|CartesianProduct|HashAggregate|SortAggregate|Window|FileScan|BatchScan|Filter|Project|Sort)", line_str)
+                if m:
+                    raw_op = m.group(1)
+                    op_type = raw_op.upper()
+                    if "CARTESIANPRODUCT" in op_type or "BROADCASTNESTEDLOOPJOIN" in op_type:
+                        op_type = "CROSS_PRODUCT"
+                    elif "JOIN" in op_type:
+                        op_type = "HASH_JOIN"
+                    elif "AGGREGATE" in op_type:
+                        op_type = "HASH_GROUP_BY"
+                    elif "SCAN" in op_type:
+                        op_type = "TABLE_SCAN"
+                    operators.append({
+                        "type": op_type,
+                        "raw_type": raw_op,
+                        "name": raw_op,
+                        "cardinality": 0,
+                        "timing_sec": 0.0,
+                        "rows_scanned": 0,
+                        "extra_info": {"plan_line": line_str[:120]}
+                    })
+
+        if isinstance(profile_tree, dict) and "plan_text" in profile_tree:
+            _traverse_databricks(profile_tree["plan_text"])
+        elif isinstance(profile_tree, list) and len(profile_tree) > 0 and isinstance(profile_tree[0], dict) and "Plan" in profile_tree[0]:
             _traverse_postgres(profile_tree)
         elif isinstance(profile_tree, dict) and "Plan" in profile_tree:
             _traverse_postgres(profile_tree)
@@ -275,10 +466,18 @@ class SQLEvalEngine:
     def extract_profile_metrics(profile_tree: Any) -> Dict[str, Any]:
         """
         Extracts high-level execution and resource consumption metrics.
-        Handles both DuckDB and PostgreSQL execution profiles.
+        Handles DuckDB, PostgreSQL, and Databricks execution profiles.
         """
         if not profile_tree:
             return {}
+
+        # Databricks format
+        if isinstance(profile_tree, dict) and "plan_text" in profile_tree:
+            return {
+                "cpu_time_sec": 0.0,
+                "latency_sec": 0.0,
+                "plan_preview": profile_tree["plan_text"][:300]
+            }
 
         # PostgreSQL format
         if isinstance(profile_tree, list) and len(profile_tree) > 0 and isinstance(profile_tree[0], dict) and "Plan" in profile_tree[0]:

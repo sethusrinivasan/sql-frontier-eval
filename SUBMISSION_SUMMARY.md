@@ -19,7 +19,7 @@ The benchmark implements an **8-category analytical failure taxonomy** that span
 7. Quadratic triangular self-joins triggering $O(N^2)$ memory spills, and
 8. Non-SARGable date predicate wrapping defeating columnar partition pruning.
 
-Built on an isolated in-memory **DuckDB 2.0 engine**, the harness enforces **zero-flakiness multiset row sorting**, floating-point tolerance, and **physical execution plan profiling** (traversing EXPLAIN JSON operator trees to catch disallowed operators like `CROSS_PRODUCT` and `PIECEWISE_MERGE_JOIN`). When any evaluation fails, the harness automatically generates a comprehensive diagnostic walkthrough featuring beautified SQL queries, ASCII comparison tables, arithmetic delta calculation, and root-cause failure analysis.
+Built on a multi-engine evaluation harness supporting isolated in-memory **DuckDB 2.0**, local **PostgreSQL 19.0** (with `pgvector 0.8.7`), and enterprise **Databricks SQL Warehouses**, the harness enforces **zero-flakiness multiset row sorting**, floating-point tolerance, and **physical execution plan profiling** (traversing EXPLAIN JSON operator trees to catch disallowed operators like `CROSS_PRODUCT` and `PIECEWISE_MERGE_JOIN`). When any evaluation fails, the harness automatically generates a comprehensive diagnostic walkthrough featuring beautified SQL queries, ASCII comparison tables, arithmetic delta calculation, and root-cause failure analysis.
 
 ---
 

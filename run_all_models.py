@@ -27,8 +27,8 @@ def parse_args():
         "--engine",
         type=str,
         default="duckdb",
-        choices=["duckdb", "postgres"],
-        help="Database engine to evaluate: 'duckdb' (default) or 'postgres'"
+        choices=["duckdb", "postgres", "databricks"],
+        help="Database engine to evaluate: 'duckdb' (default), 'postgres', or 'databricks'"
     )
     parser.add_argument(
         "--tasks",

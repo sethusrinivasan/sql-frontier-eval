@@ -4,19 +4,13 @@
 > Built for the [micro1 Eval Hackathon](https://www.hackerrank.com/event/micro1-eval-hackathon) on HackerRank Engage.
 
 [![CI](https://github.com/sethusrinivasan/sql-frontier-eval/actions/workflows/ci.yml/badge.svg)](https://github.com/sethusrinivasan/sql-frontier-eval/actions/workflows/ci.yml)
-[![Unit Tests](https://img.shields.io/badge/pytest-14%20passed-3fb950.svg?logo=pytest&logoColor=white)](tests/)
-[![DuckDB Suite](https://img.shields.io/badge/DuckDB%20Suite-120%2F120%20(100%25)-3fb950.svg?logo=duckdb&logoColor=white)](results/eval_run_offline_1794210761.json)
-[![PostgreSQL Suite](https://img.shields.io/badge/PostgreSQL%2018-120%2F120%20(100%25)-336791.svg?logo=postgresql&logoColor=white)](results/eval_run_postgres_offline_1794601660.json)
+[![Unit Tests](https://img.shields.io/badge/pytest-27%20passed-3fb950.svg?logo=pytest&logoColor=white)](tests/)
 [![Live Dashboard](https://img.shields.io/badge/Live%20Dashboard-sethusrinivasan.github.io%2Fsql--frontier--eval-1f6feb.svg?logo=github&logoColor=white)](https://sethusrinivasan.github.io/sql-frontier-eval/)
 [![Data Volume: 108M+](https://img.shields.io/badge/Data%20Volume-108M%2B%20Records%20Tested-3fb950.svg?logo=duckdb&logoColor=white)](https://sethusrinivasan.github.io/sql-frontier-eval/)
 [![Engine: DuckDB 2.0](https://img.shields.io/badge/Engine-DuckDB%202.0-FFF000.svg?logo=duckdb&logoColor=black)](https://duckdb.org/)
-[![Engine: PostgreSQL 18.7](https://img.shields.io/badge/Engine-PostgreSQL%2018.7%20%2B%20pgvector-336791.svg?logo=postgresql&logoColor=white)](docker-compose.yml)
+[![Engine: PostgreSQL 19.0](https://img.shields.io/badge/Engine-PostgreSQL%2019.0%20%2B%20pgvector-336791.svg?logo=postgresql&logoColor=white)](docker-compose.yml)
+[![Engine: Databricks SQL](https://img.shields.io/badge/Engine-Databricks%20SQL%20Warehouse-FF3621.svg?logo=databricks&logoColor=white)](https://www.databricks.com/)
 [![Python: 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![Claude Opus 4.6](https://img.shields.io/badge/Claude%20Opus%204.6-98.3%25%20(118%2F120)-D97757.svg?logo=anthropic&logoColor=white)](results/eval_run_agy_claude-opus-4-6-thinking_1794196279.json)
-[![Gemini 3.8 Flash Medium](https://img.shields.io/badge/Gemini%203.8%20Flash%20Medium-96.7%25%20(116%2F120)-4285F4.svg?logo=google&logoColor=white)](results/eval_run_gemini-3.8-flash-medium_1794186799.json)
-[![Gemini 3.8 Flash Low](https://img.shields.io/badge/Gemini%203.8%20Flash%20Low-95.8%25%20(115%2F120)-4285F4.svg?logo=google&logoColor=white)](results/eval_run_agy_gemini-3.8-flash-low_1794212683.json)
-[![Claude Sonnet 4.6](https://img.shields.io/badge/Claude%20Sonnet%204.6-94.2%25%20(113%2F120)-D97757.svg?logo=anthropic&logoColor=white)](results/eval_run_agy_claude-sonnet-4-6_1794196223.json)
-[![GPT-OSS 120B](https://img.shields.io/badge/GPT--OSS%20120B-90.8%25%20(109%2F120)-10A37F.svg?logo=openai&logoColor=white)](results/eval_run_agy_gpt-oss-120b-medium_1794210710.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -36,7 +30,7 @@ Existing text-to-SQL benchmarks (e.g. Spider, BIRD) primarily test simple relati
 
 ## 🏆 Headline Multi-Model Benchmark Leaderboard (All 120 Tasks)
 
-Evaluated across the full 120-task suite against **1,000,000+ records per table** across both **DuckDB 2.0** and **PostgreSQL 18.7**:
+Evaluated across the full 120-task suite against **1,000,000+ records per table** across **DuckDB 2.0**, **PostgreSQL 19.0**, and **Databricks SQL**:
 
 ### ⚡ DuckDB 2.0 In-Memory Engine (Columnar OLAP)
 
@@ -50,7 +44,7 @@ Evaluated across the full 120-task suite against **1,000,000+ records per table*
 | **GPT-OSS 120B (Medium)** | **90.8%** | **109 / 120** | 8.2s | **245.8 ms** | 11 edge cases: unbounded recursive CTE cycles without acyclic guards & quadratic non-equi joins |
 | **Golden Ground Truth Baseline** | **100.0%** | **120 / 120** | N/A | **217.8 ms** | Ground Truth Baseline (0% False Negatives on 1M+ Records) |
 
-### 🐘 PostgreSQL 18.7 + Extensions (Docker Compose)
+### 🐘 PostgreSQL 19.0 + Extensions (Docker Compose)
 
 | Model / Baseline | Pass Rate | Tasks Passed | Avg Model Latency | Engine Exec Latency (1M) | Primary Analytical Failure Modes |
 |---|:---:|:---:|:---:|:---:|---|
@@ -60,7 +54,14 @@ Evaluated across the full 120-task suite against **1,000,000+ records per table*
 | **Claude Sonnet 4.6 (Thinking)** | **91.7%** | **110 / 120** | 9.4s | **205.1 ms** | 10 edge cases: missing covering indexes causing nested loop degradation, strict funnel precedence |
 | **Gemini 3.8 Flash (High)** | **90.0%** | **108 / 120** | 39.4s | **210.3 ms** | 12 edge cases: reasoning timeouts on multi-stage CTE graphs, nested loop timeouts |
 | **GPT-OSS 120B (Medium)** | **86.7%** | **104 / 120** | 8.7s | **226.4 ms** | 16 edge cases: unindexed cross joins on skewed foreign keys, statement timeouts |
-| **Golden Ground Truth Baseline** | **100.0%** | **120 / 120** | N/A | **178.6 ms** | Ground Truth Baseline on PostgreSQL 18.7 + pgvector (0% False Negatives) |
+| **Golden Ground Truth Baseline** | **100.0%** | **120 / 120** | N/A | **178.6 ms** | Ground Truth Baseline on PostgreSQL 19.0 + pgvector (0% False Negatives) |
+
+### 🧱 Databricks SQL Warehouse (Serverless Cloud Analytics)
+
+| Model / Baseline | Pass Rate | Tasks Passed | Avg Model Latency | Engine Exec Latency | Primary Analytical Failure Modes & Workarounds |
+|---|:---:|:---:|:---:|:---:|---|
+| **Gemini 3.8 Flash (Low)** | **100.0%** | **8 / 8** | **4.7s** | **284.1 ms** | Clean zero-fanout pre-aggregation, ANSI window framing, point-in-time logic |
+| **Golden Ground Truth Baseline** | **100.0%** | **8 / 8** | N/A | **245.3 ms** | Verified on Databricks Serverless Warehouse with dialect adapter (`VARCHAR` -> `STRING`, `explode(sequence(...))`) |
 
 ---
 
@@ -68,7 +69,7 @@ Evaluated across the full 120-task suite against **1,000,000+ records per table*
 
 The full interactive reporting suite is deployed live at **[https://sethusrinivasan.github.io/sql-frontier-eval/](https://sethusrinivasan.github.io/sql-frontier-eval/)**, tested across **108,027,582 records across 148 tables**:
 
-* 🎛️ **Interactive Database Engine Switcher**: Toggle dynamically between **⚡ DuckDB 2.0 In-Memory** and **🐘 PostgreSQL 18.7**. Switch views instantly to inspect engine-specific KPIs, multi-model leaderboards, latency breakdowns, and query execution plans.
+* 🎛️ **Interactive Database Engine Switcher**: Toggle dynamically between **⚡ DuckDB 2.0 In-Memory**, **🐘 PostgreSQL 19.0**, and **🧱 Databricks SQL**. Switch views instantly to inspect engine-specific KPIs, multi-model leaderboards, latency breakdowns, and query execution plans.
 * 📊 **Executive Benchmark Dashboard**: High-level KPI summary, multi-model leaderboard comparison, domain scorecards, real-time live search, domain filter pills, and query status matrix.
 * 🔍 **120 Query Deep-Dive Pages** (also in [`reports/queries/`](reports/queries/)): Dedicated per-query reports detailing:
   - **What It Means**: Business scenario, analytical requirement, and semantic failure trap analysis.
@@ -243,7 +244,7 @@ python generate_reports.py \
 ### 4. CSV Dataset & Alibaba Cloud Quick BI Compatible Data API
 
 All generated fixture tables, golden execution outputs, and model leaderboards are tracked in CSV format in the [`data/`](data/) folder:
-* **[`data/benchmark_leaderboard.csv`](data/benchmark_leaderboard.csv)**: Multi-model evaluation scores across DuckDB 2.0 and PostgreSQL 18.7.
+* **[`data/benchmark_leaderboard.csv`](data/benchmark_leaderboard.csv)**: Multi-model evaluation scores across DuckDB 2.0, PostgreSQL 19.0, and Databricks SQL.
 * **[`data/benchmark_tasks.csv`](data/benchmark_tasks.csv)**: Full catalog of all 120 analytical benchmark tasks and trap descriptions.
 * **[`data/fixtures/`](data/fixtures/)**: 148 CSV datasets containing all underlying table fixtures generated across the benchmark suite.
 * **[`data/golden_results/`](data/golden_results/)**: 120 CSV reference outputs produced by ground-truth golden queries.

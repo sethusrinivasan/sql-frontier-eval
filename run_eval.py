@@ -182,8 +182,8 @@ def parse_args():
         "--engine",
         type=str,
         default="duckdb",
-        choices=["duckdb", "postgres"],
-        help="Database execution engine: 'duckdb' (default, in-memory OLAP) or 'postgres' (PostgreSQL 18+ via Docker)"
+        choices=["duckdb", "postgres", "databricks"],
+        help="Database execution engine: 'duckdb' (default, in-memory OLAP), 'postgres' (PostgreSQL 19+ via Docker), or 'databricks' (Databricks SQL Warehouse/Cluster)"
     )
     parser.add_argument(
         "--save-results",
@@ -218,7 +218,14 @@ def run_evaluation(args) -> Dict[str, Any]:
     print(f"SQL FRONTIER EVALUATION RUNNER")
     print(f"Target Model: {args.model} {'(TESTING GOLDEN BASELINE)' if args.test_gold else ''}")
     print(f"Tasks Discovered: {len(task_files)}")
-    engine_desc = "DuckDB 2.0 In-Memory (threads=4)" if args.engine == "duckdb" else "PostgreSQL 18+ (Docker Compose with pgvector)"
+    if args.engine == "duckdb":
+        engine_desc = "DuckDB 2.0 In-Memory (threads=4)"
+    elif args.engine == "postgres":
+        engine_desc = "PostgreSQL 19+ (Docker Compose with pgvector)"
+    elif args.engine == "databricks":
+        engine_desc = "Databricks SQL Warehouse (Unity Catalog / Serverless)"
+    else:
+        engine_desc = args.engine
     print(f"Execution Engine: {engine_desc}")
     print("=" * 80)
 
