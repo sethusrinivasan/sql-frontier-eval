@@ -182,8 +182,8 @@ def parse_args():
         "--engine",
         type=str,
         default="duckdb",
-        choices=["duckdb", "postgres", "databricks"],
-        help="Database execution engine: 'duckdb' (default, in-memory OLAP), 'postgres' (PostgreSQL 19+ via Docker), or 'databricks' (Databricks SQL Warehouse/Cluster)"
+        choices=["duckdb", "postgres", "databricks", "aurora", "aurora-postgres"],
+        help="Database execution engine: 'duckdb' (default, in-memory OLAP), 'postgres' (PostgreSQL 19+ via Docker), 'databricks' (Databricks SQL Warehouse/Cluster), or 'aurora' (Aurora Serverless v2 PostgreSQL via IAM DB Auth)"
     )
     parser.add_argument(
         "--save-results",
@@ -224,6 +224,8 @@ def run_evaluation(args) -> Dict[str, Any]:
         engine_desc = "PostgreSQL 19+ (Docker Compose with pgvector)"
     elif args.engine == "databricks":
         engine_desc = "Databricks SQL Warehouse (Unity Catalog / Serverless)"
+    elif args.engine in ("aurora", "aurora-postgres"):
+        engine_desc = "Aurora Serverless v2 PostgreSQL (Per-Category IAM DB Auth)"
     else:
         engine_desc = args.engine
     print(f"Execution Engine: {engine_desc}")
@@ -246,7 +248,7 @@ def run_evaluation(args) -> Dict[str, Any]:
         print(f"  Category: {category}")
 
         # 1. Fresh sandbox & load fixture
-        engine.reset_sandbox()
+        engine.reset_sandbox(category=category)
         setup_err = engine.load_seed_data(task["setup_sql"])
         if setup_err:
             print(f"  [ERROR] Setup SQL failed: {setup_err}")

@@ -21,6 +21,12 @@ try:
 except ImportError:
     DATABRICKS_AVAILABLE = False
 
+try:
+    import boto3
+    BOTO3_AVAILABLE = True
+except ImportError:
+    BOTO3_AVAILABLE = False
+
 
 def load_env_file(filepath: str = ".env"):
     """Loads key=value pairs from .env into os.environ if not already set."""
@@ -145,6 +151,12 @@ class SQLEvalEngine:
             "port": int(os.environ.get("PGPORT", "5432")),
         }
 
+        self.aurora_host = os.environ.get("AURORA_HOST", "reality-check-cost-tracker.cluster-c52ymc6u0ruy.us-east-2.rds.amazonaws.com")
+        self.aurora_port = int(os.environ.get("AURORA_PORT", "5432"))
+        self.aurora_dbname = os.environ.get("AURORA_DBNAME", "postgres")
+        self.aurora_region = os.environ.get("AURORA_REGION", "us-east-2")
+        self.aurora_current_category: Optional[str] = None
+
         self.databricks_conn_params = databricks_conn_params or {
             "server_hostname": os.environ.get("DATABRICKS_SERVER_HOSTNAME"),
             "http_path": os.environ.get("DATABRICKS_HTTP_PATH"),
@@ -157,14 +169,99 @@ class SQLEvalEngine:
 
         self.reset_sandbox()
 
-    def reset_sandbox(self):
+    def reset_sandbox(self, category: Optional[str] = None):
         """
         Reinitializes a clean database environment to prevent cross-task data leakage.
         - For DuckDB: recreates an isolated in-memory catalog (:memory:).
         - For PostgreSQL: recreates and sets search_path to an isolated 'eval_sandbox' schema.
         - For Databricks: isolates into configured sandbox schema and drops previous tables.
+        - For Aurora PostgreSQL: dynamically switches to per-category IAM role, connects as the
+          dedicated category Postgres user with IAM DB Auth, and isolates in sql_eval_s_<cat_slug>.
         """
-        if self.engine_type == "postgres":
+        if self.engine_type in ("aurora", "aurora-postgres"):
+            if not PSYCOPG2_AVAILABLE:
+                raise RuntimeError("psycopg2 is required for Aurora PostgreSQL execution. Install via pip install psycopg2-binary.")
+            if not BOTO3_AVAILABLE:
+                raise RuntimeError("boto3 is required for Aurora IAM Database Authentication.")
+
+            if category is None and self.aurora_current_category is None:
+                # Defer connection until first task category is provided
+                return
+
+            if category is None:
+                category = self.aurora_current_category or "Warehouse & Statistical"
+
+            from harness.aurora_category_auth import get_role_names
+            names = get_role_names(category)
+            pg_user = names["pg_user"]
+            pg_schema = names["pg_schema"]
+            role_arn = names["iam_role_arn"]
+
+            # Reconnect if category switched or connection is closed
+            if (
+                self.pg_conn is None
+                or getattr(self.pg_conn, "closed", True)
+                or self.aurora_current_category != category
+            ):
+                if self.pg_conn and not getattr(self.pg_conn, "closed", True):
+                    try:
+                        self.pg_conn.close()
+                    except Exception:
+                        pass
+
+                # 1. Assume dedicated category IAM role
+                sts = boto3.client("sts", region_name=self.aurora_region)
+                assumed = sts.assume_role(
+                    RoleArn=role_arn,
+                    RoleSessionName=f"sql-eval-{names['slug']}"
+                )
+                creds = assumed["Credentials"]
+
+                # 2. Generate scoped IAM DB Auth token
+                scoped_rds = boto3.client(
+                    "rds",
+                    region_name=self.aurora_region,
+                    aws_access_key_id=creds["AccessKeyId"],
+                    aws_secret_access_key=creds["SecretAccessKey"],
+                    aws_session_token=creds["SessionToken"],
+                )
+                token = scoped_rds.generate_db_auth_token(
+                    DBHostname=self.aurora_host,
+                    Port=self.aurora_port,
+                    DBUsername=pg_user,
+                    Region=self.aurora_region,
+                )
+
+                # 3. Connect to Aurora PostgreSQL with IAM DB Auth over TLS
+                import certifi
+                self.pg_conn = psycopg2.connect(
+                    host=self.aurora_host,
+                    port=self.aurora_port,
+                    dbname=self.aurora_dbname,
+                    user=pg_user,
+                    password=token,
+                    sslmode="verify-full",
+                    sslrootcert=certifi.where(),
+                    connect_timeout=15,
+                )
+                self.pg_conn.autocommit = True
+                self.aurora_current_category = category
+
+            # 4. Enforce isolated search_path and clean schema tables
+            with self.pg_conn.cursor() as cur:
+                cur.execute(f"SET search_path TO {pg_schema}, public;")
+                cur.execute(f"""
+                    DO $$
+                    DECLARE
+                        r RECORD;
+                    BEGIN
+                        FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = '{pg_schema}') LOOP
+                            EXECUTE 'DROP TABLE IF EXISTS {pg_schema}.' || quote_ident(r.tablename) || ' CASCADE';
+                        END LOOP;
+                    END $$;
+                """)
+
+        elif self.engine_type == "postgres":
             if not PSYCOPG2_AVAILABLE:
                 raise RuntimeError("psycopg2 is required for PostgreSQL execution. Install via pip install psycopg2-binary.")
             if self.pg_conn is None or getattr(self.pg_conn, "closed", True):
@@ -263,7 +360,7 @@ class SQLEvalEngine:
         Returns an error string if setup fails, or None on success.
         """
         try:
-            if self.engine_type == "postgres":
+            if self.engine_type in ("postgres", "aurora", "aurora-postgres"):
                 adapted_sql = adapt_to_postgres(setup_sql)
                 with self.pg_conn.cursor() as cur:
                     cur.execute(adapted_sql)
@@ -291,7 +388,7 @@ class SQLEvalEngine:
         """
         start_time = time.perf_counter()
 
-        if self.engine_type == "postgres":
+        if self.engine_type in ("postgres", "aurora", "aurora-postgres"):
             adapted_query = adapt_to_postgres(query)
             try:
                 with self.pg_conn.cursor() as cur:
@@ -353,7 +450,7 @@ class SQLEvalEngine:
         - PostgreSQL: EXPLAIN (ANALYZE, FORMAT JSON, VERBOSE)
         - Databricks: EXPLAIN EXTENDED
         """
-        if self.engine_type == "postgres":
+        if self.engine_type in ("postgres", "aurora", "aurora-postgres"):
             adapted_query = adapt_to_postgres(query)
             try:
                 with self.pg_conn.cursor() as cur:
