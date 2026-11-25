@@ -13,7 +13,10 @@ Naming convention (fixed prefix/suffix for idempotent re-use):
 """
 import re
 import json
-import boto3
+try:
+    import boto3
+except ImportError:
+    boto3 = None
 from typing import Dict, Any, List
 
 ACCOUNT_ID = "596090776030"
@@ -62,6 +65,8 @@ def get_role_names(category: str) -> Dict[str, str]:
 
 def ensure_all_iam_roles() -> Dict[str, str]:
     """Idempotently provisions or reuses all 15 category-specific IAM roles and policies."""
+    if boto3 is None:
+        raise RuntimeError("boto3 must be installed to manage IAM roles")
     iam = boto3.client("iam", region_name=REGION)
     created_or_verified = {}
     
@@ -183,6 +188,8 @@ def generate_pg_cleanup_sql() -> str:
 
 def cleanup_all_iam_roles() -> None:
     """Deletes all 15 category-specific IAM roles and policies."""
+    if boto3 is None:
+        raise RuntimeError("boto3 must be installed to manage IAM roles")
     iam = boto3.client("iam", region_name=REGION)
     for cat_name in CATEGORY_SLUG_MAP.keys():
         names = get_role_names(cat_name)
