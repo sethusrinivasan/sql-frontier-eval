@@ -54,6 +54,8 @@ def adapt_to_postgres(sql: str) -> str:
     # Strip DuckDB pragmas and install/load statements
     res = re.sub(r"INSTALL\s+\w+;\s*LOAD\s+\w+;?", "", sql, flags=re.IGNORECASE)
     res = re.sub(r"PRAGMA\s+[^;]+;?", "", res, flags=re.IGNORECASE)
+    # Convert standalone DOUBLE to DOUBLE PRECISION
+    res = re.sub(r"\bDOUBLE\b", "DOUBLE PRECISION", res, flags=re.IGNORECASE)
     # Convert square-bracket numeric/float arrays to ARRAY[...]
     res = re.sub(r"(?<![A-Za-z0-9_])\[\s*([0-9\.\,\s\-]+)\s*\]", r"ARRAY[\1]", res)
     # Enforce quoted interval strings: INTERVAL 30 SECOND -> INTERVAL '30 SECOND'
