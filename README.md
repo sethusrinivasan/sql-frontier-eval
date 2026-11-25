@@ -58,15 +58,17 @@ Evaluated across the full 120-task suite against **1,000,000+ records per table*
 
 ### 🧱 Databricks SQL Warehouse (Serverless Cloud Analytics)
 
-| Model / Baseline | Pass Rate | Tasks Passed | Avg Model Latency | Engine Exec Latency | Primary Analytical Failure Modes & Workarounds |
+Evaluated across the full 120-task suite against **1,000,000+ records per table** hosted on Databricks Serverless Compute (`workspace.sql_frontier_eval_sandbox`):
+
+| Model / Baseline | Pass Rate | Tasks Passed | Avg Model Latency | Engine Exec Latency | Primary Analytical Failure Modes & Dialect Workarounds |
 |---|:---:|:---:|:---:|:---:|---|
-| **Claude Opus 4.6 (Thinking)** | **100.0%** | **8 / 8** | 12.0s | **238.2 ms** | Flawless analytical translation; correctly synthesized CTE pre-aggregations & ANSI window frames |
-| **Claude Sonnet 4.6 (Thinking)** | **100.0%** | **8 / 8** | 12.5s | **242.6 ms** | Robust point-in-time joins, anti-joins, and non-SARGable date predicate handling |
-| **Gemini 3.8 Flash (Low)** | **100.0%** | **8 / 8** | **4.7s** | **284.1 ms** | Clean zero-fanout pre-aggregation, ANSI window framing, point-in-time logic |
-| **Gemini 3.8 Flash (Medium)** | **87.5%** | **7 / 8** | 27.4s | **265.4 ms** | 1 failure on sessionization inactivity gap syntax on Spark SQL |
-| **GPT-OSS 120B (Medium)** | **87.5%** | **7 / 8** | 12.0s | **251.8 ms** | 1 failure on sequential funnel conversion step precedence syntax |
-| **Core Traps Baseline** | **100.0%** | **8 / 8** | N/A | **245.3 ms** | Verified on Databricks Serverless Warehouse with dialect adapter (`VARCHAR` -> `STRING`, `explode(sequence(...))`) |
-| **Full 120-Task Suite Audit** | **59.2%** | **71 / 120** | N/A | **468.2 ms** | 71/120 tasks passed natively; 49 tasks isolated Spark SQL dialect boundaries (27 vector math UDFs, 4 window `EXCLUDE`, 3 serverless ASOF joins, 2 recursive CTE paths, 2 PIVOT/UNPIVOT) |
+| **Claude Opus 4.6 (Thinking)** | **78.3%** | **94 / 120** | 14.8s | **248.5 ms** | Correctly synthesized CTE pre-aggregations, vector UDFs, higher-order functions; fails on serverless ASOF joins & ANSI window exclusions |
+| **Claude Sonnet 4.6 (Thinking)** | **76.7%** | **92 / 120** | 11.2s | **254.1 ms** | Robust point-in-time joins, anti-joins, and non-SARGable date predicate handling; fails on recursive CTE array syntax & window exclusions |
+| **Gemini 3.8 Flash (Medium)** | **74.2%** | **89 / 120** | 22.4s | **268.4 ms** | Clean vector UDF invocation and sessionization; fails on dynamic pivot and Spark SQL array concatenation |
+| **Gemini 3.8 Flash (Low)** | **73.3%** | **88 / 120** | **4.9s** | **276.8 ms** | Fast zero-fanout pre-aggregation and vector distance math; syntax slips on UNNEST vs explode |
+| **GPT-OSS 120B (Medium)** | **70.0%** | **84 / 120** | 10.5s | **282.6 ms** | Solid relational CTEs; syntax failures on sequential funnel step precedence & dynamic pivot |
+| **Full 120-Task Suite Audit** | **80.8%** | **97 / 120** | N/A | **386.4 ms** | **97/120 tasks passed natively**; 0 setup failures; 23 isolated Spark SQL boundaries (4 window `EXCLUDE`, 3 serverless ASOF, 3 PIVOT/lambdas, 3 UNNEST, 2 recursive arrays, 2 UDF sorting limits) |
+| **Core Traps Baseline** | **100.0%** | **8 / 8** | N/A | **245.3 ms** | 8/8 core trap baseline queries verified with dialect adapter (`VARCHAR` -> `STRING`, `explode(sequence(...))`) |
 
 ---
 

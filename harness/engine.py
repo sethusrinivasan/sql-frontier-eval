@@ -81,10 +81,20 @@ def adapt_to_databricks(sql: str) -> str:
     res = re.sub(r"\bTEXT\b", "STRING", res, flags=re.IGNORECASE)
     # Convert fixed-size or bracketed array types FLOAT[N] -> ARRAY<FLOAT>
     res = re.sub(r"\bFLOAT\[\d+\]", "ARRAY<FLOAT>", res, flags=re.IGNORECASE)
-    res = re.sub(r"\bDOUBLE\[\d+\]", "ARRAY<DOUBLE>", res, flags=re.IGNORECASE)
+    res = re.sub(r"\bDOUBLE\[\d*\]", "ARRAY<DOUBLE>", res, flags=re.IGNORECASE)
     res = re.sub(r"\bINT(EGER)?\[\d*\]", "ARRAY<INT>", res, flags=re.IGNORECASE)
+    # Strip cast suffixes like ::FLOAT[2] or ::DOUBLE[]
+    res = re.sub(r"::FLOAT\[\d+\]", "", res, flags=re.IGNORECASE)
+    res = re.sub(r"::DOUBLE\[\d*\]", "", res, flags=re.IGNORECASE)
+    res = re.sub(r"::INT(EGER)?\[\d*\]", "", res, flags=re.IGNORECASE)
     # Convert square-bracket float/number array literals [0.1, 0.2] to array(0.1, 0.2)
     res = re.sub(r"(?<![A-Za-z0-9_])\[\s*([0-9\.\,\s\-]+)\s*\]", r"array(\1)", res)
+    # Databricks JSON type to STRING
+    res = re.sub(r"\bJSON\b", "STRING", res, flags=re.IGNORECASE)
+    # QUANTILE_CONT to percentile_approx
+    res = re.sub(r"\bQUANTILE_CONT\b", "percentile_approx", res, flags=re.IGNORECASE)
+    # LIST agg function to collect_list
+    res = re.sub(r"\bLIST\s*\(", "collect_list(", res, flags=re.IGNORECASE)
     # Databricks date_diff expects unquoted unit: date_diff('second', a, b) -> date_diff(SECOND, a, b)
     res = re.sub(r"\bdate_diff\s*\(\s*['\"](\w+)['\"]\s*,", lambda m: f"date_diff({m.group(1).upper()},", res, flags=re.IGNORECASE)
     # Databricks ASOF JOIN: convert ON ... AND t1.ts >= t2.ts to ON ... MATCH_CONDITION ( t1.ts >= t2.ts )
@@ -123,6 +133,7 @@ class SQLEvalEngine:
         self.con: Optional[duckdb.DuckDBPyConnection] = None
         self.pg_conn: Optional[Any] = None
         self.databricks_conn: Optional[Any] = None
+        self._databricks_udfs_created: bool = False
 
         self.pg_conn_params = pg_conn_params or {
             "dbname": os.environ.get("PGDATABASE", "sql_frontier_eval"),
@@ -182,8 +193,14 @@ class SQLEvalEngine:
                     conn_kwargs["client_secret"] = self.databricks_conn_params["client_secret"]
                     conn_kwargs["auth_type"] = "databricks-oauth"
                 else:
-                    # Default to native Databricks OAuth U2M
+                    # Default to native Databricks OAuth U2M with persistent token cache
                     conn_kwargs["auth_type"] = "databricks-oauth"
+                    try:
+                        from databricks.sql.experimental.oauth_persistence import DevOnlyFilePersistence
+                        auth_cache = os.path.expanduser("~/.databricks_oauth_cache.json")
+                        conn_kwargs["experimental_oauth_persistence"] = DevOnlyFilePersistence(auth_cache)
+                    except Exception:
+                        pass
 
                 self.databricks_conn = dbsql.connect(**conn_kwargs)
             catalog = self.databricks_conn_params.get("catalog", "workspace")
@@ -192,6 +209,29 @@ class SQLEvalEngine:
                 cur.execute(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
                 cur.execute(f"USE CATALOG {catalog}")
                 cur.execute(f"USE SCHEMA {schema}")
+                # Ensure vector distance routines exist in sandbox schema (create once)
+                if not self._databricks_udfs_created:
+                    try:
+                        cur.execute("""
+                            CREATE OR REPLACE FUNCTION array_cosine_similarity(a ARRAY<DOUBLE>, b ARRAY<DOUBLE>)
+                            RETURNS DOUBLE
+                            RETURN ((aggregate(zip_with(a, b, (x, y) -> x * y), 0.0D, (acc, x) -> acc + x)) / 
+                                   (sqrt(aggregate(transform(a, x -> x * x), 0.0D, (acc, x) -> acc + x)) * 
+                                    sqrt(aggregate(transform(b, x -> x * x), 0.0D, (acc, x) -> acc + x))))
+                        """)
+                        cur.execute("""
+                            CREATE OR REPLACE FUNCTION array_distance(a ARRAY<DOUBLE>, b ARRAY<DOUBLE>)
+                            RETURNS DOUBLE
+                            RETURN sqrt(aggregate(zip_with(a, b, (x, y) -> (x - y) * (x - y)), 0.0D, (acc, x) -> acc + x))
+                        """)
+                        cur.execute("""
+                            CREATE OR REPLACE FUNCTION array_inner_product(a ARRAY<DOUBLE>, b ARRAY<DOUBLE>)
+                            RETURNS DOUBLE
+                            RETURN aggregate(zip_with(a, b, (x, y) -> x * y), 0.0D, (acc, x) -> acc + x)
+                        """)
+                        self._databricks_udfs_created = True
+                    except Exception:
+                        pass
                 try:
                     cur.execute("SHOW TABLES")
                     tables = cur.fetchall()

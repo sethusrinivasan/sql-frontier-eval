@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-11-25T01:55:00.631905+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 1,
+  "passed": 1,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_026_Q26_cosine_similarity_top_k",
+      "name": "Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)",
+      "category": "Vector & Embeddings",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Find the top 2 documents closest to the query embedding [0.9, 0.1, 0.25, 0.0]\n            WITH scored_docs AS (\n                SELECT \n                    doc_id,\n                    title,\n                    embedding,\n                    -- Native SIMD cosine similarity\n                    array_cosine_similarity(embedding, [0.9, 0.1, 0.25, 0.0]::FLOAT[4]) AS cosine_score\n                FROM doc_embeddings\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(cosine_score, 4) AS similarity_score\n            FROM scored_docs\n            ORDER BY cosine_score DESC\n            LIMIT 2;",
+      "golden_sql": "-- Find the top 2 documents closest to the query embedding [0.9, 0.1, 0.25, 0.0]\n            WITH scored_docs AS (\n                SELECT \n                    doc_id,\n                    title,\n                    embedding,\n                    -- Native SIMD cosine similarity\n                    array_cosine_similarity(embedding, [0.9, 0.1, 0.25, 0.0]::FLOAT[4]) AS cosine_score\n                FROM doc_embeddings\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(cosine_score, 4) AS similarity_score\n            FROM scored_docs\n            ORDER BY cosine_score DESC\n            LIMIT 2;",
+      "execution_time_ms": 300.2523339964682,
+      "golden_time_ms": 1277.8348439896945,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [scored_docs]\n:  +- 'SubqueryAlias scored_docs\n:     +- 'Project ['doc_id, 'title, 'embedding, 'array_cosine_similarity('embedding, cast('array(0.9, 0.1, 0.25, 0.0) as array<float>)) AS cosine_score#14046]\n:        +- 'UnresolvedRelation [doc_embeddings], [], false\n+- '"
+        },
+        "rows_verified": 2
+      },
+      "llm_metadata": {}
+    }
+  ]
+}

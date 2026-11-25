@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-11-25T01:55:49.135145+00:00",
+  "model": "offline",
+  "engine": "databricks",
+  "is_golden_test": true,
+  "total_tasks": 1,
+  "passed": 1,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "tasks": [
+    {
+      "task_id": "task_095_Q95_robust_z_score_iqr_normalization",
+      "name": "Robust Z-Score Normalization using Median and Interquartile Range (IQR)",
+      "category": "Warehouse & Statistical",
+      "verdict": "PASS",
+      "passed": true,
+      "reason": "All correctness and performance checks passed",
+      "candidate_sql": "-- Compute robust IQR-normalized score: (x - Q2) / (Q3 - Q1)\n            WITH quartiles AS (\n                SELECT \n                    QUANTILE_CONT(latency_ms, 0.25) AS q1,\n                    QUANTILE_CONT(latency_ms, 0.50) AS median_val,\n                    QUANTILE_CONT(latency_ms, 0.75) AS q3\n                FROM response_times\n            )\n            SELECT \n                r.request_id,\n                r.latency_ms,\n                ROUND((r.latency_ms - q.median_val) / NULLIF(q.q3 - q.q1, 0), 3) AS robust_iqr_z_score\n            FROM response_times r\n            CROSS JOIN quartiles q\n            ORDER BY robust_iqr_z_score DESC;",
+      "golden_sql": "-- Compute robust IQR-normalized score: (x - Q2) / (Q3 - Q1)\n            WITH quartiles AS (\n                SELECT \n                    QUANTILE_CONT(latency_ms, 0.25) AS q1,\n                    QUANTILE_CONT(latency_ms, 0.50) AS median_val,\n                    QUANTILE_CONT(latency_ms, 0.75) AS q3\n                FROM response_times\n            )\n            SELECT \n                r.request_id,\n                r.latency_ms,\n                ROUND((r.latency_ms - q.median_val) / NULLIF(q.q3 - q.q1, 0), 3) AS robust_iqr_z_score\n            FROM response_times r\n            CROSS JOIN quartiles q\n            ORDER BY robust_iqr_z_score DESC;",
+      "execution_time_ms": 223.3296659978805,
+      "golden_time_ms": 924.0872170048533,
+      "diagnostics": {
+        "profile_metrics": {
+          "cpu_time_sec": 0.0,
+          "latency_sec": 0.0,
+          "plan_preview": "== Parsed Logical Plan ==\nCTE [quartiles]\n:  +- 'SubqueryAlias quartiles\n:     +- 'Project ['percentile_approx('latency_ms, 0.25) AS q1#14880, 'percentile_approx('latency_ms, 0.50) AS median_val#14881, 'percentile_approx('latency_ms, 0.75) AS q3#14882]\n:        +- 'UnresolvedRelation [response_times"
+        },
+        "rows_verified": 5
+      },
+      "llm_metadata": {}
+    }
+  ]
+}
