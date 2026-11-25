@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_026_Q26_cosine_similarity_top_k - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_026_Q26_cosine_similarity_top_k: Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN) | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_026_Q26_cosine_similarity_top_k (Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)). Category: Vector &amp; Embeddings. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. When a user asks a question in an AI assistant, the query is embedded into a dense vector (e.g. 4-dimensional here for illustratio">
+    <meta name="keywords" content="SQL Frontier Eval, Vector &amp; Embeddings, task_026_Q26_cosine_similarity_top_k, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_026_Q26_cosine_similarity_top_k.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_026_Q26_cosine_similarity_top_k: Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_026_Q26_cosine_similarity_top_k.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_026_Q26_cosine_similarity_top_k.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_026_Q26_cosine_similarity_top_k: Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_026_Q26_cosine_similarity_top_k.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_026_Q26_cosine_similarity_top_k: Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)",
+      "identifier": "task_026_Q26_cosine_similarity_top_k",
+      "articleSection": "Vector & Embeddings",
+      "description": "When a user asks a question in an AI assistant, the query is embedded into a dense vector (e.g. 4-dimensional here for illustration, or 384/1536 in prod). We retrieve the top most semantically relevant documentation chunks.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_026_Q26_cosine_similarity_top_k.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Vector & Embeddings",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_026_Q26_cosine_similarity_top_k",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_026_Q26_cosine_similarity_top_k.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_026_Q26_cosine_similarity_top_k Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Find the top 2 documents closest to the query embedding [0.9, 0.1, 0.25, 0.0]\n            WITH scored_docs AS (\n                SELECT \n                    doc_id,\n                    title,\n                    embedding,\n                    -- Native SIMD cosine similarity\n                    array_cosine_similarity(embedding, [0.9, 0.1, 0.25, 0.0]::FLOAT[4]) AS cosine_score\n                FROM doc_embeddings\n            )\n            SELECT \n                doc_id,\n                title,\n                ROUND(cosine_score, 4) AS similarity_score\n            FROM scored_docs\n            ORDER BY cosine_score DESC\n            LIMIT 2;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_026_Q26_cosine_similarity_top_k')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_026_Q26_cosine_similarity_top_k')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_026_Q26_cosine_similarity_top_k%20%28Dense%20Vector%20Cosine%20Similarity%20Nearest%20Neighbors%20%28Top-K%20ANN%29%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_026_Q26_cosine_similarity_top_k.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_026_Q26_cosine_similarity_top_k.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_026_Q26_cosine_similarity_top_k.html&amp;title=task_026_Q26_cosine_similarity_top_k%3A%20Dense%20Vector%20Cosine%20Similarity%20Nearest%20Neighbors%20%28Top-K%20ANN%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_026_Q26_cosine_similarity_top_k.html&amp;t=task_026_Q26_cosine_similarity_top_k%3A%20Dense%20Vector%20Cosine%20Similarity%20Nearest%20Neighbors%20%28Top-K%20ANN%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_026_Q26_cosine_similarity_top_k.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)</h1>
+                <h1 class="task-title">
+                    Dense Vector Cosine Similarity Nearest Neighbors (Top-K ANN)
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">9.38 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                    <div class="stat-val">5.48 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">9.15 ms</div>
+                    <div class="stat-val">5.54 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>When a user asks a question in an AI assistant, the query is embedded into a dense vector (e.g. 4-dimensional here for illustration, or 384/1536 in prod). We retrieve the top most semantically relevant documentation chunks.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 38.1 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -165,67 +285,67 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>DuckDB Architecture Overview</td>
-<td>[ 0.8041  0.0789 -0.0114  0.0505]</td>
+<td>[0.8432 0.0533 0.0341 0.043 ]</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>PostgreSQL Vacuum Internals</td>
-<td>[0.8474 0.0386 0.052  0.0331]</td>
+<td>[0.8551 0.0532 0.0128 0.0449]</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>Vector Search &amp; Embeddings</td>
-<td>[0.8427 0.0133 0.1037 0.066 ]</td>
+<td>[ 0.8707  0.0512 -0.052   0.0174]</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>Kafka Event Streaming Guide</td>
-<td>[ 0.8865  0.0359 -0.0112 -0.0023]</td>
+<td>[0.8764 0.0278 0.0685 0.0464]</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>DuckDB Architecture Overview</td>
-<td>[ 0.8563  0.0285  0.0851 -0.0293]</td>
+<td>[ 8.464e-01  1.010e-02  1.860e-02 -6.000e-04]</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>PostgreSQL Vacuum Internals</td>
-<td>[0.752  0.1005 0.0889 0.0438]</td>
+<td>[ 0.8456  0.0267 -0.0266  0.0372]</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>Vector Search &amp; Embeddings</td>
-<td>[ 0.8363  0.0608 -0.0014  0.0635]</td>
+<td>[ 0.8553 -0.0021  0.0088  0.0116]</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>Kafka Event Streaming Guide</td>
-<td>[ 0.8037 -0.0051  0.0054  0.0318]</td>
+<td>[0.9734 0.0826 0.0808 0.0931]</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>DuckDB Architecture Overview</td>
-<td>[ 0.8536 -0.0087 -0.0399  0.056 ]</td>
+<td>[ 0.8739 -0.0595  0.0111  0.0144]</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>PostgreSQL Vacuum Internals</td>
-<td>[0.8633 0.0515 0.0517 0.0023]</td>
+<td>[ 0.8422 -0.0112  0.0114  0.0203]</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>Vector Search &amp; Embeddings</td>
-<td>[0.8502 0.0439 0.0129 0.0802]</td>
+<td>[ 0.7436  0.0717  0.019  -0.0647]</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -234,234 +354,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 23.23 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 77.12403525736701%; background: #f85149;" title="PROJECTION: 17.91ms (77.1%)"></div><div class="cost-bar-seg" style="width: 10.903732420372117%; background: #f85149;" title="TOP_N: 2.53ms (10.9%)"></div><div class="cost-bar-seg" style="width: 9.609796211881369%; background: #3fb950;" title="TABLE_SCAN: 2.23ms (9.6%)"></div><div class="cost-bar-seg" style="width: 0.9788609228552878%; background: #d29922;" title="TABLE_SCAN: 0.23ms (1.0%)"></div><div class="cost-bar-seg" style="width: 0.8594656945143889%; background: #bc8cff;" title="ORDER_BY: 0.20ms (0.9%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="node-cost-tag">0.9%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.20 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">48 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">56 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;, &#x27;similarity_sco">📁 Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;,...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
-                <span class="node-cost-tag">0.4%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.10 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">72 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">1.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.23 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">88 B</span></div>
-                <div class="nm-tbl" title="memory.main.doc_embeddings">📁 memory.main.doc_embeddings</div>
-            </div>
-            
-        </div>
-        </div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">✂️ <strong>TOP_N</strong></span>
-                <span class="node-cost-tag">10.9%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.53 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="high-cost-tag">🔥 77.1% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">17.91 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;cosine_score&#x27;, &#x27;rowid&#x27;]">📁 Projections: [&#x27;cosine_score&#x27;, &#x27;r...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (77.1% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">9.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.23 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
-                <div class="nm-tbl" title="memory.main.doc_embeddings">📁 memory.main.doc_embeddings</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>77.1%</strong></td>
-            <td>17.91 ms</td>
-            <td>1,000,000</td>
-            <td>11.44 MB</td>
-            <td><small>Projections: [&#x27;cosine_score&#x27;, &#x27;rowid&#x27;]</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TOP_N</strong></td>
-            <td><strong>10.9%</strong></td>
-            <td>2.53 ms</td>
-            <td>2</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>9.6%</strong></td>
-            <td>2.23 ms</td>
-            <td>1,000,000</td>
-            <td>22.89 MB</td>
-            <td><small>memory.main.doc_embeddings</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>1.0%</strong></td>
-            <td>0.23 ms</td>
-            <td>2</td>
-            <td>0.00 MB</td>
-            <td><small>memory.main.doc_embeddings</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>0.9%</strong></td>
-            <td>0.20 ms</td>
-            <td>2</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>HASH_JOIN</strong></td>
-            <td><strong>0.4%</strong></td>
-            <td>0.10 ms</td>
-            <td>2</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.1%</strong></td>
-            <td>0.02 ms</td>
-            <td>2</td>
-            <td>0.00 MB</td>
-            <td><small>Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;, &#x27;similarity_sco</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 9.38 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 5.48 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">scored_docs</span><span class="w"> </span><span class="k">AS</span>
@@ -481,7 +409,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 9.15 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 5.54 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Find the top 2 documents closest to the query embedding [0.9, 0.1, 0.25, 0.0]</span>
@@ -502,7 +430,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">doc_embeddings</span><span class="w"> </span><span class="p">(</span><span class="n">doc_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">embedding</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">4</span><span class="p">]);</span>
@@ -519,9 +447,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -539,15 +470,15 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>3,019</td>
-<td>Kafka Event Streaming Guide</td>
+<td>328,166</td>
+<td>Vector Search &amp; Embeddings</td>
 <td>0.9989</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>1</td>
-<td>DuckDB Architecture Overview</td>
-<td>0.9986</td>
+<td>276,230</td>
+<td>Vector Search &amp; Embeddings</td>
+<td>0.9989</td>
 </tr>
 </tbody></table></div>
                 </div>
@@ -565,15 +496,15 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>3,019</td>
-<td>Kafka Event Streaming Guide</td>
+<td>328,166</td>
+<td>Vector Search &amp; Embeddings</td>
 <td>0.9989</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>1</td>
-<td>DuckDB Architecture Overview</td>
-<td>0.9986</td>
+<td>276,230</td>
+<td>Vector Search &amp; Embeddings</td>
+<td>0.9989</td>
 </tr>
 </tbody></table></div>
                 </div>
@@ -589,7 +520,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:28 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

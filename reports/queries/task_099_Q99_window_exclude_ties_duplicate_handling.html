@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_099_Q99_window_exclude_ties_duplicate_handling - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_099_Q99_window_exclude_ties_duplicate_handling: Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_099_Q99_window_exclude_ties_duplicate_handling (Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals). Category: Warehouse &amp; Statistical. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. In financial ranking, when multiple entities have the exact same score, evaluating cumulative rank metrics without self-reinforcin">
+    <meta name="keywords" content="SQL Frontier Eval, Warehouse &amp; Statistical, task_099_Q99_window_exclude_ties_duplicate_handling, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_099_Q99_window_exclude_ties_duplicate_handling.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_099_Q99_window_exclude_ties_duplicate_handling: Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_099_Q99_window_exclude_ties_duplicate_handling.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_099_Q99_window_exclude_ties_duplicate_handling.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_099_Q99_window_exclude_ties_duplicate_handling: Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_099_Q99_window_exclude_ties_duplicate_handling.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_099_Q99_window_exclude_ties_duplicate_handling: Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals",
+      "identifier": "task_099_Q99_window_exclude_ties_duplicate_handling",
+      "articleSection": "Warehouse & Statistical",
+      "description": "In financial ranking, when multiple entities have the exact same score, evaluating cumulative rank metrics without self-reinforcing duplicate ties prevents tied participants from skewing percentiles.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_099_Q99_window_exclude_ties_duplicate_handling.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Warehouse & Statistical",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_099_Q99_window_exclude_ties_duplicate_handling",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_099_Q99_window_exclude_ties_duplicate_handling.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_099_Q99_window_exclude_ties_duplicate_handling Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Calculate cumulative score excluding tied peers at the current rank\n            SELECT \n                player_id,\n                score,\n                SUM(score) OVER (\n                    ORDER BY score DESC\n                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n                    EXCLUDE TIES\n                ) AS cumulative_score_excluding_tied_peers\n            FROM gaming_scores\n            ORDER BY score DESC, player_id;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_099_Q99_window_exclude_ties_duplicate_handling')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_099_Q99_window_exclude_ties_duplicate_handling')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_099_Q99_window_exclude_ties_duplicate_handling%20%28Window%20Frame%20Ties%20Exclusion%3A%20EXCLUDE%20TIES%20for%20Unbiased%20Cumulative%20Totals%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_099_Q99_window_exclude_ties_duplicate_handling.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_099_Q99_window_exclude_ties_duplicate_handling.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_099_Q99_window_exclude_ties_duplicate_handling.html&amp;title=task_099_Q99_window_exclude_ties_duplicate_handling%3A%20Window%20Frame%20Ties%20Exclusion%3A%20EXCLUDE%20TIES%20for%20Unbiased%20Cumulative%20Totals%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_099_Q99_window_exclude_ties_duplicate_handling.html&amp;t=task_099_Q99_window_exclude_ties_duplicate_handling%3A%20Window%20Frame%20Ties%20Exclusion%3A%20EXCLUDE%20TIES%20for%20Unbiased%20Cumulative%20Totals%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_099_Q99_window_exclude_ties_duplicate_handling.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals</h1>
+                <h1 class="task-title">
+                    Window Frame Ties Exclusion: EXCLUDE TIES for Unbiased Cumulative Totals
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">98.74 ms</div>
-                    <div class="stat-sub"><span class="latency-diff faster">(1.1x faster than golden)</span></div>
+                    <div class="stat-val">78.05 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">109.08 ms</div>
+                    <div class="stat-val">76.76 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>In financial ranking, when multiple entities have the exact same score, evaluating cumulative rank metrics without self-reinforcing duplicate ties prevents tied participants from skewing percentiles.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 7.6 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -159,57 +279,57 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
-<td>480</td>
+<td>386</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
-<td>282</td>
+<td>451</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
-<td>322</td>
+<td>465</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
-<td>330</td>
+<td>502</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
-<td>346</td>
+<td>434</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
-<td>359</td>
+<td>438</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
-<td>571</td>
+<td>436</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
-<td>444</td>
+<td>430</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
-<td>315</td>
+<td>372</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
-<td>505</td>
+<td>544</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
-<td>417</td>
+<td>448</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -218,210 +338,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 236.88 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 78.79411785589714%; background: #f85149;" title="WINDOW: 186.65ms (78.8%)"></div><div class="cost-bar-seg" style="width: 20.277542517931575%; background: #f85149;" title="ORDER_BY: 48.03ms (20.3%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.34 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;CAST(#1 AS INTEGER)&#x27;, &#x27;#2&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;CAST(#1 AS ...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="high-cost-tag">🔥 20.3% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">48.03 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">20.98 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (20.3% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.3%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.72 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">20.98 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;CAST(#1 AS SMALLINT)&#x27;, &#x27;#2&#x27;">📁 Projections: [&#x27;#0&#x27;, &#x27;CAST(#1 AS ...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.13 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
-                <span class="high-cost-tag">🔥 78.8% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">186.65 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
-                <div class="nm-tbl" title="Projections: sum_no_overflow(score) OVER (ORDER ">📁 Projections: sum_no_overflow(sco...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (78.8% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.4%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.01 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">7.63 MB</span></div>
-                <div class="nm-tbl" title="memory.main.gaming_scores">📁 memory.main.gaming_scores</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>WINDOW</strong></td>
-            <td><strong>78.8%</strong></td>
-            <td>186.65 ms</td>
-            <td>1,000,000</td>
-            <td>22.89 MB</td>
-            <td><small>Projections: sum_no_overflow(score) OVER (ORDER </small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>20.3%</strong></td>
-            <td>48.03 ms</td>
-            <td>1,000,000</td>
-            <td>20.98 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.4%</strong></td>
-            <td>1.01 ms</td>
-            <td>1,000,000</td>
-            <td>7.63 MB</td>
-            <td><small>memory.main.gaming_scores</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.3%</strong></td>
-            <td>0.72 ms</td>
-            <td>1,000,000</td>
-            <td>20.98 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;CAST(#1 AS SMALLINT)&#x27;, &#x27;#2&#x27;</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.1%</strong></td>
-            <td>0.34 ms</td>
-            <td>1,000,000</td>
-            <td>22.89 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;CAST(#1 AS INTEGER)&#x27;, &#x27;#2&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.1%</strong></td>
-            <td>0.13 ms</td>
-            <td>1,000,000</td>
-            <td>22.89 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 98.74 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 78.05 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">player_id</span><span class="p">,</span>
@@ -436,7 +388,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 109.08 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 76.76 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Calculate cumulative score excluding tied peers at the current rank</span>
@@ -453,7 +405,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">gaming_scores</span><span class="w"> </span><span class="p">(</span><span class="n">player_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">score</span><span class="w"> </span><span class="nb">INT</span><span class="p">);</span>
@@ -471,9 +423,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -491,153 +446,153 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>568,164</td>
-<td>835</td>
-<td>835</td>
+<td>428,428</td>
+<td>837</td>
+<td>837</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>327,804</td>
-<td>824</td>
-<td>1,659</td>
+<td>832,322</td>
+<td>830</td>
+<td>1,667</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>732,572</td>
-<td>817</td>
-<td>2,476</td>
+<td>238,346</td>
+<td>816</td>
+<td>2,483</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>535,833</td>
-<td>813</td>
-<td>3,289</td>
+<td>427,439</td>
+<td>809</td>
+<td>3,292</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>892,445</td>
-<td>811</td>
+<td>7,543</td>
+<td>808</td>
 <td>4,100</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>409,880</td>
-<td>803</td>
-<td>4,903</td>
+<td>188,336</td>
+<td>807</td>
+<td>4,907</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>23,940</td>
-<td>800</td>
-<td>5,703</td>
+<td>386,754</td>
+<td>804</td>
+<td>5,711</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>251,918</td>
-<td>797</td>
-<td>6,500</td>
+<td>675,053</td>
+<td>803</td>
+<td>6,514</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>908,613</td>
-<td>793</td>
-<td>7,293</td>
+<td>713,726</td>
+<td>800</td>
+<td>7,314</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>62,078</td>
-<td>789</td>
-<td>8,082</td>
+<td>645,651</td>
+<td>799</td>
+<td>8,113</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>206,628</td>
-<td>788</td>
-<td>8,870</td>
+<td>993,326</td>
+<td>798</td>
+<td>8,911</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>985,463</td>
-<td>788</td>
-<td>8,870</td>
+<td>402,764</td>
+<td>797</td>
+<td>9,708</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>282,897</td>
-<td>787</td>
-<td>10,445</td>
+<td>15,795</td>
+<td>788</td>
+<td>10,496</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>195,133</td>
-<td>786</td>
-<td>11,231</td>
+<td>231,794</td>
+<td>787</td>
+<td>11,283</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>892,873</td>
-<td>786</td>
-<td>11,231</td>
+<td>718,832</td>
+<td>787</td>
+<td>11,283</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>293,670</td>
-<td>784</td>
-<td>12,801</td>
+<td>379,429</td>
+<td>785</td>
+<td>12,855</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>351,391</td>
-<td>783</td>
-<td>13,584</td>
+<td>651,900</td>
+<td>784</td>
+<td>13,639</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>69,527</td>
-<td>775</td>
-<td>14,359</td>
+<td>624,737</td>
+<td>782</td>
+<td>14,421</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>360,269</td>
-<td>775</td>
-<td>14,359</td>
+<td>310,955</td>
+<td>781</td>
+<td>15,202</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>486,002</td>
-<td>771</td>
-<td>15,905</td>
+<td>128,694</td>
+<td>778</td>
+<td>15,980</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>952,400</td>
-<td>771</td>
-<td>15,905</td>
+<td>162,659</td>
+<td>777</td>
+<td>16,757</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>863,798</td>
-<td>770</td>
-<td>17,446</td>
+<td>7,238</td>
+<td>776</td>
+<td>17,533</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>144,795</td>
-<td>769</td>
-<td>18,215</td>
+<td>136,842</td>
+<td>776</td>
+<td>17,533</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>854,631</td>
-<td>769</td>
-<td>18,215</td>
+<td>742,960</td>
+<td>776</td>
+<td>17,533</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>20,336</td>
-<td>768</td>
-<td>19,752</td>
+<td>7,424</td>
+<td>774</td>
+<td>19,859</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
@@ -656,153 +611,153 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>568,164</td>
-<td>835</td>
-<td>835</td>
+<td>428,428</td>
+<td>837</td>
+<td>837</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>327,804</td>
-<td>824</td>
-<td>1,659</td>
+<td>832,322</td>
+<td>830</td>
+<td>1,667</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>732,572</td>
-<td>817</td>
-<td>2,476</td>
+<td>238,346</td>
+<td>816</td>
+<td>2,483</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>535,833</td>
-<td>813</td>
-<td>3,289</td>
+<td>427,439</td>
+<td>809</td>
+<td>3,292</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>892,445</td>
-<td>811</td>
+<td>7,543</td>
+<td>808</td>
 <td>4,100</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>409,880</td>
-<td>803</td>
-<td>4,903</td>
+<td>188,336</td>
+<td>807</td>
+<td>4,907</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>23,940</td>
-<td>800</td>
-<td>5,703</td>
+<td>386,754</td>
+<td>804</td>
+<td>5,711</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>251,918</td>
-<td>797</td>
-<td>6,500</td>
+<td>675,053</td>
+<td>803</td>
+<td>6,514</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>908,613</td>
-<td>793</td>
-<td>7,293</td>
+<td>713,726</td>
+<td>800</td>
+<td>7,314</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>62,078</td>
-<td>789</td>
-<td>8,082</td>
+<td>645,651</td>
+<td>799</td>
+<td>8,113</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>206,628</td>
-<td>788</td>
-<td>8,870</td>
+<td>993,326</td>
+<td>798</td>
+<td>8,911</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>985,463</td>
-<td>788</td>
-<td>8,870</td>
+<td>402,764</td>
+<td>797</td>
+<td>9,708</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>282,897</td>
-<td>787</td>
-<td>10,445</td>
+<td>15,795</td>
+<td>788</td>
+<td>10,496</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>195,133</td>
-<td>786</td>
-<td>11,231</td>
+<td>231,794</td>
+<td>787</td>
+<td>11,283</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>892,873</td>
-<td>786</td>
-<td>11,231</td>
+<td>718,832</td>
+<td>787</td>
+<td>11,283</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>293,670</td>
-<td>784</td>
-<td>12,801</td>
+<td>379,429</td>
+<td>785</td>
+<td>12,855</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>351,391</td>
-<td>783</td>
-<td>13,584</td>
+<td>651,900</td>
+<td>784</td>
+<td>13,639</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>69,527</td>
-<td>775</td>
-<td>14,359</td>
+<td>624,737</td>
+<td>782</td>
+<td>14,421</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>360,269</td>
-<td>775</td>
-<td>14,359</td>
+<td>310,955</td>
+<td>781</td>
+<td>15,202</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>486,002</td>
-<td>771</td>
-<td>15,905</td>
+<td>128,694</td>
+<td>778</td>
+<td>15,980</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>952,400</td>
-<td>771</td>
-<td>15,905</td>
+<td>162,659</td>
+<td>777</td>
+<td>16,757</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>863,798</td>
-<td>770</td>
-<td>17,446</td>
+<td>7,238</td>
+<td>776</td>
+<td>17,533</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>144,795</td>
-<td>769</td>
-<td>18,215</td>
+<td>136,842</td>
+<td>776</td>
+<td>17,533</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>854,631</td>
-<td>769</td>
-<td>18,215</td>
+<td>742,960</td>
+<td>776</td>
+<td>17,533</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>20,336</td>
-<td>768</td>
-<td>19,752</td>
+<td>7,424</td>
+<td>774</td>
+<td>19,859</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
@@ -819,7 +774,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

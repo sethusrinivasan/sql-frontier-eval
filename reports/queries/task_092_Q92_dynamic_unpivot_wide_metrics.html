@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_092_Q92_dynamic_unpivot_wide_metrics - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_092_Q92_dynamic_unpivot_wide_metrics: Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_092_Q92_dynamic_unpivot_wide_metrics (Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics). Category: Warehouse &amp; Statistical. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, memory, disk). Normalizing them into key">
+    <meta name="keywords" content="SQL Frontier Eval, Warehouse &amp; Statistical, task_092_Q92_dynamic_unpivot_wide_metrics, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_092_Q92_dynamic_unpivot_wide_metrics.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_092_Q92_dynamic_unpivot_wide_metrics: Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_092_Q92_dynamic_unpivot_wide_metrics.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_092_Q92_dynamic_unpivot_wide_metrics.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_092_Q92_dynamic_unpivot_wide_metrics: Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_092_Q92_dynamic_unpivot_wide_metrics.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_092_Q92_dynamic_unpivot_wide_metrics: Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics",
+      "identifier": "task_092_Q92_dynamic_unpivot_wide_metrics",
+      "articleSection": "Warehouse & Statistical",
+      "description": "Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, memory, disk). Normalizing them into key-value pairs is necessary for time-series modeling.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_092_Q92_dynamic_unpivot_wide_metrics.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Warehouse & Statistical",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_092_Q92_dynamic_unpivot_wide_metrics",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_092_Q92_dynamic_unpivot_wide_metrics.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_092_Q92_dynamic_unpivot_wide_metrics Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Transform wide metric columns into normalized key-value rows\n            UNPIVOT wide_telemetry\n            ON cpu_metric, mem_metric, disk_metric\n            INTO\n                NAME metric_name\n                VALUE metric_value;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_092_Q92_dynamic_unpivot_wide_metrics')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_092_Q92_dynamic_unpivot_wide_metrics')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_092_Q92_dynamic_unpivot_wide_metrics%20%28Dynamic%20UNPIVOT%20of%20Wide%20Tabular%20Sensor%20%2F%20Survey%20Metrics%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_092_Q92_dynamic_unpivot_wide_metrics.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_092_Q92_dynamic_unpivot_wide_metrics.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_092_Q92_dynamic_unpivot_wide_metrics.html&amp;title=task_092_Q92_dynamic_unpivot_wide_metrics%3A%20Dynamic%20UNPIVOT%20of%20Wide%20Tabular%20Sensor%20%2F%20Survey%20Metrics%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_092_Q92_dynamic_unpivot_wide_metrics.html&amp;t=task_092_Q92_dynamic_unpivot_wide_metrics%3A%20Dynamic%20UNPIVOT%20of%20Wide%20Tabular%20Sensor%20%2F%20Survey%20Metrics%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_092_Q92_dynamic_unpivot_wide_metrics.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: No</span>
                 </div>
-                <h1 class="task-title">Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics</h1>
+                <h1 class="task-title">
+                    Dynamic UNPIVOT of Wide Tabular Sensor / Survey Metrics
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">784.96 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
+                    <div class="stat-val">566.62 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">739.91 ms</div>
+                    <div class="stat-val">557.25 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, memory, disk). Normalizing them into key-value pairs is necessary for time-series modeling.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 45.8 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -151,113 +271,113 @@ Row order does not matter.</pre>
 <td class="td-idx">2</td>
 <td>srv-01</td>
 <td>2026-01-01 00:00:00</td>
-<td>53.95</td>
-<td>93.7</td>
-<td>109.92</td>
+<td>43.41</td>
+<td>75.39</td>
+<td>88.45</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>srv-01</td>
 <td>2026-01-02 00:00:00</td>
-<td>49.06</td>
-<td>85.21</td>
-<td>99.96</td>
+<td>40.93</td>
+<td>71.09</td>
+<td>83.41</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>srv-01</td>
 <td>2026-01-03 00:00:00</td>
-<td>43.65</td>
-<td>75.8</td>
-<td>88.94</td>
+<td>50.67</td>
+<td>88</td>
+<td>103.24</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>srv-01</td>
 <td>2026-01-04 00:00:00</td>
-<td>36.91</td>
-<td>64.09</td>
-<td>75.21</td>
+<td>51.05</td>
+<td>88.66</td>
+<td>104.01</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>srv-01</td>
 <td>2026-01-05 00:00:00</td>
-<td>54.01</td>
-<td>93.81</td>
-<td>110.05</td>
+<td>37.97</td>
+<td>65.94</td>
+<td>77.38</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>srv-01</td>
 <td>2026-01-06 00:00:00</td>
-<td>39.96</td>
-<td>69.39</td>
-<td>81.42</td>
+<td>53.65</td>
+<td>93.18</td>
+<td>109.31</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>srv-01</td>
 <td>2026-01-07 00:00:00</td>
-<td>52.53</td>
-<td>91.24</td>
-<td>107.04</td>
+<td>44.06</td>
+<td>76.51</td>
+<td>89.77</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>srv-01</td>
 <td>2026-01-08 00:00:00</td>
-<td>41.27</td>
-<td>71.67</td>
-<td>84.09</td>
+<td>49.02</td>
+<td>85.13</td>
+<td>99.87</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>srv-01</td>
 <td>2026-01-09 00:00:00</td>
-<td>46.29</td>
-<td>80.4</td>
-<td>94.32</td>
+<td>51.94</td>
+<td>90.2</td>
+<td>105.82</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>srv-01</td>
 <td>2026-01-10 00:00:00</td>
-<td>49.37</td>
-<td>85.74</td>
-<td>100.59</td>
+<td>42.18</td>
+<td>73.25</td>
+<td>85.95</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>srv-01</td>
 <td>2026-01-11 00:00:00</td>
-<td>49.18</td>
-<td>85.42</td>
-<td>100.21</td>
+<td>37.88</td>
+<td>65.78</td>
+<td>77.19</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>srv-01</td>
 <td>2026-01-12 00:00:00</td>
-<td>35.27</td>
-<td>61.24</td>
-<td>71.86</td>
+<td>45.5</td>
+<td>79.01</td>
+<td>92.7</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>srv-01</td>
 <td>2026-01-13 00:00:00</td>
-<td>50.51</td>
-<td>87.72</td>
-<td>102.91</td>
+<td>45.08</td>
+<td>78.3</td>
+<td>91.86</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>srv-01</td>
 <td>2026-01-14 00:00:00</td>
-<td>42.98</td>
-<td>74.64</td>
-<td>87.58</td>
+<td>32.52</td>
+<td>56.46</td>
+<td>66.27</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -266,186 +386,42 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 48.19 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 47.037578237979396%; background: #f85149;" title="UNNEST: 22.67ms (47.0%)"></div><div class="cost-bar-seg" style="width: 27.091743044832235%; background: #f85149;" title="TABLE_SCAN: 13.06ms (27.1%)"></div><div class="cost-bar-seg" style="width: 22.97423707445884%; background: #f85149;" title="PROJECTION: 11.07ms (23.0%)"></div><div class="cost-bar-seg" style="width: 1.5758494773061076%; background: #d29922;" title="FILTER: 0.76ms (1.6%)"></div><div class="cost-bar-seg" style="width: 1.3205921654234218%; background: #bc8cff;" title="PROJECTION: 0.64ms (1.3%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">1.3%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.64 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">125.89 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#4&#x27;, &#x27;#5&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#4&#x27;, ...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🎯 <strong>FILTER</strong></span>
-                <span class="node-cost-tag">1.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.76 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">286.14 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⚙️ <strong>UNNEST</strong></span>
-                <span class="high-cost-tag">🔥 47.0% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">22.67 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">286.14 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (47.0% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="high-cost-tag">🔥 23.0% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">11.07 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">72.50 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;host_id&#x27;, &#x27;captured_date&#x27;, &#x27;unpiv">📁 Projections: [&#x27;host_id&#x27;, &#x27;captur...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (23.0% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="high-cost-tag">🔥 27.1% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.06 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
-                <div class="nm-tbl" title="memory.main.wide_telemetry">📁 memory.main.wide_telemetry</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (27.1% of query runtime)</div>
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>UNNEST</strong></td>
-            <td><strong>47.0%</strong></td>
-            <td>22.67 ms</td>
-            <td>3,000,000</td>
-            <td>286.14 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>27.1%</strong></td>
-            <td>13.06 ms</td>
-            <td>1,000,000</td>
-            <td>41.96 MB</td>
-            <td><small>memory.main.wide_telemetry</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>23.0%</strong></td>
-            <td>11.07 ms</td>
-            <td>1,000,000</td>
-            <td>72.50 MB</td>
-            <td><small>Projections: [&#x27;host_id&#x27;, &#x27;captured_date&#x27;, &#x27;unpiv</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>FILTER</strong></td>
-            <td><strong>1.6%</strong></td>
-            <td>0.76 ms</td>
-            <td>3,000,000</td>
-            <td>286.14 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>1.3%</strong></td>
-            <td>0.64 ms</td>
-            <td>3,000,000</td>
-            <td>125.89 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#4&#x27;, &#x27;#5&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 784.96 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 566.62 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="n">UNPIVOT</span><span class="w"> </span><span class="n">wide_telemetry</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">cpu_metric</span><span class="p">,</span>
@@ -456,7 +432,7 @@ Row order does not matter.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 739.91 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 557.25 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Transform wide metric columns into normalized key-value rows</span>
@@ -468,7 +444,7 @@ Row order does not matter.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">wide_telemetry</span><span class="w"> </span><span class="p">(</span><span class="n">host_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">captured_date</span><span class="w"> </span><span class="nb">DATE</span><span class="p">,</span><span class="w"> </span><span class="n">cpu_metric</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">,</span>
@@ -484,9 +460,12 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -529,154 +508,154 @@ Row order does not matter.</pre>
 <td>srv-01</td>
 <td>2026-01-01 00:00:00</td>
 <td>cpu_metric</td>
-<td>53.95</td>
+<td>43.41</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>srv-01</td>
 <td>2026-01-01 00:00:00</td>
 <td>mem_metric</td>
-<td>93.7</td>
+<td>75.39</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>srv-01</td>
 <td>2026-01-01 00:00:00</td>
 <td>disk_metric</td>
-<td>109.92</td>
+<td>88.45</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>srv-01</td>
 <td>2026-01-02 00:00:00</td>
 <td>cpu_metric</td>
-<td>49.06</td>
+<td>40.93</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>srv-01</td>
 <td>2026-01-02 00:00:00</td>
 <td>mem_metric</td>
-<td>85.21</td>
+<td>71.09</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>srv-01</td>
 <td>2026-01-02 00:00:00</td>
 <td>disk_metric</td>
-<td>99.96</td>
+<td>83.41</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>srv-01</td>
 <td>2026-01-03 00:00:00</td>
 <td>cpu_metric</td>
-<td>43.65</td>
+<td>50.67</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>srv-01</td>
 <td>2026-01-03 00:00:00</td>
 <td>mem_metric</td>
-<td>75.8</td>
+<td>88</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>srv-01</td>
 <td>2026-01-03 00:00:00</td>
 <td>disk_metric</td>
-<td>88.94</td>
+<td>103.24</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>srv-01</td>
 <td>2026-01-04 00:00:00</td>
 <td>cpu_metric</td>
-<td>36.91</td>
+<td>51.05</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>srv-01</td>
 <td>2026-01-04 00:00:00</td>
 <td>mem_metric</td>
-<td>64.09</td>
+<td>88.66</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>srv-01</td>
 <td>2026-01-04 00:00:00</td>
 <td>disk_metric</td>
-<td>75.21</td>
+<td>104.01</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>srv-01</td>
 <td>2026-01-05 00:00:00</td>
 <td>cpu_metric</td>
-<td>54.01</td>
+<td>37.97</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>srv-01</td>
 <td>2026-01-05 00:00:00</td>
 <td>mem_metric</td>
-<td>93.81</td>
+<td>65.94</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>srv-01</td>
 <td>2026-01-05 00:00:00</td>
 <td>disk_metric</td>
-<td>110.05</td>
+<td>77.38</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>srv-01</td>
 <td>2026-01-06 00:00:00</td>
 <td>cpu_metric</td>
-<td>39.96</td>
+<td>53.65</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>srv-01</td>
 <td>2026-01-06 00:00:00</td>
 <td>mem_metric</td>
-<td>69.39</td>
+<td>93.18</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>srv-01</td>
 <td>2026-01-06 00:00:00</td>
 <td>disk_metric</td>
-<td>81.42</td>
+<td>109.31</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>srv-01</td>
 <td>2026-01-07 00:00:00</td>
 <td>cpu_metric</td>
-<td>52.53</td>
+<td>44.06</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>srv-01</td>
 <td>2026-01-07 00:00:00</td>
 <td>mem_metric</td>
-<td>91.24</td>
+<td>76.51</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>srv-01</td>
 <td>2026-01-07 00:00:00</td>
 <td>disk_metric</td>
-<td>107.04</td>
+<td>89.77</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>srv-01</td>
 <td>2026-01-08 00:00:00</td>
 <td>cpu_metric</td>
-<td>41.27</td>
+<td>49.02</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 3,000,000 total rows.</div>
@@ -720,154 +699,154 @@ Row order does not matter.</pre>
 <td>srv-01</td>
 <td>2026-01-01 00:00:00</td>
 <td>cpu_metric</td>
-<td>53.95</td>
+<td>43.41</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>srv-01</td>
 <td>2026-01-01 00:00:00</td>
 <td>mem_metric</td>
-<td>93.7</td>
+<td>75.39</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>srv-01</td>
 <td>2026-01-01 00:00:00</td>
 <td>disk_metric</td>
-<td>109.92</td>
+<td>88.45</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>srv-01</td>
 <td>2026-01-02 00:00:00</td>
 <td>cpu_metric</td>
-<td>49.06</td>
+<td>40.93</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>srv-01</td>
 <td>2026-01-02 00:00:00</td>
 <td>mem_metric</td>
-<td>85.21</td>
+<td>71.09</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>srv-01</td>
 <td>2026-01-02 00:00:00</td>
 <td>disk_metric</td>
-<td>99.96</td>
+<td>83.41</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>srv-01</td>
 <td>2026-01-03 00:00:00</td>
 <td>cpu_metric</td>
-<td>43.65</td>
+<td>50.67</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>srv-01</td>
 <td>2026-01-03 00:00:00</td>
 <td>mem_metric</td>
-<td>75.8</td>
+<td>88</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>srv-01</td>
 <td>2026-01-03 00:00:00</td>
 <td>disk_metric</td>
-<td>88.94</td>
+<td>103.24</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>srv-01</td>
 <td>2026-01-04 00:00:00</td>
 <td>cpu_metric</td>
-<td>36.91</td>
+<td>51.05</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>srv-01</td>
 <td>2026-01-04 00:00:00</td>
 <td>mem_metric</td>
-<td>64.09</td>
+<td>88.66</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>srv-01</td>
 <td>2026-01-04 00:00:00</td>
 <td>disk_metric</td>
-<td>75.21</td>
+<td>104.01</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>srv-01</td>
 <td>2026-01-05 00:00:00</td>
 <td>cpu_metric</td>
-<td>54.01</td>
+<td>37.97</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>srv-01</td>
 <td>2026-01-05 00:00:00</td>
 <td>mem_metric</td>
-<td>93.81</td>
+<td>65.94</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>srv-01</td>
 <td>2026-01-05 00:00:00</td>
 <td>disk_metric</td>
-<td>110.05</td>
+<td>77.38</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>srv-01</td>
 <td>2026-01-06 00:00:00</td>
 <td>cpu_metric</td>
-<td>39.96</td>
+<td>53.65</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>srv-01</td>
 <td>2026-01-06 00:00:00</td>
 <td>mem_metric</td>
-<td>69.39</td>
+<td>93.18</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>srv-01</td>
 <td>2026-01-06 00:00:00</td>
 <td>disk_metric</td>
-<td>81.42</td>
+<td>109.31</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>srv-01</td>
 <td>2026-01-07 00:00:00</td>
 <td>cpu_metric</td>
-<td>52.53</td>
+<td>44.06</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>srv-01</td>
 <td>2026-01-07 00:00:00</td>
 <td>mem_metric</td>
-<td>91.24</td>
+<td>76.51</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>srv-01</td>
 <td>2026-01-07 00:00:00</td>
 <td>disk_metric</td>
-<td>107.04</td>
+<td>89.77</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>srv-01</td>
 <td>2026-01-08 00:00:00</td>
 <td>cpu_metric</td>
-<td>41.27</td>
+<td>49.02</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 3,000,000 total rows.</div>
@@ -884,7 +863,7 @@ Row order does not matter.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

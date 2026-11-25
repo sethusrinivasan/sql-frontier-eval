@@ -1,0 +1,29 @@
+# SQL-Frontier-Eval Robots Configuration
+# Permissive indexing for search engines and AI frontier agents
+
+User-agent: *
+Allow: /
+
+# Dedicated directives for AI Search & Research Agents
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+Sitemap: https://sethusrinivasan.github.io/sql-frontier-eval/sitemap.xml

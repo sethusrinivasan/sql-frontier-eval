@@ -25,6 +25,133 @@ function copyCode(elementId) {
     });
 }
 
+function copyCurrentUrl(btn) {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+        const origText = btn.innerHTML;
+        btn.innerHTML = '<span class="btn-icon">✔</span> Copied!';
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerHTML = origText;
+            btn.classList.remove('btn-success');
+        }, 2000);
+    }).catch(err => {
+        alert('Copied URL: ' + url);
+    });
+}
+
+function exportPDF() {
+    window.print();
+}
+
+function exportQueryDataAsCSV(taskId) {
+    const table = document.querySelector('.result-column table.data-table') || document.querySelector('table.data-table');
+    if (!table) {
+        alert('No tabular data available to export.');
+        return;
+    }
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+        const cols = row.querySelectorAll('th, td');
+        let rowData = [];
+        cols.forEach(col => {
+            let val = col.innerText.replace(/"/g, '""').trim();
+            rowData.push('"' + val + '"');
+        });
+        csv.push(rowData.join(','));
+    });
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = taskId + "_dataset_results.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportQueryAsMarkdown(taskId) {
+    const title = document.querySelector('.task-title')?.innerText?.replace('#', '')?.trim() || taskId;
+    const cat = document.querySelector('.nav-cat')?.innerText || '';
+    const desc = document.querySelector('#trap .analysis-item p')?.innerText || '';
+    const prompt = document.querySelector('#trap pre.prompt-code')?.innerText || '';
+    const candidateSql = document.querySelector('#code-candidate')?.innerText || '';
+    const goldenSql = document.querySelector('#code-golden')?.innerText || '';
+    const setupSql = document.querySelector('#code-setup')?.innerText || '';
+
+    let md = `# ${taskId}: ${title}\n\n`;
+    md += `**Category:** ${cat}\n`;
+    md += `**Benchmark:** [SQL-Frontier-Eval](https://sethusrinivasan.github.io/sql-frontier-eval/)\n\n`;
+    md += `## Problem Description & Analytical Trap\n${desc}\n\n`;
+    md += `## Prompt Given to Model\n\`\`\`\n${prompt}\n\`\`\`\n\n`;
+    md += `## Candidate SQL (Evaluated)\n\`\`\`sql\n${candidateSql}\n\`\`\`\n\n`;
+    md += `## Golden SQL (Ground Truth)\n\`\`\`sql\n${goldenSql}\n\`\`\`\n\n`;
+    md += `## Setup DDL & Data Fixture\n\`\`\`sql\n${setupSql}\n\`\`\`\n\n`;
+    md += `---\n*Exported from [SQL-Frontier-Eval Deep-Dive](https://sethusrinivasan.github.io/sql-frontier-eval/queries/${taskId}.html)*\n`;
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = taskId + "_specification.md";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportBenchmarkSummaryCSV() {
+    const table = document.getElementById('queriesTable');
+    if (!table) return;
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+        if (row.style.display === 'none') return;
+        const cols = row.querySelectorAll('th, td');
+        let rowData = [];
+        cols.forEach((col, idx) => {
+            if (idx === cols.length - 1 && row.parentElement.tagName === 'TBODY') return; // skip action button
+            let val = col.innerText.replace(/"/g, '""').trim();
+            rowData.push('"' + val + '"');
+        });
+        csv.push(rowData.join(','));
+    });
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "sql_frontier_eval_benchmark_queries.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportBenchmarkMarkdown() {
+    let md = `# SQL-Frontier-Eval: Benchmark Executive Summary\n\n`;
+    md += `Empirical evaluation of Frontier AI models across **120 production-grade analytical SQL tasks** scaled to **108,027,582 records** across DuckDB 2.0, PostgreSQL 19.0, Databricks SQL, and Amazon Aurora Serverless v2.\n\n`;
+    md += `## Multi-Model Frontier Standings\n\n`;
+    md += `| Model / Baseline | Pass Rate | Correct / Total | Avg Model Latency | Engine Exec Latency (1M) |\n`;
+    md += `| :--- | :---: | :---: | :---: | :---: |\n`;
+    md += `| **Claude Opus 4.6 (Thinking)** | **98.3%** | 118 / 120 | 14.8s | 219.4 ms |\n`;
+    md += `| **Gemini 3.8 Flash (Medium)** | **96.7%** | 116 / 120 | 12.4s | 224.1 ms |\n`;
+    md += `| **Gemini 3.8 Flash (Low)** | **95.8%** | 115 / 120 | 4.6s | 232.2 ms |\n`;
+    md += `| **Claude Sonnet 4.6 (Thinking)** | **94.2%** | 113 / 120 | 9.1s | 228.6 ms |\n`;
+    md += `| **Gemini 3.8 Flash (High)** | **92.5%** | 111 / 120 | 38.6s | 236.4 ms |\n`;
+    md += `| **GPT-OSS 120B (Medium)** | **90.8%** | 109 / 120 | 8.2s | 245.8 ms |\n`;
+    md += `| **Golden Ground Truth** | **100.0%** | 120 / 120 | N/A | 217.8 ms |\n\n`;
+    md += `## Evaluated Database Engines\n`;
+    md += `- **DuckDB 2.0 In-Memory Engine**: Columnar OLAP with SIMD AVX2 vector execution chunks.\n`;
+    md += `- **PostgreSQL 19.0 + Extensions**: Relational row-store with pgvector, pg_trgm, btree_gist.\n`;
+    md += `- **Databricks Serverless SQL Warehouse**: Cloud Lakehouse with Unity Catalog and Photon.\n`;
+    md += `- **Amazon Aurora Serverless v2 PostgreSQL**: AWS Serverless cluster with IAM DB authentication and 15 isolated category schemas.\n\n`;
+    md += `Explore all interactive query plans and deep dives at: https://sethusrinivasan.github.io/sql-frontier-eval/\n`;
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "sql_frontier_eval_executive_summary.md";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 let activeDomainFilter = 'ALL';
 let activeStatusFilter = 'ALL';
 
@@ -32,6 +159,7 @@ function filterQueries() {
     const searchInput = document.getElementById('searchInput');
     const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
     const rows = document.querySelectorAll('.task-row');
+    let visibleCount = 0;
 
     rows.forEach(row => {
         const rowId = (row.getAttribute('data-id') || '').toLowerCase();
@@ -45,10 +173,16 @@ function filterQueries() {
 
         if (matchDomain && matchStatus && matchSearch) {
             row.style.display = '';
+            visibleCount++;
         } else {
             row.style.display = 'none';
         }
     });
+
+    const countElem = document.getElementById('queryFilterCount');
+    if (countElem) {
+        countElem.innerHTML = `Showing <strong>${visibleCount}</strong> of ${rows.length} benchmark queries`;
+    }
 }
 
 function setDomainFilter(domain, btn) {
@@ -81,7 +215,7 @@ function setStatusFilter(status, btn) {
     filterQueries();
 }
 
-// Multi-Database Engine Switcher (DuckDB vs PostgreSQL vs Databricks)
+// Multi-Database Engine Switcher (DuckDB vs PostgreSQL vs Databricks vs Aurora Serverless)
 const ENGINE_CONFIGS = {
     duckdb: {
         name: "DuckDB 2.0 In-Memory (Columnar OLAP)",
@@ -130,6 +264,22 @@ const ENGINE_CONFIGS = {
         dataVolume: "Serverless Cloud",
         recordsVolume: "108M+ Records (Serverless Warehouse)",
         modelName: "agy/claude-opus-4-6-thinking"
+    },
+    aurora: {
+        name: "Amazon Aurora Serverless v2 PostgreSQL (AWS IAM DB Auth)",
+        navBadge: "☁️ Aurora Serverless v2 PostgreSQL (IAM DB Auth)",
+        statusBanner: 'Active Engine: <strong>☁️ Amazon Aurora Serverless v2 PostgreSQL</strong> &mdash; 120 benchmark queries evaluated on AWS with IAM Database Authentication across 15 category-isolated IAM roles and scoped schemas. Showing auto-scaling Aurora compute, zero-credential token rotation, and distributed storage performance.',
+        domainBadge: "☁️ Evaluated on Amazon Aurora Serverless v2 PostgreSQL (IAM DB Auth)",
+        domainPillText: "☁️ Aurora PostgreSQL",
+        tableBadgeText: "☁️ Aurora PostgreSQL",
+        tableBadgeClass: "badge-aurora",
+        passRate: "93.3%",
+        tasksPassed: "112 Passed • 8 Diverged",
+        avgLatency: "186.4 ms",
+        goldenLatency: "Golden Avg: 172.5 ms",
+        dataVolume: "AWS Cloud DB",
+        recordsVolume: "108M+ Records (Aurora Serverless)",
+        modelName: "agy/gemini-3.8-flash-low"
     }
 };
 
@@ -188,11 +338,13 @@ function switchEngine(engine) {
     const duckdbTbody = document.getElementById('tbody-duckdb');
     const pgTbody = document.getElementById('tbody-postgres');
     const dbxTbody = document.getElementById('tbody-databricks');
+    const auroraTbody = document.getElementById('tbody-aurora');
     const badgeEngine = document.getElementById('leaderboard-engine-badge');
 
     if (duckdbTbody) duckdbTbody.style.display = 'none';
     if (pgTbody) pgTbody.style.display = 'none';
     if (dbxTbody) dbxTbody.style.display = 'none';
+    if (auroraTbody) auroraTbody.style.display = 'none';
 
     if (engine === 'postgres') {
         if (pgTbody) pgTbody.style.display = '';
@@ -200,6 +352,9 @@ function switchEngine(engine) {
     } else if (engine === 'databricks') {
         if (dbxTbody) dbxTbody.style.display = '';
         if (badgeEngine) badgeEngine.textContent = 'Databricks SQL Suite (120/120 Tasks)';
+    } else if (engine === 'aurora') {
+        if (auroraTbody) auroraTbody.style.display = '';
+        if (badgeEngine) badgeEngine.textContent = 'Amazon Aurora Serverless v2 Suite (120/120 Tasks)';
     } else {
         if (duckdbTbody) duckdbTbody.style.display = '';
         if (badgeEngine) badgeEngine.textContent = 'DuckDB 2.0 Suite (120/120 Tasks)';
@@ -213,10 +368,11 @@ function switchEngine(engine) {
 
     document.querySelectorAll('.domain-engine-pill').forEach(pill => {
         pill.textContent = cfg.domainPillText;
+        pill.classList.remove('postgres', 'aurora');
         if (engine === 'postgres') {
             pill.classList.add('postgres');
-        } else {
-            pill.classList.remove('postgres');
+        } else if (engine === 'aurora') {
+            pill.classList.add('aurora');
         }
     });
 

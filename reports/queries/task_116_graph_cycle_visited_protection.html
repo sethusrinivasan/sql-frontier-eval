@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_116_graph_cycle_visited_protection - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_116_graph_cycle_visited_protection: Directed Dependency Graph Cycle Protection via Visited Array Path | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_116_graph_cycle_visited_protection (Directed Dependency Graph Cycle Protection via Visited Array Path). Category: Graph &amp; Hierarchy. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Traverses downstream dependencies in a directed acyclic graph that contains an intentional cyclic loop (A -&gt; B -&gt; C -&gt; A), requiri">
+    <meta name="keywords" content="SQL Frontier Eval, Graph &amp; Hierarchy, task_116_graph_cycle_visited_protection, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_116_graph_cycle_visited_protection.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_116_graph_cycle_visited_protection: Directed Dependency Graph Cycle Protection via Visited Array Path">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_116_graph_cycle_visited_protection.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_116_graph_cycle_visited_protection.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_116_graph_cycle_visited_protection: Directed Dependency Graph Cycle Protection via Visited Array Path">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_116_graph_cycle_visited_protection.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_116_graph_cycle_visited_protection: Directed Dependency Graph Cycle Protection via Visited Array Path",
+      "identifier": "task_116_graph_cycle_visited_protection",
+      "articleSection": "Graph & Hierarchy",
+      "description": "Traverses downstream dependencies in a directed acyclic graph that contains an intentional cyclic loop (A -> B -> C -> A), requiring visited path arrays to prevent infinite recursion OOM.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_116_graph_cycle_visited_protection.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Graph & Hierarchy",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_116_graph_cycle_visited_protection",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_116_graph_cycle_visited_protection.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_116_graph_cycle_visited_protection Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "\nWITH RECURSIVE downstream_graph AS (\n    SELECT \n        child_task AS task_id,\n        1 AS depth,\n        ['BUILD_CORE', child_task] AS path_nodes\n    FROM task_edges\n    WHERE parent_task = 'BUILD_CORE'\n    \n    UNION ALL\n    \n    SELECT \n        e.child_task,\n        g.depth + 1,\n        list_append(g.path_nodes, e.child_task)\n    FROM downstream_graph g\n    JOIN task_edges e ON g.task_id = e.parent_task\n    WHERE NOT list_contains(g.path_nodes, e.child_task)\n      AND g.depth < 10\n)\nSELECT \n    task_id,\n    MIN(depth) AS min_depth\nFROM downstream_graph\nGROUP BY task_id\nORDER BY min_depth ASC, task_id ASC;\n"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_116_graph_cycle_visited_protection')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_116_graph_cycle_visited_protection')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_116_graph_cycle_visited_protection%20%28Directed%20Dependency%20Graph%20Cycle%20Protection%20via%20Visited%20Array%20Path%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_116_graph_cycle_visited_protection.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_116_graph_cycle_visited_protection.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_116_graph_cycle_visited_protection.html&amp;title=task_116_graph_cycle_visited_protection%3A%20Directed%20Dependency%20Graph%20Cycle%20Protection%20via%20Visited%20Array%20Path%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_116_graph_cycle_visited_protection.html&amp;t=task_116_graph_cycle_visited_protection%3A%20Directed%20Dependency%20Graph%20Cycle%20Protection%20via%20Visited%20Array%20Path%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_116_graph_cycle_visited_protection.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Directed Dependency Graph Cycle Protection via Visited Array Path</h1>
+                <h1 class="task-title">
+                    Directed Dependency Graph Cycle Protection via Visited Array Path
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">1.04 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(1.2x slower than golden)</span></div>
+                    <div class="stat-val">2.33 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">0.86 ms</div>
+                    <div class="stat-val">2.31 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Traverses downstream dependencies in a directed acyclic graph that contains an intentional cyclic loop (A -&gt; B -&gt; C -&gt; A), requiring visited path arrays to prevent infinite recursion OOM.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -116,9 +233,12 @@ Order by min_depth ASC, task_id ASC.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (5 rows &bull; 200 B)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -171,330 +291,42 @@ Order by min_depth ASC, task_id ASC.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 1.04 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 47.0562780575907%; background: #58a6ff;" title="RECURSIVE_CTE: 0.49ms (47.1%)"></div><div class="cost-bar-seg" style="width: 21.713515253498947%; background: #f85149;" title="HASH_GROUP_BY: 0.23ms (21.7%)"></div><div class="cost-bar-seg" style="width: 17.666861347072757%; background: #3fb950;" title="ORDER_BY: 0.18ms (17.7%)"></div><div class="cost-bar-seg" style="width: 8.628486176727401%; background: #d29922;" title="HASH_JOIN: 0.09ms (8.6%)"></div><div class="cost-bar-seg" style="width: 1.672709469370604%; background: #bc8cff;" title="TABLE_SCAN: 0.02ms (1.7%)"></div><div class="cost-bar-seg" style="width: 1.6725167164932855%; background: #39c5cf;" title="PROJECTION: 0.02ms (1.7%)"></div><div class="cost-bar-seg" style="width: 0.5324798235925667%; background: #f0883e;" title="TABLE_SCAN: 0.01ms (0.5%)"></div><div class="cost-bar-seg" style="width: 0.5033741391174616%; background: #79c0ff;" title="RECURSIVE_CTE_SCAN: 0.01ms (0.5%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="node-cost-tag">17.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.18 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">60 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
-                <span class="node-cost-tag">21.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.23 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">60 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">60 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;]">📁 Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">60 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;]</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔄 <strong>RECURSIVE_CTE</strong></span>
-                <span class="node-cost-tag">47.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.49 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">252 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.4%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">68 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;, &#x27;visited_path&#x27;">📁 Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">1.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">16 B</span></div>
-                <div class="nm-tbl" title="memory.main.task_edges">📁 memory.main.task_edges</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">1.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">184 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;, &#x27;visited_path&#x27;">📁 Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
-                <span class="node-cost-tag">8.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.09 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">2</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">152 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>RECURSIVE_CTE_SCAN</strong></span>
-                <span class="node-cost-tag">0.5%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">3</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">252 B</span></div>
-                
-            </div>
-            
-        </div>
-        </div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.5%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">5</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">160 B</span></div>
-                <div class="nm-tbl" title="memory.main.task_edges">📁 memory.main.task_edges</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>RECURSIVE_CTE</strong></td>
-            <td><strong>47.1%</strong></td>
-            <td>0.49 ms</td>
-            <td>3</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>HASH_GROUP_BY</strong></td>
-            <td><strong>21.7%</strong></td>
-            <td>0.23 ms</td>
-            <td>3</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>17.7%</strong></td>
-            <td>0.18 ms</td>
-            <td>3</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>HASH_JOIN</strong></td>
-            <td><strong>8.6%</strong></td>
-            <td>0.09 ms</td>
-            <td>2</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>1.7%</strong></td>
-            <td>0.02 ms</td>
-            <td>1</td>
-            <td>0.00 MB</td>
-            <td><small>memory.main.task_edges</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>1.7%</strong></td>
-            <td>0.02 ms</td>
-            <td>2</td>
-            <td>0.00 MB</td>
-            <td><small>Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;, &#x27;visited_path&#x27;</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.5%</strong></td>
-            <td>0.01 ms</td>
-            <td>5</td>
-            <td>0.00 MB</td>
-            <td><small>memory.main.task_edges</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>RECURSIVE_CTE_SCAN</strong></td>
-            <td><strong>0.5%</strong></td>
-            <td>0.01 ms</td>
-            <td>3</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.4%</strong></td>
-            <td>0.00 ms</td>
-            <td>1</td>
-            <td>0.00 MB</td>
-            <td><small>Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;, &#x27;visited_path&#x27;</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.1%</strong></td>
-            <td>0.00 ms</td>
-            <td>3</td>
-            <td>0.00 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.00 ms</td>
-            <td>3</td>
-            <td>0.00 MB</td>
-            <td><small>Projections: [&#x27;task_id&#x27;, &#x27;depth&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 1.04 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 2.33 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="k">RECURSIVE</span><span class="w"> </span><span class="n">downstream_tasks</span><span class="w"> </span><span class="k">AS</span>
@@ -520,7 +352,7 @@ Order by min_depth ASC, task_id ASC.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 0.86 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 2.31 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="k">RECURSIVE</span><span class="w"> </span><span class="n">downstream_graph</span><span class="w"> </span><span class="k">AS</span>
@@ -547,7 +379,7 @@ Order by min_depth ASC, task_id ASC.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">task_edges</span><span class="w"> </span><span class="p">(</span><span class="n">parent_task</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">child_task</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">);</span>
@@ -566,9 +398,12 @@ Order by min_depth ASC, task_id ASC.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -640,7 +475,7 @@ Order by min_depth ASC, task_id ASC.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

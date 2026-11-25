@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_071_Q71_search_journey_order_attribution - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_071_Q71_search_journey_order_attribution: Customer Search-to-Purchase Path Attribution (Session Query Lift) | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_071_Q71_search_journey_order_attribution (Customer Search-to-Purchase Path Attribution (Session Query Lift)). Category: Search &amp; Retrieval. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. E-commerce search product managers need to know which search queries drove actual revenue. We link search queries to checkout even">
+    <meta name="keywords" content="SQL Frontier Eval, Search &amp; Retrieval, task_071_Q71_search_journey_order_attribution, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_071_Q71_search_journey_order_attribution.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_071_Q71_search_journey_order_attribution: Customer Search-to-Purchase Path Attribution (Session Query Lift)">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_071_Q71_search_journey_order_attribution.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_071_Q71_search_journey_order_attribution.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_071_Q71_search_journey_order_attribution: Customer Search-to-Purchase Path Attribution (Session Query Lift)">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_071_Q71_search_journey_order_attribution.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_071_Q71_search_journey_order_attribution: Customer Search-to-Purchase Path Attribution (Session Query Lift)",
+      "identifier": "task_071_Q71_search_journey_order_attribution",
+      "articleSection": "Search & Retrieval",
+      "description": "E-commerce search product managers need to know which search queries drove actual revenue. We link search queries to checkout events within the same 30-minute session.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_071_Q71_search_journey_order_attribution.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Search & Retrieval",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_071_Q71_search_journey_order_attribution",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_071_Q71_search_journey_order_attribution.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_071_Q71_search_journey_order_attribution Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Attribute purchase to the most recent search query prior to order\n            SELECT \n                o.order_id,\n                o.user_id,\n                o.order_total,\n                s.query_term AS attributing_search_query,\n                s.searched_at,\n                o.ordered_at\n            FROM completed_orders o\n            ASOF JOIN user_search_queries s\n              ON o.user_id = s.user_id\n             AND o.ordered_at >= s.searched_at\n            ORDER BY o.order_id;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_071_Q71_search_journey_order_attribution')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_071_Q71_search_journey_order_attribution')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_071_Q71_search_journey_order_attribution%20%28Customer%20Search-to-Purchase%20Path%20Attribution%20%28Session%20Query%20Lift%29%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_071_Q71_search_journey_order_attribution.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_071_Q71_search_journey_order_attribution.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_071_Q71_search_journey_order_attribution.html&amp;title=task_071_Q71_search_journey_order_attribution%3A%20Customer%20Search-to-Purchase%20Path%20Attribution%20%28Session%20Query%20Lift%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_071_Q71_search_journey_order_attribution.html&amp;t=task_071_Q71_search_journey_order_attribution%3A%20Customer%20Search-to-Purchase%20Path%20Attribution%20%28Session%20Query%20Lift%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_071_Q71_search_journey_order_attribution.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Customer Search-to-Purchase Path Attribution (Session Query Lift)</h1>
+                <h1 class="task-title">
+                    Customer Search-to-Purchase Path Attribution (Session Query Lift)
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">247.89 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
+                    <div class="stat-val">149.75 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">227.26 ms</div>
+                    <div class="stat-val">144.46 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>E-commerce search product managers need to know which search queries drove actual revenue. We link search queries to checkout events within the same 30-minute session.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">2 Tables (2,000,000 rows &bull; 61.0 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -149,99 +269,99 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">2</td>
 <td>1,001</td>
 <td>50</td>
-<td>337.84</td>
-<td>2026-03-01 09:30:00.000002</td>
+<td>297.75</td>
+<td>2026-03-01 09:30:00.000008</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>1,002</td>
 <td>51</td>
-<td>414.3</td>
-<td>2026-03-01 09:30:00.000030</td>
+<td>277.97</td>
+<td>2026-03-01 09:30:00.000031</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>1,003</td>
 <td>52</td>
-<td>392.97</td>
-<td>2026-03-01 09:30:00.000047</td>
+<td>322.22</td>
+<td>2026-03-01 09:30:00.000044</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>1,004</td>
 <td>53</td>
-<td>389.91</td>
-<td>2026-03-01 09:30:00.000066</td>
+<td>335.72</td>
+<td>2026-03-01 09:30:00.000062</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>1,005</td>
 <td>54</td>
-<td>342.54</td>
-<td>2026-03-01 09:30:00.000081</td>
+<td>320.03</td>
+<td>2026-03-01 09:30:00.000085</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>1,006</td>
 <td>55</td>
-<td>411.71</td>
-<td>2026-03-01 09:30:00.000109</td>
+<td>398.38</td>
+<td>2026-03-01 09:30:00.000107</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>1,007</td>
 <td>56</td>
-<td>366.16</td>
+<td>339.39</td>
 <td>2026-03-01 09:30:00.000122</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>1,008</td>
 <td>57</td>
-<td>257.57</td>
-<td>2026-03-01 09:30:00.000154</td>
+<td>219.32</td>
+<td>2026-03-01 09:30:00.000160</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>1,009</td>
 <td>58</td>
-<td>326.13</td>
-<td>2026-03-01 09:30:00.000164</td>
+<td>382.44</td>
+<td>2026-03-01 09:30:00.000165</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>1,010</td>
 <td>59</td>
-<td>265.78</td>
-<td>2026-03-01 09:30:00.000193</td>
+<td>391</td>
+<td>2026-03-01 09:30:00.000186</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>1,011</td>
 <td>60</td>
-<td>373.45</td>
+<td>376.93</td>
 <td>2026-03-01 09:30:00.000204</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>1,012</td>
 <td>61</td>
-<td>490.31</td>
-<td>2026-03-01 09:30:00.000241</td>
+<td>356.92</td>
+<td>2026-03-01 09:30:00.000221</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>1,013</td>
 <td>62</td>
-<td>340.11</td>
-<td>2026-03-01 09:30:00.000242</td>
+<td>355.78</td>
+<td>2026-03-01 09:30:00.000241</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>1,014</td>
 <td>63</td>
-<td>310.58</td>
-<td>2026-03-01 09:30:00.000266</td>
+<td>344.06</td>
+<td>2026-03-01 09:30:00.000261</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -287,25 +407,25 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">4</td>
 <td>51</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000041</td>
+<td>2026-03-01 09:30:00.000030</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>52</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000042</td>
+<td>2026-03-01 09:30:00.000046</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>53</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000062</td>
+<td>2026-03-01 09:30:00.000065</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>54</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000082</td>
+<td>2026-03-01 09:30:00.000095</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
@@ -317,43 +437,43 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">9</td>
 <td>56</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000127</td>
+<td>2026-03-01 09:30:00.000121</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>57</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000143</td>
+<td>2026-03-01 09:30:00.000154</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>58</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000174</td>
+<td>2026-03-01 09:30:00.000165</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>59</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000188</td>
+<td>2026-03-01 09:30:00.000187</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>60</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000213</td>
+<td>2026-03-01 09:30:00.000201</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>61</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000223</td>
+<td>2026-03-01 09:30:00.000227</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>62</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000254</td>
+<td>2026-03-01 09:30:00.000242</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -362,186 +482,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 575.91 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 87.74693659258877%; background: #f85149;" title="ASOF_JOIN: 505.34ms (87.7%)"></div><div class="cost-bar-seg" style="width: 10.078577513038619%; background: #f85149;" title="ORDER_BY: 58.04ms (10.1%)"></div><div class="cost-bar-seg" style="width: 1.7326970094818195%; background: #3fb950;" title="TABLE_SCAN: 9.98ms (1.7%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="high-cost-tag">🔥 10.1% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">58.04 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,770</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">24.43 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (10.1% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.62 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,770</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">37.86 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;order_id&#x27;, &#x27;user_id&#x27;, &#x27;order_tota">📁 Projections: [&#x27;order_id&#x27;, &#x27;user_...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⚡ <strong>ASOF_JOIN</strong></span>
-                <span class="high-cost-tag">🔥 87.7% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">505.34 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,770</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">37.86 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (87.7% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.3%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.93 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,999</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
-                <div class="nm-tbl" title="memory.main.completed_orders">📁 memory.main.completed_orders</div>
-            </div>
-            
-        </div>
-        </div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">1.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">9.98 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
-                <div class="nm-tbl" title="memory.main.user_search_queries">📁 memory.main.user_search_queries</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>ASOF_JOIN</strong></td>
-            <td><strong>87.7%</strong></td>
-            <td>505.34 ms</td>
-            <td>533,770</td>
-            <td>37.86 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>10.1%</strong></td>
-            <td>58.04 ms</td>
-            <td>533,770</td>
-            <td>24.43 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>1.7%</strong></td>
-            <td>9.98 ms</td>
-            <td>1,000,000</td>
-            <td>26.70 MB</td>
-            <td><small>memory.main.user_search_queries</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.3%</strong></td>
-            <td>1.93 ms</td>
-            <td>999,999</td>
-            <td>22.89 MB</td>
-            <td><small>memory.main.completed_orders</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.1%</strong></td>
-            <td>0.62 ms</td>
-            <td>533,770</td>
-            <td>37.86 MB</td>
-            <td><small>Projections: [&#x27;order_id&#x27;, &#x27;user_id&#x27;, &#x27;order_tota</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 247.89 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 149.75 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="c1">-- Attribute purchase to the most recent search query prior to order</span>
@@ -561,7 +537,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 227.26 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 144.46 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Attribute purchase to the most recent search query prior to order</span>
@@ -581,7 +557,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">user_search_queries</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">query_term</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">searched_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">);</span>
@@ -604,9 +580,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -614,7 +593,7 @@ Results should be ordered as specified.</pre>
                 <div class="result-column">
                     <div class="result-header">
                         <span class="result-title">Actual Candidate Output</span>
-                        <span class="badge badge-pass">(533,770 rows × 6 cols)</span>
+                        <span class="badge badge-pass">(534,463 rows × 6 cols)</span>
                     </div>
                     <div class="table-responsive"><table class="data-table">
 <thead><tr><th class="th-idx">#</th>
@@ -629,235 +608,235 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">1</td>
 <td>1,001</td>
 <td>50</td>
+<td>297.75</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000006</td>
+<td>2026-03-01 09:30:00.000008</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1,001</td>
+<td>50</td>
 <td>349.99</td>
 <td>sony xm5 sale</td>
 <td>2026-03-01 14:15:00</td>
 <td>2026-03-01 14:25:00</td>
 </tr>
 <tr>
-<td class="td-idx">2</td>
-<td>1,003</td>
-<td>52</td>
-<td>392.97</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000042</td>
-<td>2026-03-01 09:30:00.000047</td>
-</tr>
-<tr>
 <td class="td-idx">3</td>
-<td>1,004</td>
-<td>53</td>
-<td>389.91</td>
+<td>1,002</td>
+<td>51</td>
+<td>277.97</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000062</td>
-<td>2026-03-01 09:30:00.000066</td>
+<td>2026-03-01 09:30:00.000030</td>
+<td>2026-03-01 09:30:00.000031</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>1,008</td>
-<td>57</td>
-<td>257.57</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000143</td>
-<td>2026-03-01 09:30:00.000154</td>
+<td>1,007</td>
+<td>56</td>
+<td>339.39</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000121</td>
+<td>2026-03-01 09:30:00.000122</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>1,010</td>
-<td>59</td>
-<td>265.78</td>
+<td>1,008</td>
+<td>57</td>
+<td>219.32</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000188</td>
-<td>2026-03-01 09:30:00.000193</td>
+<td>2026-03-01 09:30:00.000154</td>
+<td>2026-03-01 09:30:00.000160</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>1,012</td>
-<td>61</td>
-<td>490.31</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000223</td>
-<td>2026-03-01 09:30:00.000241</td>
+<td>1,009</td>
+<td>58</td>
+<td>382.44</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000165</td>
+<td>2026-03-01 09:30:00.000165</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>1,014</td>
-<td>63</td>
-<td>310.58</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000264</td>
-<td>2026-03-01 09:30:00.000266</td>
+<td>1,011</td>
+<td>60</td>
+<td>376.93</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000201</td>
+<td>2026-03-01 09:30:00.000204</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>1,017</td>
-<td>66</td>
-<td>291.52</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000329</td>
-<td>2026-03-01 09:30:00.000329</td>
+<td>1,016</td>
+<td>65</td>
+<td>298.96</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000300</td>
+<td>2026-03-01 09:30:00.000308</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>1,018</td>
-<td>67</td>
-<td>324.79</td>
+<td>1,020</td>
+<td>69</td>
+<td>381.88</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000341</td>
-<td>2026-03-01 09:30:00.000344</td>
+<td>2026-03-01 09:30:00.000385</td>
+<td>2026-03-01 09:30:00.000385</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>1,019</td>
-<td>68</td>
-<td>420.22</td>
+<td>1,021</td>
+<td>70</td>
+<td>334.59</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000367</td>
-<td>2026-03-01 09:30:00.000371</td>
+<td>2026-03-01 09:30:00.000401</td>
+<td>2026-03-01 09:30:00.000402</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>1,020</td>
-<td>69</td>
-<td>231.35</td>
+<td>1,022</td>
+<td>71</td>
+<td>371.91</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000395</td>
-<td>2026-03-01 09:30:00.000398</td>
+<td>2026-03-01 09:30:00.000423</td>
+<td>2026-03-01 09:30:00.000423</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>1,024</td>
-<td>73</td>
-<td>393.78</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000462</td>
-<td>2026-03-01 09:30:00.000467</td>
+<td>1,025</td>
+<td>74</td>
+<td>331.89</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000483</td>
+<td>2026-03-01 09:30:00.000483</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>1,026</td>
-<td>75</td>
-<td>301.47</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000505</td>
-<td>2026-03-01 09:30:00.000507</td>
+<td>1,027</td>
+<td>76</td>
+<td>387.28</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000526</td>
+<td>2026-03-01 09:30:00.000526</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>1,027</td>
-<td>76</td>
-<td>288.13</td>
+<td>1,029</td>
+<td>78</td>
+<td>409.08</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000522</td>
-<td>2026-03-01 09:30:00.000529</td>
+<td>2026-03-01 09:30:00.000561</td>
+<td>2026-03-01 09:30:00.000569</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>1,028</td>
-<td>77</td>
-<td>375.72</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000542</td>
-<td>2026-03-01 09:30:00.000544</td>
+<td>1,033</td>
+<td>82</td>
+<td>343.1</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000641</td>
+<td>2026-03-01 09:30:00.000641</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>1,031</td>
-<td>80</td>
-<td>454.06</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000611</td>
-<td>2026-03-01 09:30:00.000616</td>
+<td>1,034</td>
+<td>83</td>
+<td>432.35</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000661</td>
+<td>2026-03-01 09:30:00.000673</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>1,033</td>
-<td>82</td>
-<td>300.66</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000643</td>
-<td>2026-03-01 09:30:00.000648</td>
+<td>1,036</td>
+<td>85</td>
+<td>399.36</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000701</td>
+<td>2026-03-01 09:30:00.000708</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>1,038</td>
 <td>87</td>
-<td>282.11</td>
+<td>285.6</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000740</td>
+<td>2026-03-01 09:30:00.000742</td>
 <td>2026-03-01 09:30:00.000750</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>1,043</td>
-<td>92</td>
-<td>402.84</td>
+<td>1,039</td>
+<td>88</td>
+<td>266.94</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000840</td>
-<td>2026-03-01 09:30:00.000848</td>
+<td>2026-03-01 09:30:00.000770</td>
+<td>2026-03-01 09:30:00.000773</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>1,047</td>
-<td>96</td>
-<td>325.85</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000924</td>
-<td>2026-03-01 09:30:00.000924</td>
+<td>1,040</td>
+<td>89</td>
+<td>310.13</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000784</td>
+<td>2026-03-01 09:30:00.000786</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>1,048</td>
-<td>97</td>
-<td>430.79</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000946</td>
-<td>2026-03-01 09:30:00.000952</td>
+<td>1,041</td>
+<td>90</td>
+<td>463.2</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000807</td>
+<td>2026-03-01 09:30:00.000817</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>1,049</td>
-<td>98</td>
-<td>336.34</td>
+<td>1,043</td>
+<td>92</td>
+<td>303</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000960</td>
-<td>2026-03-01 09:30:00.000962</td>
+<td>2026-03-01 09:30:00.000840</td>
+<td>2026-03-01 09:30:00.000847</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>1,052</td>
-<td>101</td>
-<td>425.22</td>
+<td>1,044</td>
+<td>93</td>
+<td>392.9</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.001023</td>
-<td>2026-03-01 09:30:00.001031</td>
+<td>2026-03-01 09:30:00.000866</td>
+<td>2026-03-01 09:30:00.000867</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>1,053</td>
-<td>102</td>
-<td>272.34</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.001051</td>
-<td>2026-03-01 09:30:00.001052</td>
+<td>1,046</td>
+<td>95</td>
+<td>327.53</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000901</td>
+<td>2026-03-01 09:30:00.000903</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>1,054</td>
-<td>103</td>
-<td>311.43</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.001062</td>
-<td>2026-03-01 09:30:00.001066</td>
+<td>1,049</td>
+<td>98</td>
+<td>418.75</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000964</td>
+<td>2026-03-01 09:30:00.000970</td>
 </tr>
 </tbody></table></div>
-<div class="table-more-note">Showing first 25 of 533,770 total rows.</div>
+<div class="table-more-note">Showing first 25 of 534,463 total rows.</div>
                 </div>
 
                 <div class="result-column">
                     <div class="result-header">
                         <span class="result-title">Expected Golden Output</span>
-                        <span class="badge badge-golden">(533,770 rows × 6 cols)</span>
+                        <span class="badge badge-golden">(534,463 rows × 6 cols)</span>
                     </div>
                     <div class="table-responsive"><table class="data-table">
 <thead><tr><th class="th-idx">#</th>
@@ -872,229 +851,229 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">1</td>
 <td>1,001</td>
 <td>50</td>
+<td>297.75</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000006</td>
+<td>2026-03-01 09:30:00.000008</td>
+</tr>
+<tr>
+<td class="td-idx">2</td>
+<td>1,001</td>
+<td>50</td>
 <td>349.99</td>
 <td>sony xm5 sale</td>
 <td>2026-03-01 14:15:00</td>
 <td>2026-03-01 14:25:00</td>
 </tr>
 <tr>
-<td class="td-idx">2</td>
-<td>1,003</td>
-<td>52</td>
-<td>392.97</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000042</td>
-<td>2026-03-01 09:30:00.000047</td>
-</tr>
-<tr>
 <td class="td-idx">3</td>
-<td>1,004</td>
-<td>53</td>
-<td>389.91</td>
+<td>1,002</td>
+<td>51</td>
+<td>277.97</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000062</td>
-<td>2026-03-01 09:30:00.000066</td>
+<td>2026-03-01 09:30:00.000030</td>
+<td>2026-03-01 09:30:00.000031</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>1,008</td>
-<td>57</td>
-<td>257.57</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000143</td>
-<td>2026-03-01 09:30:00.000154</td>
+<td>1,007</td>
+<td>56</td>
+<td>339.39</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000121</td>
+<td>2026-03-01 09:30:00.000122</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>1,010</td>
-<td>59</td>
-<td>265.78</td>
+<td>1,008</td>
+<td>57</td>
+<td>219.32</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000188</td>
-<td>2026-03-01 09:30:00.000193</td>
+<td>2026-03-01 09:30:00.000154</td>
+<td>2026-03-01 09:30:00.000160</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>1,012</td>
-<td>61</td>
-<td>490.31</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000223</td>
-<td>2026-03-01 09:30:00.000241</td>
+<td>1,009</td>
+<td>58</td>
+<td>382.44</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000165</td>
+<td>2026-03-01 09:30:00.000165</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>1,014</td>
-<td>63</td>
-<td>310.58</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000264</td>
-<td>2026-03-01 09:30:00.000266</td>
+<td>1,011</td>
+<td>60</td>
+<td>376.93</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000201</td>
+<td>2026-03-01 09:30:00.000204</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>1,017</td>
-<td>66</td>
-<td>291.52</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000329</td>
-<td>2026-03-01 09:30:00.000329</td>
+<td>1,016</td>
+<td>65</td>
+<td>298.96</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000300</td>
+<td>2026-03-01 09:30:00.000308</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>1,018</td>
-<td>67</td>
-<td>324.79</td>
+<td>1,020</td>
+<td>69</td>
+<td>381.88</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000341</td>
-<td>2026-03-01 09:30:00.000344</td>
+<td>2026-03-01 09:30:00.000385</td>
+<td>2026-03-01 09:30:00.000385</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>1,019</td>
-<td>68</td>
-<td>420.22</td>
+<td>1,021</td>
+<td>70</td>
+<td>334.59</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000367</td>
-<td>2026-03-01 09:30:00.000371</td>
+<td>2026-03-01 09:30:00.000401</td>
+<td>2026-03-01 09:30:00.000402</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>1,020</td>
-<td>69</td>
-<td>231.35</td>
+<td>1,022</td>
+<td>71</td>
+<td>371.91</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000395</td>
-<td>2026-03-01 09:30:00.000398</td>
+<td>2026-03-01 09:30:00.000423</td>
+<td>2026-03-01 09:30:00.000423</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>1,024</td>
-<td>73</td>
-<td>393.78</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000462</td>
-<td>2026-03-01 09:30:00.000467</td>
+<td>1,025</td>
+<td>74</td>
+<td>331.89</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000483</td>
+<td>2026-03-01 09:30:00.000483</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>1,026</td>
-<td>75</td>
-<td>301.47</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000505</td>
-<td>2026-03-01 09:30:00.000507</td>
+<td>1,027</td>
+<td>76</td>
+<td>387.28</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000526</td>
+<td>2026-03-01 09:30:00.000526</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>1,027</td>
-<td>76</td>
-<td>288.13</td>
+<td>1,029</td>
+<td>78</td>
+<td>409.08</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000522</td>
-<td>2026-03-01 09:30:00.000529</td>
+<td>2026-03-01 09:30:00.000561</td>
+<td>2026-03-01 09:30:00.000569</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>1,028</td>
-<td>77</td>
-<td>375.72</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000542</td>
-<td>2026-03-01 09:30:00.000544</td>
+<td>1,033</td>
+<td>82</td>
+<td>343.1</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000641</td>
+<td>2026-03-01 09:30:00.000641</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>1,031</td>
-<td>80</td>
-<td>454.06</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000611</td>
-<td>2026-03-01 09:30:00.000616</td>
+<td>1,034</td>
+<td>83</td>
+<td>432.35</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000661</td>
+<td>2026-03-01 09:30:00.000673</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>1,033</td>
-<td>82</td>
-<td>300.66</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000643</td>
-<td>2026-03-01 09:30:00.000648</td>
+<td>1,036</td>
+<td>85</td>
+<td>399.36</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000701</td>
+<td>2026-03-01 09:30:00.000708</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>1,038</td>
 <td>87</td>
-<td>282.11</td>
+<td>285.6</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000740</td>
+<td>2026-03-01 09:30:00.000742</td>
 <td>2026-03-01 09:30:00.000750</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>1,043</td>
-<td>92</td>
-<td>402.84</td>
+<td>1,039</td>
+<td>88</td>
+<td>266.94</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000840</td>
-<td>2026-03-01 09:30:00.000848</td>
+<td>2026-03-01 09:30:00.000770</td>
+<td>2026-03-01 09:30:00.000773</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>1,047</td>
-<td>96</td>
-<td>325.85</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000924</td>
-<td>2026-03-01 09:30:00.000924</td>
+<td>1,040</td>
+<td>89</td>
+<td>310.13</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000784</td>
+<td>2026-03-01 09:30:00.000786</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>1,048</td>
-<td>97</td>
-<td>430.79</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.000946</td>
-<td>2026-03-01 09:30:00.000952</td>
+<td>1,041</td>
+<td>90</td>
+<td>463.2</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000807</td>
+<td>2026-03-01 09:30:00.000817</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>1,049</td>
-<td>98</td>
-<td>336.34</td>
+<td>1,043</td>
+<td>92</td>
+<td>303</td>
 <td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.000960</td>
-<td>2026-03-01 09:30:00.000962</td>
+<td>2026-03-01 09:30:00.000840</td>
+<td>2026-03-01 09:30:00.000847</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>1,052</td>
-<td>101</td>
-<td>425.22</td>
+<td>1,044</td>
+<td>93</td>
+<td>392.9</td>
 <td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.001023</td>
-<td>2026-03-01 09:30:00.001031</td>
+<td>2026-03-01 09:30:00.000866</td>
+<td>2026-03-01 09:30:00.000867</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>1,053</td>
-<td>102</td>
-<td>272.34</td>
-<td>noise canceling headphones</td>
-<td>2026-03-01 09:30:00.001051</td>
-<td>2026-03-01 09:30:00.001052</td>
+<td>1,046</td>
+<td>95</td>
+<td>327.53</td>
+<td>sony xm5 sale</td>
+<td>2026-03-01 09:30:00.000901</td>
+<td>2026-03-01 09:30:00.000903</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>1,054</td>
-<td>103</td>
-<td>311.43</td>
-<td>sony xm5 sale</td>
-<td>2026-03-01 09:30:00.001062</td>
-<td>2026-03-01 09:30:00.001066</td>
+<td>1,049</td>
+<td>98</td>
+<td>418.75</td>
+<td>noise canceling headphones</td>
+<td>2026-03-01 09:30:00.000964</td>
+<td>2026-03-01 09:30:00.000970</td>
 </tr>
 </tbody></table></div>
-<div class="table-more-note">Showing first 25 of 533,770 total rows.</div>
+<div class="table-more-note">Showing first 25 of 534,463 total rows.</div>
                 </div>
             </div>
         </section>
@@ -1108,7 +1087,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

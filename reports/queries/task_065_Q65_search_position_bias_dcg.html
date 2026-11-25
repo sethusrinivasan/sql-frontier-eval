@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_065_Q65_search_position_bias_dcg - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_065_Q65_search_position_bias_dcg: Discounted Cumulative Gain (DCG) with Search Position Bias Discount | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_065_Q65_search_position_bias_dcg (Discounted Cumulative Gain (DCG) with Search Position Bias Discount). Category: Search &amp; Retrieval. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Users are far more likely to click the #1 search result than the #5 result regardless of relevance. Ranking quality is measured vi">
+    <meta name="keywords" content="SQL Frontier Eval, Search &amp; Retrieval, task_065_Q65_search_position_bias_dcg, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_065_Q65_search_position_bias_dcg.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_065_Q65_search_position_bias_dcg: Discounted Cumulative Gain (DCG) with Search Position Bias Discount">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_065_Q65_search_position_bias_dcg.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_065_Q65_search_position_bias_dcg.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_065_Q65_search_position_bias_dcg: Discounted Cumulative Gain (DCG) with Search Position Bias Discount">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_065_Q65_search_position_bias_dcg.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_065_Q65_search_position_bias_dcg: Discounted Cumulative Gain (DCG) with Search Position Bias Discount",
+      "identifier": "task_065_Q65_search_position_bias_dcg",
+      "articleSection": "Search & Retrieval",
+      "description": "Users are far more likely to click the #1 search result than the #5 result regardless of relevance. Ranking quality is measured via Discounted Cumulative Gain: DCG = SUM(relevance / log2(rank + 1)).",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_065_Q65_search_position_bias_dcg.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Search & Retrieval",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_065_Q65_search_position_bias_dcg",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_065_Q65_search_position_bias_dcg.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_065_Q65_search_position_bias_dcg Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Calculate DCG@3 for query 1\n            SELECT \n                query_id,\n                ROUND(SUM(relevance_label / LOG2(rank_position + 1)), 4) AS dcg_at_3\n            FROM search_impressions\n            WHERE rank_position <= 3\n            GROUP BY query_id;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_065_Q65_search_position_bias_dcg')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_065_Q65_search_position_bias_dcg')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_065_Q65_search_position_bias_dcg%20%28Discounted%20Cumulative%20Gain%20%28DCG%29%20with%20Search%20Position%20Bias%20Discount%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_065_Q65_search_position_bias_dcg.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_065_Q65_search_position_bias_dcg.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_065_Q65_search_position_bias_dcg.html&amp;title=task_065_Q65_search_position_bias_dcg%3A%20Discounted%20Cumulative%20Gain%20%28DCG%29%20with%20Search%20Position%20Bias%20Discount%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_065_Q65_search_position_bias_dcg.html&amp;t=task_065_Q65_search_position_bias_dcg%3A%20Discounted%20Cumulative%20Gain%20%28DCG%29%20with%20Search%20Position%20Bias%20Discount%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_065_Q65_search_position_bias_dcg.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: No</span>
                 </div>
-                <h1 class="task-title">Discounted Cumulative Gain (DCG) with Search Position Bias Discount</h1>
+                <h1 class="task-title">
+                    Discounted Cumulative Gain (DCG) with Search Position Bias Discount
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">43.14 ms</div>
-                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
+                    <div class="stat-val">32.98 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.8x faster than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">43.50 ms</div>
+                    <div class="stat-val">58.93 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Users are far more likely to click the #1 search result than the #5 result regardless of relevance. Ranking quality is measured via Discounted Cumulative Gain: DCG = SUM(relevance / log2(rank + 1)).</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 11.4 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -158,7 +278,7 @@ Row order does not matter.</pre>
 <tr>
 <td class="td-idx">4</td>
 <td>1</td>
-<td>2</td>
+<td>1</td>
 <td>1</td>
 </tr>
 <tr>
@@ -176,20 +296,20 @@ Row order does not matter.</pre>
 <tr>
 <td class="td-idx">7</td>
 <td>4</td>
-<td>1</td>
-<td>1</td>
+<td>3</td>
+<td>2</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>5</td>
-<td>1</td>
-<td>1</td>
+<td>4</td>
+<td>3</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>6</td>
-<td>1</td>
-<td>1</td>
+<td>3</td>
+<td>2</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
@@ -200,14 +320,14 @@ Row order does not matter.</pre>
 <tr>
 <td class="td-idx">11</td>
 <td>8</td>
+<td>3</td>
 <td>2</td>
-<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>9</td>
+<td>3</td>
 <td>2</td>
-<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
@@ -224,8 +344,8 @@ Row order does not matter.</pre>
 <tr>
 <td class="td-idx">15</td>
 <td>12</td>
+<td>3</td>
 <td>2</td>
-<td>1</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -234,138 +354,42 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 127.77 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 88.02563402195793%; background: #f85149;" title="HASH_GROUP_BY: 112.47ms (88.0%)"></div><div class="cost-bar-seg" style="width: 9.11150365182873%; background: #f85149;" title="PROJECTION: 11.64ms (9.1%)"></div><div class="cost-bar-seg" style="width: 2.8628623262133366%; background: #3fb950;" title="TABLE_SCAN: 3.66ms (2.9%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
-                <span class="high-cost-tag">🔥 88.0% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">112.47 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">933,078</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10.68 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (88.0% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">9.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">11.64 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">933,081</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10.68 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;query_id&#x27;, &#x27;(CAST(relevance_label">📁 Projections: [&#x27;query_id&#x27;, &#x27;(CAST...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">2.9%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">3.66 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">933,081</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10.68 MB</span></div>
-                <div class="nm-tbl" title="memory.main.search_impressions">📁 memory.main.search_impressions</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>HASH_GROUP_BY</strong></td>
-            <td><strong>88.0%</strong></td>
-            <td>112.47 ms</td>
-            <td>933,078</td>
-            <td>10.68 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>9.1%</strong></td>
-            <td>11.64 ms</td>
-            <td>933,081</td>
-            <td>10.68 MB</td>
-            <td><small>Projections: [&#x27;query_id&#x27;, &#x27;(CAST(relevance_label</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>2.9%</strong></td>
-            <td>3.66 ms</td>
-            <td>933,081</td>
-            <td>10.68 MB</td>
-            <td><small>memory.main.search_impressions</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 43.14 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 32.98 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">query_id</span><span class="p">,</span>
@@ -378,7 +402,7 @@ Row order does not matter.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 43.50 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 58.93 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Calculate DCG@3 for query 1</span>
@@ -393,7 +417,7 @@ Row order does not matter.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">search_impressions</span><span class="w"> </span><span class="p">(</span><span class="n">query_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">rank_position</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">relevance_label</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="c1">-- 0=irrelevant, 1=relevant, 2=perfect</span>
@@ -412,9 +436,12 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -422,7 +449,7 @@ Row order does not matter.</pre>
                 <div class="result-column">
                     <div class="result-header">
                         <span class="result-title">Actual Candidate Output</span>
-                        <span class="badge badge-pass">(933,078 rows × 2 cols)</span>
+                        <span class="badge badge-pass">(932,990 rows × 2 cols)</span>
                     </div>
                     <div class="table-responsive"><table class="data-table">
 <thead><tr><th class="th-idx">#</th>
@@ -431,137 +458,137 @@ Row order does not matter.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>245,799</td>
+<td>245,780</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>245,838</td>
+<td>245,826</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>245,839</td>
+<td>245,843</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>245,862</td>
+<td>245,996</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>245,877</td>
-<td>0.6309</td>
+<td>246,009</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>245,906</td>
+<td>246,014</td>
 <td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>245,973</td>
+<td>246,019</td>
 <td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>246,018</td>
+<td>246,046</td>
 <td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>246,022</td>
+<td>246,088</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>246,035</td>
-<td>0.6309</td>
-</tr>
-<tr>
-<td class="td-idx">11</td>
-<td>246,086</td>
-<td>0.6309</td>
-</tr>
-<tr>
-<td class="td-idx">12</td>
-<td>246,126</td>
+<td>246,123</td>
 <td>1</td>
 </tr>
 <tr>
+<td class="td-idx">11</td>
+<td>246,137</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>246,138</td>
+<td>0.6309</td>
+</tr>
+<tr>
 <td class="td-idx">13</td>
-<td>246,183</td>
+<td>246,176</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>246,256</td>
-<td>1</td>
+<td>246,179</td>
+<td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>246,266</td>
+<td>246,260</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>246,290</td>
+<td>246,289</td>
 <td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>246,357</td>
-<td>0.6309</td>
+<td>246,319</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>246,393</td>
+<td>246,326</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>246,546</td>
+<td>246,354</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>246,592</td>
+<td>246,364</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>246,600</td>
+<td>246,474</td>
 <td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>246,696</td>
-<td>0.6309</td>
+<td>246,575</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>246,706</td>
-<td>0.6309</td>
+<td>246,605</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>246,713</td>
+<td>246,638</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>246,730</td>
-<td>0.6309</td>
+<td>246,670</td>
+<td>1</td>
 </tr>
 </tbody></table></div>
-<div class="table-more-note">Showing first 25 of 933,078 total rows.</div>
+<div class="table-more-note">Showing first 25 of 932,990 total rows.</div>
                 </div>
 
                 <div class="result-column">
                     <div class="result-header">
                         <span class="result-title">Expected Golden Output</span>
-                        <span class="badge badge-golden">(933,078 rows × 2 cols)</span>
+                        <span class="badge badge-golden">(932,990 rows × 2 cols)</span>
                     </div>
                     <div class="table-responsive"><table class="data-table">
 <thead><tr><th class="th-idx">#</th>
@@ -570,131 +597,131 @@ Row order does not matter.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>245,799</td>
+<td>245,762</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>245,838</td>
-<td>1</td>
+<td>245,790</td>
+<td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>245,839</td>
+<td>245,794</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>245,862</td>
+<td>245,850</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>245,877</td>
-<td>0.6309</td>
+<td>245,857</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>245,906</td>
-<td>0.6309</td>
+<td>245,875</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>245,973</td>
-<td>0.6309</td>
+<td>245,992</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>246,018</td>
-<td>0.6309</td>
+<td>245,994</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>246,022</td>
-<td>1</td>
+<td>246,168</td>
+<td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>246,035</td>
-<td>0.6309</td>
-</tr>
-<tr>
-<td class="td-idx">11</td>
-<td>246,086</td>
-<td>0.6309</td>
-</tr>
-<tr>
-<td class="td-idx">12</td>
-<td>246,126</td>
+<td>246,296</td>
 <td>1</td>
 </tr>
 <tr>
+<td class="td-idx">11</td>
+<td>246,376</td>
+<td>1</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>246,456</td>
+<td>0.6309</td>
+</tr>
+<tr>
 <td class="td-idx">13</td>
-<td>246,183</td>
+<td>246,507</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>246,256</td>
+<td>246,608</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>246,266</td>
+<td>246,657</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>246,290</td>
-<td>0.6309</td>
+<td>246,672</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>246,357</td>
-<td>0.6309</td>
+<td>246,703</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>246,393</td>
+<td>246,704</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>246,546</td>
+<td>246,745</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>246,592</td>
-<td>1</td>
+<td>246,773</td>
+<td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>246,600</td>
+<td>246,809</td>
 <td>0.6309</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>246,696</td>
-<td>0.6309</td>
+<td>246,819</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>246,706</td>
-<td>0.6309</td>
+<td>246,828</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>246,713</td>
+<td>246,960</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>246,730</td>
-<td>0.6309</td>
+<td>247,022</td>
+<td>1</td>
 </tr>
 </tbody></table></div>
-<div class="table-more-note">Showing first 25 of 933,078 total rows.</div>
+<div class="table-more-note">Showing first 25 of 932,990 total rows.</div>
                 </div>
             </div>
         </section>
@@ -708,7 +735,7 @@ Row order does not matter.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

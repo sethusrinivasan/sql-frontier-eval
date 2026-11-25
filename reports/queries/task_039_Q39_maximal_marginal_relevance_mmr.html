@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_039_Q39_maximal_marginal_relevance_mmr - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_039_Q39_maximal_marginal_relevance_mmr: Maximal Marginal Relevance (MMR) Diversity Reranking in SQL | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_039_Q39_maximal_marginal_relevance_mmr (Maximal Marginal Relevance (MMR) Diversity Reranking in SQL). Category: Vector &amp; Embeddings. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Standard vector retrieval often returns 5 virtually identical articles. MMR penalizes redundancy by selecting documents that are s">
+    <meta name="keywords" content="SQL Frontier Eval, Vector &amp; Embeddings, task_039_Q39_maximal_marginal_relevance_mmr, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_039_Q39_maximal_marginal_relevance_mmr.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_039_Q39_maximal_marginal_relevance_mmr: Maximal Marginal Relevance (MMR) Diversity Reranking in SQL">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_039_Q39_maximal_marginal_relevance_mmr.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_039_Q39_maximal_marginal_relevance_mmr.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_039_Q39_maximal_marginal_relevance_mmr: Maximal Marginal Relevance (MMR) Diversity Reranking in SQL">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_039_Q39_maximal_marginal_relevance_mmr.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_039_Q39_maximal_marginal_relevance_mmr: Maximal Marginal Relevance (MMR) Diversity Reranking in SQL",
+      "identifier": "task_039_Q39_maximal_marginal_relevance_mmr",
+      "articleSection": "Vector & Embeddings",
+      "description": "Standard vector retrieval often returns 5 virtually identical articles. MMR penalizes redundancy by selecting documents that are similar to the query but dissimilar to already-selected documents.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_039_Q39_maximal_marginal_relevance_mmr.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Vector & Embeddings",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_039_Q39_maximal_marginal_relevance_mmr",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_039_Q39_maximal_marginal_relevance_mmr.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_039_Q39_maximal_marginal_relevance_mmr Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- First candidate is highest query similarity; score subsequent candidates by query sim minus similarity to article 1\n            WITH ranked_candidates AS (\n                SELECT \n                    article_id,\n                    headline,\n                    vec,\n                    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) AS query_sim\n                FROM news_articles\n            )\n            SELECT \n                c.article_id,\n                c.headline,\n                ROUND(c.query_sim, 4) AS query_relevance,\n                ROUND(array_cosine_similarity(c.vec, top1.vec), 4) AS redundancy_with_top1,\n                -- MMR formula: 0.7 * Sim(doc, query) - 0.3 * Sim(doc, top1)\n                ROUND(0.7 * c.query_sim - 0.3 * array_cosine_similarity(c.vec, top1.vec), 4) AS mmr_score\n            FROM ranked_candidates c\n            CROSS JOIN (SELECT vec FROM ranked_candidates ORDER BY query_sim DESC LIMIT 1) top1\n            ORDER BY mmr_score DESC;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_039_Q39_maximal_marginal_relevance_mmr')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_039_Q39_maximal_marginal_relevance_mmr')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_039_Q39_maximal_marginal_relevance_mmr%20%28Maximal%20Marginal%20Relevance%20%28MMR%29%20Diversity%20Reranking%20in%20SQL%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_039_Q39_maximal_marginal_relevance_mmr.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_039_Q39_maximal_marginal_relevance_mmr.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_039_Q39_maximal_marginal_relevance_mmr.html&amp;title=task_039_Q39_maximal_marginal_relevance_mmr%3A%20Maximal%20Marginal%20Relevance%20%28MMR%29%20Diversity%20Reranking%20in%20SQL%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_039_Q39_maximal_marginal_relevance_mmr.html&amp;t=task_039_Q39_maximal_marginal_relevance_mmr%3A%20Maximal%20Marginal%20Relevance%20%28MMR%29%20Diversity%20Reranking%20in%20SQL%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_039_Q39_maximal_marginal_relevance_mmr.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Maximal Marginal Relevance (MMR) Diversity Reranking in SQL</h1>
+                <h1 class="task-title">
+                    Maximal Marginal Relevance (MMR) Diversity Reranking in SQL
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">297.35 ms</div>
-                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
+                    <div class="stat-val">219.00 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">299.08 ms</div>
+                    <div class="stat-val">213.61 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Standard vector retrieval often returns 5 virtually identical articles. MMR penalizes redundancy by selecting documents that are similar to the query but dissimilar to already-selected documents.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 30.5 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -159,73 +279,73 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">4</td>
 <td>3</td>
 <td>Fed cuts interest rates by 25 bps</td>
-<td>[0.8446 0.0938]</td>
+<td>[0.8624 0.0513]</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>Central bank lowers benchmark 25 bps</td>
-<td>[0.8133 0.1181]</td>
+<td>[0.8638 0.1195]</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>Tech stock rally follows monetary shift</td>
-<td>[0.9169 0.1756]</td>
+<td>[0.8509 0.0801]</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>Fed cuts interest rates by 25 bps</td>
-<td>[0.8414 0.1053]</td>
+<td>[0.8556 0.1053]</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>Central bank lowers benchmark 25 bps</td>
-<td>[0.8747 0.1313]</td>
+<td>[0.8515 0.1   ]</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>Tech stock rally follows monetary shift</td>
-<td>[0.8288 0.1514]</td>
+<td>[0.7982 0.1051]</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>Fed cuts interest rates by 25 bps</td>
-<td>[0.856 0.077]</td>
+<td>[0.8303 0.0878]</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>Central bank lowers benchmark 25 bps</td>
-<td>[0.8614 0.1249]</td>
+<td>[0.7819 0.0851]</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>Tech stock rally follows monetary shift</td>
-<td>[0.8371 0.1208]</td>
+<td>[0.843  0.0961]</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>Fed cuts interest rates by 25 bps</td>
-<td>[0.8012 0.1274]</td>
+<td>[0.7542 0.0829]</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>Central bank lowers benchmark 25 bps</td>
-<td>[0.8922 0.1321]</td>
+<td>[0.8849 0.0804]</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>Tech stock rally follows monetary shift</td>
-<td>[0.9104 0.1016]</td>
+<td>[0.8172 0.0648]</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -234,354 +354,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 361.53 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 47.02168944940897%; background: #f85149;" title="ORDER_BY: 170.00ms (47.0%)"></div><div class="cost-bar-seg" style="width: 26.855223168538135%; background: #f85149;" title="PROJECTION: 97.09ms (26.9%)"></div><div class="cost-bar-seg" style="width: 11.201252087573515%; background: #3fb950;" title="CTE: 40.50ms (11.2%)"></div><div class="cost-bar-seg" style="width: 4.5701827645198385%; background: #d29922;" title="PROJECTION: 16.52ms (4.6%)"></div><div class="cost-bar-seg" style="width: 4.566805974646599%; background: #bc8cff;" title="PROJECTION: 16.51ms (4.6%)"></div><div class="cost-bar-seg" style="width: 3.2187058757629163%; background: #39c5cf;" title="TABLE_SCAN: 11.64ms (3.2%)"></div><div class="cost-bar-seg" style="width: 0.8600925559627064%; background: #f0883e;" title="CTE_SCAN: 3.11ms (0.9%)"></div><div class="cost-bar-seg" style="width: 0.7432176761871997%; background: #79c0ff;" title="TOP_N: 2.69ms (0.7%)"></div><div class="cost-bar-seg" style="width: 0.57892915924413%; background: #58a6ff;" title="CTE_SCAN: 2.09ms (0.6%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔄 <strong>CTE</strong></span>
-                <span class="node-cost-tag">11.2%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">40.50 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">0</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">4.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">16.51 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;article_id&#x27;, &#x27;headline&#x27;, &#x27;vec&#x27;, &#x27;">📁 Projections: [&#x27;article_id&#x27;, &#x27;hea...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">3.2%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">11.64 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
-                <div class="nm-tbl" title="memory.main.news_articles">📁 memory.main.news_articles</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="high-cost-tag">🔥 47.0% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">170.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (47.0% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="high-cost-tag">🔥 26.9% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">97.09 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;article_id&#x27;, &#x27;headline&#x27;, &#x27;query_r">📁 Projections: [&#x27;article_id&#x27;, &#x27;hea...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (26.9% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">4.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">16.52 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;article_id&#x27;, &#x27;headline&#x27;, &#x27;query_s">📁 Projections: [&#x27;article_id&#x27;, &#x27;hea...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⚙️ <strong>CROSS_PRODUCT</strong></span>
-                <span class="node-cost-tag">0.4%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.31 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">38.15 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
-                <span class="node-cost-tag">0.9%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">3.11 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                
-            </div>
-            
-        </div>
-        </div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8 B</span></div>
-                <div class="nm-tbl" title="Projections: #0">📁 Projections: #0</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">✂️ <strong>TOP_N</strong></span>
-                <span class="node-cost-tag">0.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.69 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">12 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.07 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;vec&#x27;, &#x27;query_sim&#x27;]">📁 Projections: [&#x27;vec&#x27;, &#x27;query_sim&#x27;...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>CTE_SCAN</strong></span>
-                <span class="node-cost-tag">0.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.09 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>47.0%</strong></td>
-            <td>170.00 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>26.9%</strong></td>
-            <td>97.09 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>Projections: [&#x27;article_id&#x27;, &#x27;headline&#x27;, &#x27;query_r</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>CTE</strong></td>
-            <td><strong>11.2%</strong></td>
-            <td>40.50 ms</td>
-            <td>0</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>4.6%</strong></td>
-            <td>16.52 ms</td>
-            <td>1,000,000</td>
-            <td>26.70 MB</td>
-            <td><small>Projections: [&#x27;article_id&#x27;, &#x27;headline&#x27;, &#x27;query_s</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>4.6%</strong></td>
-            <td>16.51 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>Projections: [&#x27;article_id&#x27;, &#x27;headline&#x27;, &#x27;vec&#x27;, &#x27;</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>3.2%</strong></td>
-            <td>11.64 ms</td>
-            <td>1,000,000</td>
-            <td>26.70 MB</td>
-            <td><small>memory.main.news_articles</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>CTE_SCAN</strong></td>
-            <td><strong>0.9%</strong></td>
-            <td>3.11 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TOP_N</strong></td>
-            <td><strong>0.7%</strong></td>
-            <td>2.69 ms</td>
-            <td>1</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>CTE_SCAN</strong></td>
-            <td><strong>0.6%</strong></td>
-            <td>2.09 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>CROSS_PRODUCT</strong></td>
-            <td><strong>0.4%</strong></td>
-            <td>1.31 ms</td>
-            <td>1,000,000</td>
-            <td>38.15 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.07 ms</td>
-            <td>1,000,000</td>
-            <td>11.44 MB</td>
-            <td><small>Projections: [&#x27;vec&#x27;, &#x27;query_sim&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.00 ms</td>
-            <td>1</td>
-            <td>0.00 MB</td>
-            <td><small>Projections: #0</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 297.35 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 219.00 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">ranked_candidates</span><span class="w"> </span><span class="k">AS</span>
@@ -607,7 +415,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 299.08 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 213.61 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- First candidate is highest query similarity; score subsequent candidates by query sim minus similarity to article 1</span>
@@ -634,7 +442,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">news_articles</span><span class="w"> </span><span class="p">(</span><span class="n">article_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">headline</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
@@ -651,9 +459,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -673,55 +484,55 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>47,151</td>
-<td>Fed cuts interest rates by 25 bps</td>
-<td>0.9999</td>
-<td>0.9999</td>
+<td>122,921</td>
+<td>Tech stock rally follows monetary shift</td>
+<td>1</td>
+<td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>47,250</td>
-<td>Fed cuts interest rates by 25 bps</td>
+<td>122,986</td>
+<td>Central bank lowers benchmark 25 bps</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>47,287</td>
-<td>Central bank lowers benchmark 25 bps</td>
-<td>0.9999</td>
-<td>0.9999</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td class="td-idx">4</td>
-<td>47,304</td>
-<td>Fed cuts interest rates by 25 bps</td>
-<td>1</td>
-<td>1</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td class="td-idx">5</td>
-<td>47,327</td>
+<td>123,140</td>
 <td>Tech stock rally follows monetary shift</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
-<td class="td-idx">6</td>
-<td>47,355</td>
+<td class="td-idx">4</td>
+<td>123,165</td>
 <td>Fed cuts interest rates by 25 bps</td>
-<td>1</td>
-<td>1</td>
+<td>0.9999</td>
+<td>0.9999</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>123,192</td>
+<td>Fed cuts interest rates by 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>123,199</td>
+<td>Central bank lowers benchmark 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>47,374</td>
+<td>123,259</td>
 <td>Central bank lowers benchmark 25 bps</td>
 <td>1</td>
 <td>1</td>
@@ -729,31 +540,31 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>47,391</td>
+<td>123,342</td>
+<td>Fed cuts interest rates by 25 bps</td>
+<td>1</td>
+<td>1</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>123,441</td>
 <td>Fed cuts interest rates by 25 bps</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
-<td class="td-idx">9</td>
-<td>47,482</td>
+<td class="td-idx">10</td>
+<td>123,454</td>
 <td>Central bank lowers benchmark 25 bps</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
-<td class="td-idx">10</td>
-<td>47,492</td>
-<td>Tech stock rally follows monetary shift</td>
-<td>0.9999</td>
-<td>0.9999</td>
-<td>0.4</td>
-</tr>
-<tr>
 <td class="td-idx">11</td>
-<td>47,540</td>
+<td>123,530</td>
 <td>Tech stock rally follows monetary shift</td>
 <td>0.9999</td>
 <td>0.9999</td>
@@ -761,39 +572,39 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>47,790</td>
-<td>Fed cuts interest rates by 25 bps</td>
+<td>123,620</td>
+<td>Tech stock rally follows monetary shift</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>47,853</td>
-<td>Fed cuts interest rates by 25 bps</td>
-<td>1</td>
-<td>1</td>
+<td>123,730</td>
+<td>Central bank lowers benchmark 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>47,945</td>
-<td>Tech stock rally follows monetary shift</td>
+<td>123,793</td>
+<td>Central bank lowers benchmark 25 bps</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>47,951</td>
-<td>Tech stock rally follows monetary shift</td>
+<td>123,819</td>
+<td>Fed cuts interest rates by 25 bps</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>47,994</td>
+<td>123,840</td>
 <td>Fed cuts interest rates by 25 bps</td>
 <td>1</td>
 <td>1</td>
@@ -801,55 +612,55 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>48,102</td>
-<td>Fed cuts interest rates by 25 bps</td>
-<td>0.9999</td>
-<td>0.9999</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td class="td-idx">18</td>
-<td>48,126</td>
-<td>Fed cuts interest rates by 25 bps</td>
-<td>1</td>
-<td>1</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td class="td-idx">19</td>
-<td>48,144</td>
-<td>Fed cuts interest rates by 25 bps</td>
-<td>1</td>
-<td>1</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td class="td-idx">20</td>
-<td>48,276</td>
-<td>Fed cuts interest rates by 25 bps</td>
-<td>1</td>
-<td>1</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td class="td-idx">21</td>
-<td>48,425</td>
+<td>123,857</td>
 <td>Tech stock rally follows monetary shift</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
-<td class="td-idx">22</td>
-<td>48,480</td>
+<td class="td-idx">18</td>
+<td>123,861</td>
 <td>Fed cuts interest rates by 25 bps</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
+<td class="td-idx">19</td>
+<td>123,886</td>
+<td>Central bank lowers benchmark 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">20</td>
+<td>124,080</td>
+<td>Fed cuts interest rates by 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>124,177</td>
+<td>Central bank lowers benchmark 25 bps</td>
+<td>1</td>
+<td>1</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>124,252</td>
+<td>Central bank lowers benchmark 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
+<td>0.4</td>
+</tr>
+<tr>
 <td class="td-idx">23</td>
-<td>48,546</td>
+<td>124,317</td>
 <td>Fed cuts interest rates by 25 bps</td>
 <td>1</td>
 <td>1</td>
@@ -857,18 +668,18 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>48,767</td>
-<td>Tech stock rally follows monetary shift</td>
+<td>124,362</td>
+<td>Fed cuts interest rates by 25 bps</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>48,778</td>
-<td>Central bank lowers benchmark 25 bps</td>
-<td>0.9999</td>
-<td>0.9999</td>
+<td>124,394</td>
+<td>Tech stock rally follows monetary shift</td>
+<td>1</td>
+<td>1</td>
 <td>0.4</td>
 </tr>
 </tbody></table></div>
@@ -890,7 +701,7 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>8,257</td>
+<td>372,769</td>
 <td>Central bank lowers benchmark 25 bps</td>
 <td>1</td>
 <td>1</td>
@@ -898,23 +709,23 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>8,420</td>
-<td>Tech stock rally follows monetary shift</td>
-<td>1</td>
-<td>1</td>
+<td>372,918</td>
+<td>Fed cuts interest rates by 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>8,439</td>
-<td>Fed cuts interest rates by 25 bps</td>
+<td>372,952</td>
+<td>Central bank lowers benchmark 25 bps</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>8,518</td>
+<td>373,045</td>
 <td>Central bank lowers benchmark 25 bps</td>
 <td>1</td>
 <td>1</td>
@@ -922,7 +733,7 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>8,606</td>
+<td>373,088</td>
 <td>Tech stock rally follows monetary shift</td>
 <td>1</td>
 <td>1</td>
@@ -930,39 +741,39 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>8,615</td>
+<td>373,109</td>
 <td>Tech stock rally follows monetary shift</td>
-<td>0.9999</td>
-<td>0.9999</td>
+<td>1</td>
+<td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>8,686</td>
-<td>Central bank lowers benchmark 25 bps</td>
+<td>373,118</td>
+<td>Tech stock rally follows monetary shift</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>8,726</td>
+<td>373,283</td>
+<td>Tech stock rally follows monetary shift</td>
+<td>0.9999</td>
+<td>0.9999</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">9</td>
+<td>373,334</td>
 <td>Tech stock rally follows monetary shift</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
-<td class="td-idx">9</td>
-<td>8,751</td>
-<td>Fed cuts interest rates by 25 bps</td>
-<td>0.9999</td>
-<td>0.9999</td>
-<td>0.4</td>
-</tr>
-<tr>
 <td class="td-idx">10</td>
-<td>8,826</td>
+<td>373,347</td>
 <td>Fed cuts interest rates by 25 bps</td>
 <td>1</td>
 <td>1</td>
@@ -970,47 +781,47 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>8,832</td>
-<td>Fed cuts interest rates by 25 bps</td>
+<td>373,349</td>
+<td>Tech stock rally follows monetary shift</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>8,891</td>
-<td>Tech stock rally follows monetary shift</td>
-<td>0.9999</td>
-<td>0.9999</td>
+<td>373,362</td>
+<td>Fed cuts interest rates by 25 bps</td>
+<td>1</td>
+<td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>8,944</td>
-<td>Central bank lowers benchmark 25 bps</td>
-<td>1</td>
-<td>1</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td class="td-idx">14</td>
-<td>8,959</td>
-<td>Central bank lowers benchmark 25 bps</td>
-<td>0.9999</td>
-<td>0.9999</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td class="td-idx">15</td>
-<td>9,093</td>
+<td>373,512</td>
 <td>Fed cuts interest rates by 25 bps</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
+<td class="td-idx">14</td>
+<td>373,535</td>
+<td>Tech stock rally follows monetary shift</td>
+<td>1</td>
+<td>1</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>373,639</td>
+<td>Central bank lowers benchmark 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
+<td>0.4</td>
+</tr>
+<tr>
 <td class="td-idx">16</td>
-<td>9,101</td>
+<td>373,652</td>
 <td>Tech stock rally follows monetary shift</td>
 <td>0.9999</td>
 <td>0.9999</td>
@@ -1018,47 +829,47 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>9,493</td>
-<td>Central bank lowers benchmark 25 bps</td>
+<td>373,694</td>
+<td>Tech stock rally follows monetary shift</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>9,601</td>
+<td>373,695</td>
+<td>Fed cuts interest rates by 25 bps</td>
+<td>0.9999</td>
+<td>0.9999</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>373,768</td>
 <td>Central bank lowers benchmark 25 bps</td>
 <td>1</td>
 <td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
-<td class="td-idx">19</td>
-<td>9,635</td>
-<td>Tech stock rally follows monetary shift</td>
-<td>1</td>
-<td>1</td>
-<td>0.4</td>
-</tr>
-<tr>
 <td class="td-idx">20</td>
-<td>9,644</td>
-<td>Tech stock rally follows monetary shift</td>
-<td>0.9999</td>
-<td>0.9999</td>
+<td>373,858</td>
+<td>Central bank lowers benchmark 25 bps</td>
+<td>1</td>
+<td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>9,755</td>
+<td>373,865</td>
 <td>Tech stock rally follows monetary shift</td>
-<td>0.9999</td>
-<td>0.9999</td>
+<td>1</td>
+<td>1</td>
 <td>0.4</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>9,821</td>
+<td>374,006</td>
 <td>Tech stock rally follows monetary shift</td>
 <td>1</td>
 <td>1</td>
@@ -1066,24 +877,24 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>9,919</td>
+<td>374,079</td>
+<td>Fed cuts interest rates by 25 bps</td>
+<td>1</td>
+<td>1</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>374,308</td>
 <td>Central bank lowers benchmark 25 bps</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
 </tr>
 <tr>
-<td class="td-idx">24</td>
-<td>9,959</td>
-<td>Tech stock rally follows monetary shift</td>
-<td>1</td>
-<td>1</td>
-<td>0.4</td>
-</tr>
-<tr>
 <td class="td-idx">25</td>
-<td>10,080</td>
-<td>Fed cuts interest rates by 25 bps</td>
+<td>374,419</td>
+<td>Central bank lowers benchmark 25 bps</td>
 <td>0.9999</td>
 <td>0.9999</td>
 <td>0.4</td>
@@ -1103,7 +914,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:28 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_037_Q37_hybrid_relational_vector_cohort_join - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_037_Q37_hybrid_relational_vector_cohort_join: Cohort-Constrained Vector Match with Geographical Regionality | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_037_Q37_hybrid_relational_vector_cohort_join (Cohort-Constrained Vector Match with Geographical Regionality). Category: Vector &amp; Embeddings. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personality/skill compatibility joined with stri">
+    <meta name="keywords" content="SQL Frontier Eval, Vector &amp; Embeddings, task_037_Q37_hybrid_relational_vector_cohort_join, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_037_Q37_hybrid_relational_vector_cohort_join.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_037_Q37_hybrid_relational_vector_cohort_join: Cohort-Constrained Vector Match with Geographical Regionality">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_037_Q37_hybrid_relational_vector_cohort_join.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_037_Q37_hybrid_relational_vector_cohort_join.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_037_Q37_hybrid_relational_vector_cohort_join: Cohort-Constrained Vector Match with Geographical Regionality">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_037_Q37_hybrid_relational_vector_cohort_join.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_037_Q37_hybrid_relational_vector_cohort_join: Cohort-Constrained Vector Match with Geographical Regionality",
+      "identifier": "task_037_Q37_hybrid_relational_vector_cohort_join",
+      "articleSection": "Vector & Embeddings",
+      "description": "Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personality/skill compatibility joined with strict relational geographic and category boundaries.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_037_Q37_hybrid_relational_vector_cohort_join.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Vector & Embeddings",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_037_Q37_hybrid_relational_vector_cohort_join",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_037_Q37_hybrid_relational_vector_cohort_join.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_037_Q37_hybrid_relational_vector_cohort_join Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Match jobs to candidates strictly within matching geographical region ordered by skill compatibility\n            SELECT \n                j.job_id,\n                j.region,\n                c.candidate_id,\n                ROUND(array_cosine_similarity(c.skills_vec, j.required_vec), 4) AS skill_fit_score\n            FROM job_openings j\n            JOIN candidates c\n              ON j.region = c.region\n            ORDER BY skill_fit_score DESC;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_037_Q37_hybrid_relational_vector_cohort_join')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_037_Q37_hybrid_relational_vector_cohort_join')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_037_Q37_hybrid_relational_vector_cohort_join%20%28Cohort-Constrained%20Vector%20Match%20with%20Geographical%20Regionality%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_037_Q37_hybrid_relational_vector_cohort_join.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_037_Q37_hybrid_relational_vector_cohort_join.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_037_Q37_hybrid_relational_vector_cohort_join.html&amp;title=task_037_Q37_hybrid_relational_vector_cohort_join%3A%20Cohort-Constrained%20Vector%20Match%20with%20Geographical%20Regionality%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_037_Q37_hybrid_relational_vector_cohort_join.html&amp;t=task_037_Q37_hybrid_relational_vector_cohort_join%3A%20Cohort-Constrained%20Vector%20Match%20with%20Geographical%20Regionality%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_037_Q37_hybrid_relational_vector_cohort_join.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Cohort-Constrained Vector Match with Geographical Regionality</h1>
+                <h1 class="task-title">
+                    Cohort-Constrained Vector Match with Geographical Regionality
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">98.80 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
+                    <div class="stat-val">64.61 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">91.67 ms</div>
+                    <div class="stat-val">65.55 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personality/skill compatibility joined with strict relational geographic and category boundaries.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">2 Tables (1,000,001 rows &bull; 34.3 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -153,79 +273,79 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">3</td>
 <td>2</td>
 <td>US-WEST</td>
-<td>[0.8564 0.0135 0.0448]</td>
+<td>[0.8218 0.0989 0.0369]</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>3</td>
 <td>EU-CENTRAL</td>
-<td>[ 0.8426 -0.0158  0.0398]</td>
+<td>[7.423e-01 1.000e-04 6.950e-02]</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>US-WEST</td>
-<td>[ 0.8315  0.0152 -0.0075]</td>
+<td>[ 0.7876  0.027  -0.0077]</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>EU-CENTRAL</td>
-<td>[ 0.8648 -0.0325  0.0799]</td>
+<td>[0.79   0.0533 0.0431]</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>US-WEST</td>
-<td>[0.8107 0.0577 0.0823]</td>
+<td>[0.8368 0.0587 0.0654]</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>EU-CENTRAL</td>
-<td>[0.8185 0.0194 0.0531]</td>
+<td>[0.8693 0.0313 0.1104]</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>US-WEST</td>
-<td>[0.898  0.0153 0.0716]</td>
+<td>[0.8676 0.0403 0.088 ]</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>EU-CENTRAL</td>
-<td>[0.8869 0.045  0.0292]</td>
+<td>[0.8831 0.0681 0.0825]</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>US-WEST</td>
-<td>[ 0.788  -0.0488 -0.001 ]</td>
+<td>[0.7773 0.0135 0.07  ]</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>EU-CENTRAL</td>
-<td>[0.8641 0.0211 0.0239]</td>
+<td>[0.9417 0.0077 0.0194]</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>US-WEST</td>
-<td>[0.8598 0.0742 0.0206]</td>
+<td>[ 0.7813  0.0687 -0.019 ]</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>EU-CENTRAL</td>
-<td>[8.295e-01 3.670e-02 1.000e-04]</td>
+<td>[ 0.8517 -0.0422  0.0165]</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>US-WEST</td>
-<td>[0.8183 0.0659 0.1206]</td>
+<td>[0.8513 0.0972 0.0488]</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -262,234 +382,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 113.87 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 40.23695540474837%; background: #f85149;" title="ORDER_BY: 45.82ms (40.2%)"></div><div class="cost-bar-seg" style="width: 20.610701650586115%; background: #f85149;" title="PROJECTION: 23.47ms (20.6%)"></div><div class="cost-bar-seg" style="width: 19.735822055844007%; background: #3fb950;" title="HASH_JOIN: 22.47ms (19.7%)"></div><div class="cost-bar-seg" style="width: 16.96736966136321%; background: #d29922;" title="TABLE_SCAN: 19.32ms (17.0%)"></div><div class="cost-bar-seg" style="width: 1.7938569949636785%; background: #bc8cff;" title="PROJECTION: 2.04ms (1.8%)"></div><div class="cost-bar-seg" style="width: 0.64377316048113%; background: #39c5cf;" title="PROJECTION: 0.73ms (0.6%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.73 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">13.35 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;__internal">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="high-cost-tag">🔥 40.2% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">45.82 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8.11 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (40.2% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">1.8%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.04 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">8.11 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS TINYINT)&#x27;, &#x27;__internal">📁 Projections: [&#x27;CAST(#0 AS TINYIN...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="high-cost-tag">🔥 20.6% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">23.47 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">13.35 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;job_id&#x27;, &#x27;region&#x27;, &#x27;candidate_id&#x27;">📁 Projections: [&#x27;job_id&#x27;, &#x27;region&#x27;...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (20.6% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
-                <span class="node-cost-tag">19.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">22.47 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.89 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">17.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">19.32 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">500,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.26 MB</span></div>
-                <div class="nm-tbl" title="memory.main.candidates">📁 memory.main.candidates</div>
-            </div>
-            
-        </div>
-        </div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.01 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">32 B</span></div>
-                <div class="nm-tbl" title="memory.main.job_openings">📁 memory.main.job_openings</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>40.2%</strong></td>
-            <td>45.82 ms</td>
-            <td>500,000</td>
-            <td>8.11 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>20.6%</strong></td>
-            <td>23.47 ms</td>
-            <td>500,000</td>
-            <td>13.35 MB</td>
-            <td><small>Projections: [&#x27;job_id&#x27;, &#x27;region&#x27;, &#x27;candidate_id&#x27;</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>HASH_JOIN</strong></td>
-            <td><strong>19.7%</strong></td>
-            <td>22.47 ms</td>
-            <td>500,000</td>
-            <td>22.89 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>17.0%</strong></td>
-            <td>19.32 ms</td>
-            <td>500,000</td>
-            <td>15.26 MB</td>
-            <td><small>memory.main.candidates</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>1.8%</strong></td>
-            <td>2.04 ms</td>
-            <td>500,000</td>
-            <td>8.11 MB</td>
-            <td><small>Projections: [&#x27;CAST(#0 AS TINYINT)&#x27;, &#x27;__internal</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.6%</strong></td>
-            <td>0.73 ms</td>
-            <td>500,000</td>
-            <td>13.35 MB</td>
-            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;__internal</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.01 ms</td>
-            <td>1</td>
-            <td>0.00 MB</td>
-            <td><small>memory.main.job_openings</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 98.80 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 64.61 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">SELECT</span><span class="w"> </span><span class="n">j</span><span class="p">.</span><span class="n">job_id</span><span class="p">,</span>
@@ -504,7 +432,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 91.67 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 65.55 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Match jobs to candidates strictly within matching geographical region ordered by skill compatibility</span>
@@ -521,7 +449,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">candidates</span><span class="w"> </span><span class="p">(</span><span class="n">candidate_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">region</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">skills_vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>
@@ -543,9 +471,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -573,169 +504,169 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">2</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>368,840</td>
-<td>0.9637</td>
+<td>113,754</td>
+<td>0.9762</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>751,078</td>
-<td>0.9613</td>
+<td>430,592</td>
+<td>0.9607</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>205,910</td>
-<td>0.961</td>
+<td>216,926</td>
+<td>0.9599</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>498,798</td>
-<td>0.9591</td>
+<td>977,566</td>
+<td>0.9598</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>938,400</td>
-<td>0.9586</td>
+<td>310,964</td>
+<td>0.9592</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>212,330</td>
-<td>0.9585</td>
+<td>669,334</td>
+<td>0.9588</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>594,744</td>
-<td>0.9582</td>
+<td>689,666</td>
+<td>0.9579</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>464,044</td>
-<td>0.9578</td>
+<td>669,058</td>
+<td>0.9577</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>453,520</td>
-<td>0.9576</td>
+<td>211,578</td>
+<td>0.9575</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>78,506</td>
-<td>0.9575</td>
+<td>260,006</td>
+<td>0.9574</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>29,152</td>
-<td>0.9573</td>
+<td>717,640</td>
+<td>0.9571</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>844,956</td>
-<td>0.9562</td>
+<td>589,264</td>
+<td>0.957</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>909,572</td>
-<td>0.9558</td>
+<td>948,846</td>
+<td>0.9568</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>855,096</td>
-<td>0.9553</td>
+<td>54,062</td>
+<td>0.9567</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>492,032</td>
-<td>0.9551</td>
+<td>67,462</td>
+<td>0.9567</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>457,548</td>
-<td>0.955</td>
+<td>729,294</td>
+<td>0.9561</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>878,170</td>
-<td>0.9548</td>
+<td>421,186</td>
+<td>0.9559</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>586,582</td>
-<td>0.9546</td>
+<td>584,696</td>
+<td>0.9556</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>486,514</td>
-<td>0.9545</td>
+<td>838,708</td>
+<td>0.9552</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>836,916</td>
-<td>0.9543</td>
+<td>578,812</td>
+<td>0.9552</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>535,410</td>
-<td>0.9538</td>
+<td>607,176</td>
+<td>0.9552</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>647,984</td>
-<td>0.9538</td>
+<td>745,042</td>
+<td>0.9549</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>203,650</td>
-<td>0.9538</td>
+<td>879,084</td>
+<td>0.9546</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>544,574</td>
-<td>0.9535</td>
+<td>542,314</td>
+<td>0.9545</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 500,000 total rows.</div>
@@ -764,169 +695,169 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">2</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>368,840</td>
-<td>0.9637</td>
+<td>113,754</td>
+<td>0.9762</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>751,078</td>
-<td>0.9613</td>
+<td>430,592</td>
+<td>0.9607</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>205,910</td>
-<td>0.961</td>
+<td>216,926</td>
+<td>0.9599</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>498,798</td>
-<td>0.9591</td>
+<td>977,566</td>
+<td>0.9598</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>938,400</td>
-<td>0.9586</td>
+<td>310,964</td>
+<td>0.9592</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>212,330</td>
-<td>0.9585</td>
+<td>669,334</td>
+<td>0.9588</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>594,744</td>
-<td>0.9582</td>
+<td>689,666</td>
+<td>0.9579</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>464,044</td>
-<td>0.9578</td>
+<td>669,058</td>
+<td>0.9577</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>453,520</td>
-<td>0.9576</td>
+<td>211,578</td>
+<td>0.9575</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>78,506</td>
-<td>0.9575</td>
+<td>260,006</td>
+<td>0.9574</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>29,152</td>
-<td>0.9573</td>
+<td>717,640</td>
+<td>0.9571</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>844,956</td>
-<td>0.9562</td>
+<td>589,264</td>
+<td>0.957</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>909,572</td>
-<td>0.9558</td>
+<td>948,846</td>
+<td>0.9568</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>855,096</td>
-<td>0.9553</td>
+<td>54,062</td>
+<td>0.9567</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>492,032</td>
-<td>0.9551</td>
+<td>67,462</td>
+<td>0.9567</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>457,548</td>
-<td>0.955</td>
+<td>729,294</td>
+<td>0.9561</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>878,170</td>
-<td>0.9548</td>
+<td>421,186</td>
+<td>0.9559</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>586,582</td>
-<td>0.9546</td>
+<td>584,696</td>
+<td>0.9556</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>486,514</td>
-<td>0.9545</td>
+<td>838,708</td>
+<td>0.9552</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>836,916</td>
-<td>0.9543</td>
+<td>578,812</td>
+<td>0.9552</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>647,984</td>
-<td>0.9538</td>
+<td>607,176</td>
+<td>0.9552</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>535,410</td>
-<td>0.9538</td>
+<td>745,042</td>
+<td>0.9549</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>203,650</td>
-<td>0.9538</td>
+<td>879,084</td>
+<td>0.9546</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>101</td>
 <td>US-WEST</td>
-<td>544,574</td>
-<td>0.9535</td>
+<td>542,314</td>
+<td>0.9545</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 500,000 total rows.</div>
@@ -943,7 +874,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:28 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

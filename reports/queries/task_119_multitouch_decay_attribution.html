@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_119_multitouch_decay_attribution - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_119_multitouch_decay_attribution: Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100% | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_119_multitouch_decay_attribution (Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%). Category: Temporal &amp; Time-Series. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Calculates exponential time-decay attribution across previous marketing touches (7-day half-life: w = 2^(-delta_t / 7)), strictly ">
+    <meta name="keywords" content="SQL Frontier Eval, Temporal &amp; Time-Series, task_119_multitouch_decay_attribution, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_119_multitouch_decay_attribution.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_119_multitouch_decay_attribution: Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_119_multitouch_decay_attribution.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_119_multitouch_decay_attribution.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_119_multitouch_decay_attribution: Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_119_multitouch_decay_attribution.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_119_multitouch_decay_attribution: Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%",
+      "identifier": "task_119_multitouch_decay_attribution",
+      "articleSection": "Temporal & Time-Series",
+      "description": "Calculates exponential time-decay attribution across previous marketing touches (7-day half-life: w = 2^(-delta_t / 7)), strictly normalizing touchpoint weights so attributed revenue sums to exactly 100% of conversion value.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_119_multitouch_decay_attribution.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Temporal & Time-Series",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_119_multitouch_decay_attribution",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_119_multitouch_decay_attribution.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_119_multitouch_decay_attribution Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "\nWITH weighted_touches AS (\n    SELECT \n        t.touch_id,\n        t.channel,\n        c.order_revenue,\n        POW(0.5, date_diff('second', t.click_time, c.conversion_time) / (7.0 * 86400.0)) AS raw_weight\n    FROM purchase_conversions c\n    JOIN touchpoints t \n      ON c.user_id = t.user_id \n     AND t.click_time <= c.conversion_time\n     AND t.click_time >= c.conversion_time - INTERVAL 30 DAYS\n),\ntotal_weight AS (\n    SELECT \n        *,\n        SUM(raw_weight) OVER () AS sum_weights\n    FROM weighted_touches\n)\nSELECT \n    touch_id,\n    channel,\n    ROUND(order_revenue * (raw_weight / sum_weights), 2) AS attributed_revenue\nFROM total_weight\nORDER BY touch_id ASC;\n"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_119_multitouch_decay_attribution')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_119_multitouch_decay_attribution')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_119_multitouch_decay_attribution%20%28Exponential%20Half-Life%20Multi-Touch%20Marketing%20Attribution%20Normalized%20to%20100%25%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_119_multitouch_decay_attribution.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_119_multitouch_decay_attribution.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_119_multitouch_decay_attribution.html&amp;title=task_119_multitouch_decay_attribution%3A%20Exponential%20Half-Life%20Multi-Touch%20Marketing%20Attribution%20Normalized%20to%20100%25%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_119_multitouch_decay_attribution.html&amp;t=task_119_multitouch_decay_attribution%3A%20Exponential%20Half-Life%20Multi-Touch%20Marketing%20Attribution%20Normalized%20to%20100%25%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_119_multitouch_decay_attribution.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%</h1>
+                <h1 class="task-title">
+                    Exponential Half-Life Multi-Touch Marketing Attribution Normalized to 100%
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">229.28 ms</div>
+                    <div class="stat-val">156.93 ms</div>
                     <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">223.86 ms</div>
+                    <div class="stat-val">152.82 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Calculates exponential time-decay attribution across previous marketing touches (7-day half-life: w = 2^(-delta_t / 7)), strictly normalizing touchpoint weights so attributed revenue sums to exactly 100% of conversion value.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -119,9 +236,12 @@ Order by touch_id ASC.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">2 Tables (2,000,000 rows &bull; 64.8 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -155,99 +275,99 @@ Order by touch_id ASC.</pre>
 <td class="td-idx">2</td>
 <td>101</td>
 <td>42</td>
-<td>377.27</td>
-<td>2026-03-01 09:30:00.000004</td>
+<td>328.02</td>
+<td>2026-03-01 09:30:00.000003</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>102</td>
 <td>43</td>
-<td>266.6</td>
-<td>2026-03-01 09:30:00.000033</td>
+<td>308.9</td>
+<td>2026-03-01 09:30:00.000026</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>103</td>
 <td>44</td>
-<td>391.22</td>
-<td>2026-03-01 09:30:00.000046</td>
+<td>296.94</td>
+<td>2026-03-01 09:30:00.000048</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>104</td>
 <td>45</td>
-<td>372.02</td>
-<td>2026-03-01 09:30:00.000063</td>
+<td>302.61</td>
+<td>2026-03-01 09:30:00.000067</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>105</td>
 <td>46</td>
-<td>317.61</td>
-<td>2026-03-01 09:30:00.000085</td>
+<td>359.66</td>
+<td>2026-03-01 09:30:00.000081</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>106</td>
 <td>47</td>
-<td>420.67</td>
-<td>2026-03-01 09:30:00.000111</td>
+<td>310.53</td>
+<td>2026-03-01 09:30:00.000106</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>107</td>
 <td>48</td>
-<td>392.91</td>
-<td>2026-03-01 09:30:00.000127</td>
+<td>298.42</td>
+<td>2026-03-01 09:30:00.000128</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>108</td>
 <td>49</td>
-<td>443.28</td>
-<td>2026-03-01 09:30:00.000154</td>
+<td>270.6</td>
+<td>2026-03-01 09:30:00.000152</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>109</td>
 <td>50</td>
-<td>435.5</td>
-<td>2026-03-01 09:30:00.000173</td>
+<td>231.37</td>
+<td>2026-03-01 09:30:00.000178</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>110</td>
 <td>51</td>
-<td>333.04</td>
-<td>2026-03-01 09:30:00.000183</td>
+<td>386.24</td>
+<td>2026-03-01 09:30:00.000186</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>111</td>
 <td>52</td>
-<td>339.94</td>
-<td>2026-03-01 09:30:00.000202</td>
+<td>278.21</td>
+<td>2026-03-01 09:30:00.000211</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>112</td>
 <td>53</td>
-<td>339.53</td>
-<td>2026-03-01 09:30:00.000222</td>
+<td>403.32</td>
+<td>2026-03-01 09:30:00.000228</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>113</td>
 <td>54</td>
-<td>377.5</td>
-<td>2026-03-01 09:30:00.000244</td>
+<td>231.58</td>
+<td>2026-03-01 09:30:00.000258</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>114</td>
 <td>55</td>
-<td>307.88</td>
-<td>2026-03-01 09:30:00.000266</td>
+<td>380.75</td>
+<td>2026-03-01 09:30:00.000265</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -298,84 +418,84 @@ Order by touch_id ASC.</pre>
 <td>3</td>
 <td>42</td>
 <td>Google Search</td>
-<td>2026-03-01 09:30:00.000001</td>
+<td>2026-03-01 09:30:00.000003</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>43</td>
 <td>Facebook Ad</td>
-<td>2026-03-01 09:30:00.000027</td>
+<td>2026-03-01 09:30:00.000023</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>44</td>
 <td>Email Promo</td>
-<td>2026-03-01 09:30:00.000045</td>
+<td>2026-03-01 09:30:00.000047</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>45</td>
 <td>Google Search</td>
-<td>2026-03-01 09:30:00.000064</td>
+<td>2026-03-01 09:30:00.000061</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>46</td>
 <td>Facebook Ad</td>
-<td>2026-03-01 09:30:00.000085</td>
+<td>2026-03-01 09:30:00.000093</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>47</td>
 <td>Email Promo</td>
-<td>2026-03-01 09:30:00.000111</td>
+<td>2026-03-01 09:30:00.000107</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>48</td>
 <td>Google Search</td>
-<td>2026-03-01 09:30:00.000136</td>
+<td>2026-03-01 09:30:00.000129</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>49</td>
 <td>Facebook Ad</td>
-<td>2026-03-01 09:30:00.000144</td>
+<td>2026-03-01 09:30:00.000151</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>50</td>
 <td>Email Promo</td>
-<td>2026-03-01 09:30:00.000162</td>
+<td>2026-03-01 09:30:00.000178</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>51</td>
 <td>Google Search</td>
-<td>2026-03-01 09:30:00.000195</td>
+<td>2026-03-01 09:30:00.000197</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>52</td>
 <td>Facebook Ad</td>
-<td>2026-03-01 09:30:00.000219</td>
+<td>2026-03-01 09:30:00.000203</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>53</td>
 <td>Email Promo</td>
-<td>2026-03-01 09:30:00.000232</td>
+<td>2026-03-01 09:30:00.000225</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -384,306 +504,42 @@ Order by touch_id ASC.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 197.63 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 54.1086277070673%; background: #f85149;" title="HASH_JOIN: 106.94ms (54.1%)"></div><div class="cost-bar-seg" style="width: 11.630864257712537%; background: #f85149;" title="ORDER_BY: 22.99ms (11.6%)"></div><div class="cost-bar-seg" style="width: 11.581650579076632%; background: #3fb950;" title="WINDOW: 22.89ms (11.6%)"></div><div class="cost-bar-seg" style="width: 6.991153651265643%; background: #d29922;" title="TABLE_SCAN: 13.82ms (7.0%)"></div><div class="cost-bar-seg" style="width: 5.07606342343893%; background: #bc8cff;" title="PROJECTION: 10.03ms (5.1%)"></div><div class="cost-bar-seg" style="width: 3.6755299289873253%; background: #39c5cf;" title="PROJECTION: 7.26ms (3.7%)"></div><div class="cost-bar-seg" style="width: 3.151823363706916%; background: #f0883e;" title="PROJECTION: 6.23ms (3.2%)"></div><div class="cost-bar-seg" style="width: 2.8213288850938674%; background: #79c0ff;" title="PROJECTION: 5.58ms (2.8%)"></div><div class="cost-bar-seg" style="width: 0.918013063529181%; background: #58a6ff;" title="TABLE_SCAN: 1.81ms (0.9%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">2.8%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">5.58 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.25 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="node-cost-tag">11.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">22.99 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.25 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">3.2%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">6.23 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.25 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;__internal_compress_string_">📁 Projections: [&#x27;#0&#x27;, &#x27;__internal_...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">5.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">10.03 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">14.25 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;touch_id&#x27;, &#x27;channel&#x27;, &#x27;attributed">📁 Projections: [&#x27;touch_id&#x27;, &#x27;chann...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.09 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.39 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
-                <span class="node-cost-tag">11.6%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">22.89 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.39 MB</span></div>
-                <div class="nm-tbl" title="Projections: sum(raw_weight) OVER ()">📁 Projections: sum(raw_weight) OVE...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">3.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">7.26 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">18.32 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;touch_id&#x27;, &#x27;channel&#x27;, &#x27;order_reve">📁 Projections: [&#x27;touch_id&#x27;, &#x27;chann...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
-                <span class="high-cost-tag">🔥 54.1% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">106.94 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">533,542</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">22.39 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (54.1% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">7.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.82 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                <div class="nm-tbl" title="memory.main.touchpoints">📁 memory.main.touchpoints</div>
-            </div>
-            
-        </div>
-        </div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.9%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.81 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,998</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
-                <div class="nm-tbl" title="memory.main.purchase_conversions">📁 memory.main.purchase_conversions</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>HASH_JOIN</strong></td>
-            <td><strong>54.1%</strong></td>
-            <td>106.94 ms</td>
-            <td>533,542</td>
-            <td>22.39 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>11.6%</strong></td>
-            <td>22.99 ms</td>
-            <td>533,542</td>
-            <td>14.25 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>WINDOW</strong></td>
-            <td><strong>11.6%</strong></td>
-            <td>22.89 ms</td>
-            <td>533,542</td>
-            <td>22.39 MB</td>
-            <td><small>Projections: sum(raw_weight) OVER ()</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>7.0%</strong></td>
-            <td>13.82 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>memory.main.touchpoints</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>5.1%</strong></td>
-            <td>10.03 ms</td>
-            <td>533,542</td>
-            <td>14.25 MB</td>
-            <td><small>Projections: [&#x27;touch_id&#x27;, &#x27;channel&#x27;, &#x27;attributed</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>3.7%</strong></td>
-            <td>7.26 ms</td>
-            <td>533,542</td>
-            <td>18.32 MB</td>
-            <td><small>Projections: [&#x27;touch_id&#x27;, &#x27;channel&#x27;, &#x27;order_reve</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>3.2%</strong></td>
-            <td>6.23 ms</td>
-            <td>533,542</td>
-            <td>14.25 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_compress_string_</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>2.8%</strong></td>
-            <td>5.58 ms</td>
-            <td>533,542</td>
-            <td>14.25 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;__internal_decompress_strin</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.9%</strong></td>
-            <td>1.81 ms</td>
-            <td>999,998</td>
-            <td>19.07 MB</td>
-            <td><small>memory.main.purchase_conversions</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.09 ms</td>
-            <td>533,542</td>
-            <td>22.39 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 229.28 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 156.93 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">touchpoint_weights</span><span class="w"> </span><span class="k">AS</span>
@@ -705,7 +561,7 @@ Order by touch_id ASC.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 223.86 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 152.82 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">weighted_touches</span><span class="w"> </span><span class="k">AS</span>
@@ -731,7 +587,7 @@ Order by touch_id ASC.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">touchpoints</span><span class="w"> </span><span class="p">(</span><span class="n">touch_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">channel</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">click_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">);</span>
@@ -757,9 +613,12 @@ Order by touch_id ASC.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -767,7 +626,7 @@ Order by touch_id ASC.</pre>
                 <div class="result-column">
                     <div class="result-header">
                         <span class="result-title">Actual Candidate Output</span>
-                        <span class="badge badge-pass">(533,542 rows × 3 cols)</span>
+                        <span class="badge badge-pass">(534,044 rows × 3 cols)</span>
                     </div>
                     <div class="table-responsive"><table class="data-table">
 <thead><tr><th class="th-idx">#</th>
@@ -819,120 +678,120 @@ Order by touch_id ASC.</pre>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>7</td>
-<td>Facebook Ad</td>
+<td>6</td>
+<td>Google Search</td>
 <td>0</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>8</td>
-<td>Email Promo</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">10</td>
 <td>10</td>
 <td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">11</td>
+<td class="td-idx">10</td>
 <td>11</td>
 <td>Email Promo</td>
 <td>0</td>
 </tr>
 <tr>
+<td class="td-idx">11</td>
+<td>13</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
 <td class="td-idx">12</td>
+<td>14</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>15</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
 <td>16</td>
 <td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">13</td>
-<td>17</td>
-<td>Email Promo</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">14</td>
+<td class="td-idx">15</td>
 <td>18</td>
 <td>Google Search</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">15</td>
+<td class="td-idx">16</td>
+<td>19</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
 <td>20</td>
 <td>Email Promo</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">16</td>
+<td class="td-idx">18</td>
 <td>21</td>
 <td>Google Search</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">17</td>
-<td>23</td>
-<td>Email Promo</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">18</td>
-<td>24</td>
-<td>Google Search</td>
-<td>0</td>
-</tr>
-<tr>
 <td class="td-idx">19</td>
-<td>28</td>
+<td>22</td>
 <td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>29</td>
-<td>Email Promo</td>
+<td>25</td>
+<td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
+<td>26</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>27</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>28</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
 <td>31</td>
 <td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">22</td>
+<td class="td-idx">25</td>
 <td>32</td>
 <td>Email Promo</td>
 <td>0</td>
 </tr>
-<tr>
-<td class="td-idx">23</td>
-<td>35</td>
-<td>Email Promo</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">24</td>
-<td>36</td>
-<td>Google Search</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">25</td>
-<td>37</td>
-<td>Facebook Ad</td>
-<td>0</td>
-</tr>
 </tbody></table></div>
-<div class="table-more-note">Showing first 25 of 533,542 total rows.</div>
+<div class="table-more-note">Showing first 25 of 534,044 total rows.</div>
                 </div>
 
                 <div class="result-column">
                     <div class="result-header">
                         <span class="result-title">Expected Golden Output</span>
-                        <span class="badge badge-golden">(533,542 rows × 3 cols)</span>
+                        <span class="badge badge-golden">(534,044 rows × 3 cols)</span>
                     </div>
                     <div class="table-responsive"><table class="data-table">
 <thead><tr><th class="th-idx">#</th>
@@ -984,114 +843,114 @@ Order by touch_id ASC.</pre>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>7</td>
-<td>Facebook Ad</td>
+<td>6</td>
+<td>Google Search</td>
 <td>0</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>8</td>
-<td>Email Promo</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">10</td>
 <td>10</td>
 <td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">11</td>
+<td class="td-idx">10</td>
 <td>11</td>
 <td>Email Promo</td>
 <td>0</td>
 </tr>
 <tr>
+<td class="td-idx">11</td>
+<td>13</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
 <td class="td-idx">12</td>
+<td>14</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>15</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
 <td>16</td>
 <td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">13</td>
-<td>17</td>
-<td>Email Promo</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">14</td>
+<td class="td-idx">15</td>
 <td>18</td>
 <td>Google Search</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">15</td>
+<td class="td-idx">16</td>
+<td>19</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
 <td>20</td>
 <td>Email Promo</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">16</td>
+<td class="td-idx">18</td>
 <td>21</td>
 <td>Google Search</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">17</td>
-<td>23</td>
-<td>Email Promo</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">18</td>
-<td>24</td>
-<td>Google Search</td>
-<td>0</td>
-</tr>
-<tr>
 <td class="td-idx">19</td>
-<td>28</td>
+<td>22</td>
 <td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>29</td>
-<td>Email Promo</td>
+<td>25</td>
+<td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
+<td>26</td>
+<td>Email Promo</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">22</td>
+<td>27</td>
+<td>Google Search</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>28</td>
+<td>Facebook Ad</td>
+<td>0</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
 <td>31</td>
 <td>Facebook Ad</td>
 <td>0</td>
 </tr>
 <tr>
-<td class="td-idx">22</td>
+<td class="td-idx">25</td>
 <td>32</td>
 <td>Email Promo</td>
 <td>0</td>
 </tr>
-<tr>
-<td class="td-idx">23</td>
-<td>35</td>
-<td>Email Promo</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">24</td>
-<td>36</td>
-<td>Google Search</td>
-<td>0</td>
-</tr>
-<tr>
-<td class="td-idx">25</td>
-<td>37</td>
-<td>Facebook Ad</td>
-<td>0</td>
-</tr>
 </tbody></table></div>
-<div class="table-more-note">Showing first 25 of 533,542 total rows.</div>
+<div class="table-more-note">Showing first 25 of 534,044 total rows.</div>
                 </div>
             </div>
         </section>
@@ -1105,7 +964,7 @@ Order by touch_id ASC.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

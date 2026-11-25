@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_003_Q03_clickstream_sessionization_gaps - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_003_Q03_clickstream_sessionization_gaps: Clickstream Sessionization with Inactivity Timeouts (Gaps &amp; Islands) | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_003_Q03_clickstream_sessionization_gaps (Clickstream Sessionization with Inactivity Timeouts (Gaps &amp; Islands)). Category: Temporal &amp; Time-Series. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Digital analytics platforms group raw user pageviews into &#x27;sessions&#x27;. If a user is inactive for more than 30 minutes, the next cli">
+    <meta name="keywords" content="SQL Frontier Eval, Temporal &amp; Time-Series, task_003_Q03_clickstream_sessionization_gaps, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_003_Q03_clickstream_sessionization_gaps.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_003_Q03_clickstream_sessionization_gaps: Clickstream Sessionization with Inactivity Timeouts (Gaps &amp; Islands)">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_003_Q03_clickstream_sessionization_gaps.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_003_Q03_clickstream_sessionization_gaps.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_003_Q03_clickstream_sessionization_gaps: Clickstream Sessionization with Inactivity Timeouts (Gaps &amp; Islands)">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_003_Q03_clickstream_sessionization_gaps.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_003_Q03_clickstream_sessionization_gaps: Clickstream Sessionization with Inactivity Timeouts (Gaps & Islands)",
+      "identifier": "task_003_Q03_clickstream_sessionization_gaps",
+      "articleSection": "Temporal & Time-Series",
+      "description": "Digital analytics platforms group raw user pageviews into 'sessions'. If a user is inactive for more than 30 minutes, the next click begins a brand-new session.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_003_Q03_clickstream_sessionization_gaps.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Temporal & Time-Series",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_003_Q03_clickstream_sessionization_gaps",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_003_Q03_clickstream_sessionization_gaps.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_003_Q03_clickstream_sessionization_gaps Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Detect session breaks (>30 min inactivity) and assign deterministic session UUIDs\n            WITH event_lags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Compare against preceding event timestamp for this user\n                    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_event_time\n                FROM user_events\n            ),\n            session_flags AS (\n                SELECT \n                    user_id,\n                    event_time,\n                    page_url,\n                    -- Mark 1 if first event or gap exceeds 30 minutes, else 0\n                    CASE \n                        WHEN prev_event_time IS NULL THEN 1\n                        WHEN date_diff('second', prev_event_time, event_time) > 1800 THEN 1 \n                        ELSE 0 \n                    END AS is_new_session\n                FROM event_lags\n            )\n            SELECT \n                user_id,\n                event_time,\n                page_url,\n                -- Cumulative sum over flags establishes monotonically increasing session ID\n                SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY event_time) AS session_id\n            FROM session_flags\n            ORDER BY user_id, event_time;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_003_Q03_clickstream_sessionization_gaps')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_003_Q03_clickstream_sessionization_gaps')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_003_Q03_clickstream_sessionization_gaps%20%28Clickstream%20Sessionization%20with%20Inactivity%20Timeouts%20%28Gaps%20%26%20Islands%29%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_003_Q03_clickstream_sessionization_gaps.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_003_Q03_clickstream_sessionization_gaps.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_003_Q03_clickstream_sessionization_gaps.html&amp;title=task_003_Q03_clickstream_sessionization_gaps%3A%20Clickstream%20Sessionization%20with%20Inactivity%20Timeouts%20%28Gaps%20%26%20Islands%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_003_Q03_clickstream_sessionization_gaps.html&amp;t=task_003_Q03_clickstream_sessionization_gaps%3A%20Clickstream%20Sessionization%20with%20Inactivity%20Timeouts%20%28Gaps%20%26%20Islands%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_003_Q03_clickstream_sessionization_gaps.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Clickstream Sessionization with Inactivity Timeouts (Gaps &amp; Islands)</h1>
+                <h1 class="task-title">
+                    Clickstream Sessionization with Inactivity Timeouts (Gaps &amp; Islands)
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">304.86 ms</div>
+                    <div class="stat-val">220.37 ms</div>
                     <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">303.91 ms</div>
+                    <div class="stat-val">211.98 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Digital analytics platforms group raw user pageviews into &#x27;sessions&#x27;. If a user is inactive for more than 30 minutes, the next click begins a brand-new session.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 30.5 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -164,7 +284,7 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">5</td>
 <td>101</td>
-<td>2026-03-01 09:30:00.000009</td>
+<td>2026-03-01 09:30:00.000011</td>
 <td>/home</td>
 </tr>
 <tr>
@@ -176,55 +296,55 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">7</td>
 <td>103</td>
-<td>2026-03-01 09:30:00.000047</td>
+<td>2026-03-01 09:30:00.000040</td>
 <td>/cart</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>104</td>
-<td>2026-03-01 09:30:00.000063</td>
+<td>2026-03-01 09:30:00.000061</td>
 <td>/checkout</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>105</td>
-<td>2026-03-01 09:30:00.000098</td>
+<td>2026-03-01 09:30:00.000092</td>
 <td>/search</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>106</td>
-<td>2026-03-01 09:30:00.000103</td>
+<td>2026-03-01 09:30:00.000108</td>
 <td>/account</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>107</td>
-<td>2026-03-01 09:30:00.000127</td>
+<td>2026-03-01 09:30:00.000122</td>
 <td>/help</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>108</td>
-<td>2026-03-01 09:30:00.000141</td>
+<td>2026-03-01 09:30:00.000145</td>
 <td>/home</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>109</td>
-<td>2026-03-01 09:30:00.000165</td>
+<td>2026-03-01 09:30:00.000169</td>
 <td>/products/detail</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>110</td>
-<td>2026-03-01 09:30:00.000186</td>
+<td>2026-03-01 09:30:00.000182</td>
 <td>/cart</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>111</td>
-<td>2026-03-01 09:30:00.000203</td>
+<td>2026-03-01 09:30:00.000205</td>
 <td>/checkout</td>
 </tr>
 </tbody></table></div>
@@ -234,258 +354,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 607.60 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 38.63336225058631%; background: #f85149;" title="WINDOW: 234.74ms (38.6%)"></div><div class="cost-bar-seg" style="width: 38.0283026934579%; background: #f85149;" title="WINDOW: 231.06ms (38.0%)"></div><div class="cost-bar-seg" style="width: 19.09714876070014%; background: #f85149;" title="ORDER_BY: 116.03ms (19.1%)"></div><div class="cost-bar-seg" style="width: 2.197957768671147%; background: #d29922;" title="TABLE_SCAN: 13.35ms (2.2%)"></div><div class="cost-bar-seg" style="width: 1.9448879442540166%; background: #bc8cff;" title="PROJECTION: 11.82ms (1.9%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="high-cost-tag">🔥 19.1% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">116.03 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (19.1% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.14 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;page_url">📁 Projections: [&#x27;user_id&#x27;, &#x27;event_...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.26 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45.78 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
-                <span class="high-cost-tag">🔥 38.6% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">234.74 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">45.78 MB</span></div>
-                <div class="nm-tbl" title="Projections: sum_no_overflow(is_new_session) OVE">📁 Projections: sum_no_overflow(is_...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (38.6% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">1.9%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">11.82 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;page_url">📁 Projections: [&#x27;user_id&#x27;, &#x27;event_...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.19 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">42.20 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#3&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
-                <span class="high-cost-tag">🔥 38.0% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">231.06 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.45 MB</span></div>
-                <div class="nm-tbl" title="Projections: lag(event_time, 1, NULL::TIMESTAMP)">📁 Projections: lag(event_time, 1, ...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (38.0% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">2.2%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">13.35 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
-                <div class="nm-tbl" title="memory.main.user_events">📁 memory.main.user_events</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>WINDOW</strong></td>
-            <td><strong>38.6%</strong></td>
-            <td>234.74 ms</td>
-            <td>1,000,000</td>
-            <td>45.78 MB</td>
-            <td><small>Projections: sum_no_overflow(is_new_session) OVE</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>WINDOW</strong></td>
-            <td><strong>38.0%</strong></td>
-            <td>231.06 ms</td>
-            <td>1,000,000</td>
-            <td>34.45 MB</td>
-            <td><small>Projections: lag(event_time, 1, NULL::TIMESTAMP)</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>19.1%</strong></td>
-            <td>116.03 ms</td>
-            <td>1,000,000</td>
-            <td>41.96 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>2.2%</strong></td>
-            <td>13.35 ms</td>
-            <td>1,000,000</td>
-            <td>26.70 MB</td>
-            <td><small>memory.main.user_events</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>1.9%</strong></td>
-            <td>11.82 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;page_url</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.26 ms</td>
-            <td>1,000,000</td>
-            <td>45.78 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.19 ms</td>
-            <td>1,000,000</td>
-            <td>42.20 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#3&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.14 ms</td>
-            <td>1,000,000</td>
-            <td>41.96 MB</td>
-            <td><small>Projections: [&#x27;user_id&#x27;, &#x27;event_time&#x27;, &#x27;page_url</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 304.86 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 220.37 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">lagged_events</span><span class="w"> </span><span class="k">AS</span>
@@ -513,7 +417,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 303.91 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 211.98 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Detect session breaks (&gt;30 min inactivity) and assign deterministic session UUIDs</span>
@@ -547,7 +451,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">user_events</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">event_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">,</span><span class="w"> </span><span class="n">page_url</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">);</span>
@@ -565,9 +469,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -587,7 +494,7 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">1</td>
 <td>101</td>
-<td>2026-03-01 09:30:00.000009</td>
+<td>2026-03-01 09:30:00.000011</td>
 <td>/home</td>
 <td>1</td>
 </tr>
@@ -629,133 +536,133 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">7</td>
 <td>103</td>
-<td>2026-03-01 09:30:00.000047</td>
+<td>2026-03-01 09:30:00.000040</td>
 <td>/cart</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>104</td>
-<td>2026-03-01 09:30:00.000063</td>
+<td>2026-03-01 09:30:00.000061</td>
 <td>/checkout</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>105</td>
-<td>2026-03-01 09:30:00.000098</td>
+<td>2026-03-01 09:30:00.000092</td>
 <td>/search</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>106</td>
-<td>2026-03-01 09:30:00.000103</td>
+<td>2026-03-01 09:30:00.000108</td>
 <td>/account</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>107</td>
-<td>2026-03-01 09:30:00.000127</td>
+<td>2026-03-01 09:30:00.000122</td>
 <td>/help</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>108</td>
-<td>2026-03-01 09:30:00.000141</td>
+<td>2026-03-01 09:30:00.000145</td>
 <td>/home</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>109</td>
-<td>2026-03-01 09:30:00.000165</td>
+<td>2026-03-01 09:30:00.000169</td>
 <td>/products/detail</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>110</td>
-<td>2026-03-01 09:30:00.000186</td>
+<td>2026-03-01 09:30:00.000182</td>
 <td>/cart</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>111</td>
-<td>2026-03-01 09:30:00.000203</td>
+<td>2026-03-01 09:30:00.000205</td>
 <td>/checkout</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>112</td>
-<td>2026-03-01 09:30:00.000230</td>
+<td>2026-03-01 09:30:00.000238</td>
 <td>/search</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>113</td>
-<td>2026-03-01 09:30:00.000242</td>
+<td>2026-03-01 09:30:00.000243</td>
 <td>/account</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>114</td>
-<td>2026-03-01 09:30:00.000275</td>
+<td>2026-03-01 09:30:00.000261</td>
 <td>/help</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>115</td>
-<td>2026-03-01 09:30:00.000284</td>
+<td>2026-03-01 09:30:00.000289</td>
 <td>/home</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>116</td>
-<td>2026-03-01 09:30:00.000308</td>
+<td>2026-03-01 09:30:00.000307</td>
 <td>/products/detail</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>117</td>
-<td>2026-03-01 09:30:00.000323</td>
+<td>2026-03-01 09:30:00.000328</td>
 <td>/cart</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>118</td>
-<td>2026-03-01 09:30:00.000353</td>
+<td>2026-03-01 09:30:00.000345</td>
 <td>/checkout</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>119</td>
-<td>2026-03-01 09:30:00.000367</td>
+<td>2026-03-01 09:30:00.000371</td>
 <td>/search</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>120</td>
-<td>2026-03-01 09:30:00.000391</td>
+<td>2026-03-01 09:30:00.000381</td>
 <td>/account</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>121</td>
-<td>2026-03-01 09:30:00.000400</td>
+<td>2026-03-01 09:30:00.000410</td>
 <td>/help</td>
 <td>1</td>
 </tr>
@@ -778,7 +685,7 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">1</td>
 <td>101</td>
-<td>2026-03-01 09:30:00.000009</td>
+<td>2026-03-01 09:30:00.000011</td>
 <td>/home</td>
 <td>1</td>
 </tr>
@@ -820,133 +727,133 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">7</td>
 <td>103</td>
-<td>2026-03-01 09:30:00.000047</td>
+<td>2026-03-01 09:30:00.000040</td>
 <td>/cart</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>104</td>
-<td>2026-03-01 09:30:00.000063</td>
+<td>2026-03-01 09:30:00.000061</td>
 <td>/checkout</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>105</td>
-<td>2026-03-01 09:30:00.000098</td>
+<td>2026-03-01 09:30:00.000092</td>
 <td>/search</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>106</td>
-<td>2026-03-01 09:30:00.000103</td>
+<td>2026-03-01 09:30:00.000108</td>
 <td>/account</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>107</td>
-<td>2026-03-01 09:30:00.000127</td>
+<td>2026-03-01 09:30:00.000122</td>
 <td>/help</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>108</td>
-<td>2026-03-01 09:30:00.000141</td>
+<td>2026-03-01 09:30:00.000145</td>
 <td>/home</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>109</td>
-<td>2026-03-01 09:30:00.000165</td>
+<td>2026-03-01 09:30:00.000169</td>
 <td>/products/detail</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>110</td>
-<td>2026-03-01 09:30:00.000186</td>
+<td>2026-03-01 09:30:00.000182</td>
 <td>/cart</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>111</td>
-<td>2026-03-01 09:30:00.000203</td>
+<td>2026-03-01 09:30:00.000205</td>
 <td>/checkout</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>112</td>
-<td>2026-03-01 09:30:00.000230</td>
+<td>2026-03-01 09:30:00.000238</td>
 <td>/search</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>113</td>
-<td>2026-03-01 09:30:00.000242</td>
+<td>2026-03-01 09:30:00.000243</td>
 <td>/account</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>114</td>
-<td>2026-03-01 09:30:00.000275</td>
+<td>2026-03-01 09:30:00.000261</td>
 <td>/help</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>115</td>
-<td>2026-03-01 09:30:00.000284</td>
+<td>2026-03-01 09:30:00.000289</td>
 <td>/home</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>116</td>
-<td>2026-03-01 09:30:00.000308</td>
+<td>2026-03-01 09:30:00.000307</td>
 <td>/products/detail</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>117</td>
-<td>2026-03-01 09:30:00.000323</td>
+<td>2026-03-01 09:30:00.000328</td>
 <td>/cart</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>118</td>
-<td>2026-03-01 09:30:00.000353</td>
+<td>2026-03-01 09:30:00.000345</td>
 <td>/checkout</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>119</td>
-<td>2026-03-01 09:30:00.000367</td>
+<td>2026-03-01 09:30:00.000371</td>
 <td>/search</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>120</td>
-<td>2026-03-01 09:30:00.000391</td>
+<td>2026-03-01 09:30:00.000381</td>
 <td>/account</td>
 <td>1</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>121</td>
-<td>2026-03-01 09:30:00.000400</td>
+<td>2026-03-01 09:30:00.000410</td>
 <td>/help</td>
 <td>1</td>
 </tr>
@@ -965,7 +872,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:28 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

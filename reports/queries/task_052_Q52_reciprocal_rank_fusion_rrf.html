@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_052_Q52_reciprocal_rank_fusion_rrf - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_052_Q52_reciprocal_rank_fusion_rrf: Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors) | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_052_Q52_reciprocal_rank_fusion_rrf (Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)). Category: Search &amp; Retrieval. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Hybrid search combines sparse keyword search (great for exact names and acronyms) with dense vector search (great for synonyms and">
+    <meta name="keywords" content="SQL Frontier Eval, Search &amp; Retrieval, task_052_Q52_reciprocal_rank_fusion_rrf, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_052_Q52_reciprocal_rank_fusion_rrf.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_052_Q52_reciprocal_rank_fusion_rrf: Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_052_Q52_reciprocal_rank_fusion_rrf.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_052_Q52_reciprocal_rank_fusion_rrf.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_052_Q52_reciprocal_rank_fusion_rrf: Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_052_Q52_reciprocal_rank_fusion_rrf.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_052_Q52_reciprocal_rank_fusion_rrf: Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)",
+      "identifier": "task_052_Q52_reciprocal_rank_fusion_rrf",
+      "articleSection": "Search & Retrieval",
+      "description": "Hybrid search combines sparse keyword search (great for exact names and acronyms) with dense vector search (great for synonyms and concepts). RRF merges both rank lists using: RRF_score = 1/(60 + rank_bm25) + 1/(60 + rank_vec).",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_052_Q52_reciprocal_rank_fusion_rrf.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Search & Retrieval",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_052_Q52_reciprocal_rank_fusion_rrf",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_052_Q52_reciprocal_rank_fusion_rrf.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_052_Q52_reciprocal_rank_fusion_rrf Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Hybrid RRF rank fusion between BM25 lexical score and dense vector cosine similarity\n            WITH ranked_lexical AS (\n                SELECT \n                    doc_id,\n                    title,\n                    ROW_NUMBER() OVER (ORDER BY lexical_score DESC) AS rank_lexical\n                FROM corpus_docs\n            ),\n            ranked_vector AS (\n                SELECT \n                    doc_id,\n                    title,\n                    ROW_NUMBER() OVER (\n                        ORDER BY array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) DESC\n                    ) AS rank_vector\n                FROM corpus_docs\n            )\n            SELECT \n                l.doc_id,\n                l.title,\n                l.rank_lexical,\n                v.rank_vector,\n                -- Standard RRF formula with k = 60\n                ROUND((1.0 / (60.0 + l.rank_lexical)) + (1.0 / (60.0 + v.rank_vector)), 6) AS rrf_score\n            FROM ranked_lexical l\n            JOIN ranked_vector v ON l.doc_id = v.doc_id\n            ORDER BY rrf_score DESC;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_052_Q52_reciprocal_rank_fusion_rrf')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_052_Q52_reciprocal_rank_fusion_rrf')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_052_Q52_reciprocal_rank_fusion_rrf%20%28Reciprocal%20Rank%20Fusion%20%28RRF%29%20Hybrid%20Search%20%28BM25%20%2B%20Dense%20Vectors%29%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_052_Q52_reciprocal_rank_fusion_rrf.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_052_Q52_reciprocal_rank_fusion_rrf.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_052_Q52_reciprocal_rank_fusion_rrf.html&amp;title=task_052_Q52_reciprocal_rank_fusion_rrf%3A%20Reciprocal%20Rank%20Fusion%20%28RRF%29%20Hybrid%20Search%20%28BM25%20%2B%20Dense%20Vectors%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_052_Q52_reciprocal_rank_fusion_rrf.html&amp;t=task_052_Q52_reciprocal_rank_fusion_rrf%3A%20Reciprocal%20Rank%20Fusion%20%28RRF%29%20Hybrid%20Search%20%28BM25%20%2B%20Dense%20Vectors%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_052_Q52_reciprocal_rank_fusion_rrf.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)</h1>
+                <h1 class="task-title">
+                    Reciprocal Rank Fusion (RRF) Hybrid Search (BM25 + Dense Vectors)
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">515.60 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                    <div class="stat-val">344.11 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">508.51 ms</div>
+                    <div class="stat-val">312.34 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Hybrid search combines sparse keyword search (great for exact names and acronyms) with dense vector search (great for synonyms and concepts). RRF merges both rank lists using: RRF_score = 1/(60 + rank_bm25) + 1/(60 + rank_vec).</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 38.1 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -163,85 +283,85 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">4</td>
 <td>3</td>
 <td>DuckDB Vector Search Guide</td>
-<td>9.47</td>
-<td>[0.8492 0.0731]</td>
+<td>0.01</td>
+<td>[0.7719 0.0533]</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>Postgres HNSW Extension</td>
-<td>4.45</td>
-<td>[0.8186 0.0276]</td>
+<td>14.35</td>
+<td>[0.879  0.0949]</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>Deep Learning Embeddings</td>
-<td>8.16</td>
-<td>[0.8412 0.0971]</td>
+<td>1.94</td>
+<td>[0.8032 0.0537]</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>DuckDB Vector Search Guide</td>
-<td>12.89</td>
-<td>[0.8701 0.0937]</td>
+<td>16.22</td>
+<td>[0.8904 0.0742]</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>Postgres HNSW Extension</td>
-<td>5.89</td>
-<td>[0.8273 0.0483]</td>
+<td>2.58</td>
+<td>[0.8072 0.1844]</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>Deep Learning Embeddings</td>
-<td>16.96</td>
-<td>[0.895  0.1401]</td>
+<td>10.92</td>
+<td>[0.8581 0.0258]</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>DuckDB Vector Search Guide</td>
 <td>0.01</td>
-<td>[0.7817 0.0886]</td>
+<td>[0.7802 0.1079]</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>Postgres HNSW Extension</td>
-<td>0.01</td>
-<td>[0.7847 0.1242]</td>
+<td>5.7</td>
+<td>[0.8262 0.1565]</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>Deep Learning Embeddings</td>
-<td>9.35</td>
-<td>[0.8485 0.0449]</td>
+<td>9.97</td>
+<td>[0.8522 0.1298]</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>DuckDB Vector Search Guide</td>
-<td>3.18</td>
-<td>[0.8108 0.1152]</td>
+<td>8.66</td>
+<td>[0.8442 0.0901]</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>Postgres HNSW Extension</td>
-<td>10.41</td>
-<td>[0.855  0.0738]</td>
+<td>12.43</td>
+<td>[0.8673 0.1114]</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>Deep Learning Embeddings</td>
-<td>8.49</td>
-<td>[0.8432 0.1226]</td>
+<td>9.61</td>
+<td>[0.8501 0.044 ]</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -250,282 +370,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 1018.18 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 26.156459493201016%; background: #f85149;" title="WINDOW: 266.32ms (26.2%)"></div><div class="cost-bar-seg" style="width: 24.919073051179314%; background: #f85149;" title="WINDOW: 253.72ms (24.9%)"></div><div class="cost-bar-seg" style="width: 20.156427856204935%; background: #f85149;" title="HASH_JOIN: 205.23ms (20.2%)"></div><div class="cost-bar-seg" style="width: 19.335704836483092%; background: #f85149;" title="ORDER_BY: 196.87ms (19.3%)"></div><div class="cost-bar-seg" style="width: 8.026821042269344%; background: #f85149;" title="PROJECTION: 81.73ms (8.0%)"></div><div class="cost-bar-seg" style="width: 1.0904247773316083%; background: #39c5cf;" title="TABLE_SCAN: 11.10ms (1.1%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="high-cost-tag">🔥 19.3% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">196.87 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,002</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (19.3% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="high-cost-tag">🔥 8.0% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">81.73 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,002</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.97 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;, &#x27;rank_lexical&#x27;,">📁 Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;,...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (8.0% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
-                <span class="high-cost-tag">🔥 20.2% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">205.23 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,002</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.34 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (20.2% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.32 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
-                <span class="high-cost-tag">🔥 26.2% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">266.32 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
-                <div class="nm-tbl" title="Projections: row_number() OVER (ORDER BY array_c">📁 Projections: row_number() OVER (...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (26.2% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.3%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.70 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
-                <div class="nm-tbl" title="memory.main.corpus_docs">📁 memory.main.corpus_docs</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.19 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.33 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;]">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
-                <span class="high-cost-tag">🔥 24.9% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">253.72 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.33 MB</span></div>
-                <div class="nm-tbl" title="Projections: row_number() OVER (ORDER BY lexical">📁 Projections: row_number() OVER (...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (24.9% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">1.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">11.10 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
-                <div class="nm-tbl" title="memory.main.corpus_docs">📁 memory.main.corpus_docs</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>WINDOW</strong></td>
-            <td><strong>26.2%</strong></td>
-            <td>266.32 ms</td>
-            <td>1,000,000</td>
-            <td>19.07 MB</td>
-            <td><small>Projections: row_number() OVER (ORDER BY array_c</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>WINDOW</strong></td>
-            <td><strong>24.9%</strong></td>
-            <td>253.72 ms</td>
-            <td>1,000,000</td>
-            <td>34.33 MB</td>
-            <td><small>Projections: row_number() OVER (ORDER BY lexical</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>HASH_JOIN</strong></td>
-            <td><strong>20.2%</strong></td>
-            <td>205.23 ms</td>
-            <td>1,000,002</td>
-            <td>34.34 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>19.3%</strong></td>
-            <td>196.87 ms</td>
-            <td>1,000,002</td>
-            <td>41.96 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>8.0%</strong></td>
-            <td>81.73 ms</td>
-            <td>1,000,002</td>
-            <td>41.97 MB</td>
-            <td><small>Projections: [&#x27;doc_id&#x27;, &#x27;title&#x27;, &#x27;rank_lexical&#x27;,</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>1.1%</strong></td>
-            <td>11.10 ms</td>
-            <td>1,000,000</td>
-            <td>26.70 MB</td>
-            <td><small>memory.main.corpus_docs</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.3%</strong></td>
-            <td>2.70 ms</td>
-            <td>1,000,000</td>
-            <td>11.44 MB</td>
-            <td><small>memory.main.corpus_docs</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.32 ms</td>
-            <td>1,000,000</td>
-            <td>19.07 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.19 ms</td>
-            <td>1,000,000</td>
-            <td>34.33 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 515.60 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 344.11 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="c1">-- Hybrid RRF rank fusion between BM25 lexical score and dense vector cosine similarity</span>
@@ -554,7 +434,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 508.51 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 312.34 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Hybrid RRF rank fusion between BM25 lexical score and dense vector cosine similarity</span>
@@ -583,7 +463,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">corpus_docs</span><span class="w"> </span><span class="p">(</span><span class="n">doc_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">lexical_score</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">,</span>
@@ -600,9 +480,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -622,202 +505,202 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>278,539</td>
+<td>211</td>
 <td>Postgres HNSW Extension</td>
+<td>52,799</td>
 <td>1</td>
-<td>44,343</td>
 <td>0.0164</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>260,455</td>
-<td>Postgres HNSW Extension</td>
-<td>812,906</td>
+<td>597,018</td>
+<td>DuckDB Vector Search Guide</td>
 <td>1</td>
+<td>156,328</td>
 <td>0.0164</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>544,505</td>
+<td>829,268</td>
 <td>Deep Learning Embeddings</td>
 <td>2</td>
-<td>135,408</td>
-<td>0.0161</td>
+<td>10,220</td>
+<td>0.0162</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>758,893</td>
-<td>Postgres HNSW Extension</td>
-<td>749,395</td>
+<td>712,991</td>
+<td>Deep Learning Embeddings</td>
+<td>323,045</td>
 <td>2</td>
 <td>0.0161</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>9,559</td>
-<td>Postgres HNSW Extension</td>
+<td>388,050</td>
+<td>DuckDB Vector Search Guide</td>
 <td>3</td>
-<td>200,998</td>
+<td>39,931</td>
 <td>0.0159</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>269,100</td>
+<td>2,331</td>
 <td>DuckDB Vector Search Guide</td>
-<td>247,696</td>
+<td>550,772</td>
 <td>3</td>
 <td>0.0159</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>259,657</td>
-<td>Postgres HNSW Extension</td>
+<td>187,698</td>
+<td>DuckDB Vector Search Guide</td>
 <td>4</td>
-<td>125,866</td>
+<td>154,794</td>
 <td>0.0156</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>271,728</td>
-<td>DuckDB Vector Search Guide</td>
-<td>378,108</td>
+<td>2,825</td>
+<td>Deep Learning Embeddings</td>
+<td>675,216</td>
 <td>4</td>
 <td>0.0156</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>194,861</td>
-<td>Deep Learning Embeddings</td>
+<td>216,319</td>
+<td>Postgres HNSW Extension</td>
 <td>5</td>
-<td>353,522</td>
+<td>207,560</td>
 <td>0.0154</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>273,626</td>
-<td>Deep Learning Embeddings</td>
-<td>380,378</td>
+<td>19,558</td>
+<td>Postgres HNSW Extension</td>
+<td>762,464</td>
 <td>5</td>
 <td>0.0154</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>33,236</td>
+<td>39,422</td>
 <td>Deep Learning Embeddings</td>
+<td>921,345</td>
 <td>6</td>
-<td>268,815</td>
 <td>0.0152</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>275,931</td>
+<td>376,716</td>
 <td>DuckDB Vector Search Guide</td>
-<td>510,375</td>
 <td>6</td>
+<td>694,242</td>
 <td>0.0152</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>280,069</td>
+<td>187,333</td>
 <td>Postgres HNSW Extension</td>
-<td>547,612</td>
 <td>7</td>
+<td>125,778</td>
 <td>0.0149</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>698,918</td>
-<td>Deep Learning Embeddings</td>
+<td>49,186</td>
+<td>Postgres HNSW Extension</td>
+<td>218,267</td>
 <td>7</td>
-<td>535,292</td>
 <td>0.0149</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>589,820</td>
+<td>50,123</td>
 <td>Deep Learning Embeddings</td>
+<td>79,785</td>
 <td>8</td>
-<td>204,826</td>
 <td>0.0147</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>286,538</td>
-<td>Deep Learning Embeddings</td>
-<td>948,765</td>
+<td>501,663</td>
+<td>DuckDB Vector Search Guide</td>
 <td>8</td>
+<td>709,787</td>
 <td>0.0147</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>290,037</td>
-<td>DuckDB Vector Search Guide</td>
-<td>13,135</td>
+<td>53,351</td>
+<td>Deep Learning Embeddings</td>
+<td>268,522</td>
 <td>9</td>
-<td>0.0146</td>
+<td>0.0145</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>329,148</td>
-<td>DuckDB Vector Search Guide</td>
+<td>461,234</td>
+<td>Deep Learning Embeddings</td>
 <td>9</td>
-<td>677,153</td>
+<td>656,510</td>
 <td>0.0145</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>297,183</td>
-<td>DuckDB Vector Search Guide</td>
-<td>284,440</td>
+<td>852,607</td>
+<td>Postgres HNSW Extension</td>
 <td>10</td>
+<td>95,345</td>
 <td>0.0143</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>861,834</td>
+<td>91,854</td>
 <td>DuckDB Vector Search Guide</td>
+<td>851,507</td>
 <td>10</td>
-<td>819,488</td>
 <td>0.0143</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>706,609</td>
-<td>Postgres HNSW Extension</td>
+<td>778,991</td>
+<td>Deep Learning Embeddings</td>
 <td>11</td>
-<td>136,559</td>
+<td>133,659</td>
 <td>0.0141</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>263,096</td>
+<td>93,155</td>
 <td>Deep Learning Embeddings</td>
-<td>174,700</td>
+<td>487,105</td>
 <td>11</td>
 <td>0.0141</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>342,090</td>
-<td>DuckDB Vector Search Guide</td>
-<td>191,245</td>
+<td>408,112</td>
+<td>Postgres HNSW Extension</td>
 <td>12</td>
+<td>190,997</td>
 <td>0.0139</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>875,002</td>
+<td>2,308</td>
 <td>Postgres HNSW Extension</td>
+<td>591,459</td>
 <td>12</td>
-<td>396,923</td>
 <td>0.0139</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>709,300</td>
-<td>Postgres HNSW Extension</td>
+<td>337,223</td>
+<td>Deep Learning Embeddings</td>
 <td>13</td>
-<td>302,325</td>
+<td>156,336</td>
 <td>0.0137</td>
 </tr>
 </tbody></table></div>
@@ -839,202 +722,202 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>278,539</td>
-<td>Postgres HNSW Extension</td>
+<td>597,018</td>
+<td>DuckDB Vector Search Guide</td>
 <td>1</td>
-<td>44,345</td>
+<td>156,326</td>
 <td>0.0164</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>260,455</td>
-<td>Postgres HNSW Extension</td>
-<td>812,827</td>
+<td>246,152</td>
+<td>Deep Learning Embeddings</td>
+<td>439,007</td>
 <td>1</td>
 <td>0.0164</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>544,505</td>
+<td>829,268</td>
 <td>Deep Learning Embeddings</td>
 <td>2</td>
-<td>135,399</td>
-<td>0.0161</td>
+<td>10,219</td>
+<td>0.0162</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>582,040</td>
-<td>Postgres HNSW Extension</td>
-<td>785,602</td>
+<td>766,253</td>
+<td>Deep Learning Embeddings</td>
+<td>610,835</td>
 <td>2</td>
 <td>0.0161</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>9,559</td>
-<td>Postgres HNSW Extension</td>
+<td>388,050</td>
+<td>DuckDB Vector Search Guide</td>
 <td>3</td>
-<td>201,000</td>
+<td>39,931</td>
 <td>0.0159</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>269,100</td>
-<td>DuckDB Vector Search Guide</td>
-<td>247,588</td>
+<td>250,138</td>
+<td>Postgres HNSW Extension</td>
+<td>811,103</td>
 <td>3</td>
 <td>0.0159</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>259,657</td>
-<td>Postgres HNSW Extension</td>
+<td>187,698</td>
+<td>DuckDB Vector Search Guide</td>
 <td>4</td>
-<td>125,866</td>
+<td>154,792</td>
 <td>0.0156</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>271,728</td>
+<td>263,562</td>
 <td>DuckDB Vector Search Guide</td>
-<td>378,024</td>
+<td>748,891</td>
 <td>4</td>
 <td>0.0156</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>273,626</td>
-<td>Deep Learning Embeddings</td>
-<td>380,274</td>
+<td>216,319</td>
+<td>Postgres HNSW Extension</td>
 <td>5</td>
+<td>207,561</td>
 <td>0.0154</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>194,861</td>
-<td>Deep Learning Embeddings</td>
+<td>266,760</td>
+<td>DuckDB Vector Search Guide</td>
+<td>312,924</td>
 <td>5</td>
-<td>353,523</td>
 <td>0.0154</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>33,236</td>
+<td>282,443</td>
 <td>Deep Learning Embeddings</td>
+<td>181,422</td>
 <td>6</td>
-<td>268,814</td>
 <td>0.0152</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>275,931</td>
+<td>376,716</td>
 <td>DuckDB Vector Search Guide</td>
-<td>510,272</td>
 <td>6</td>
+<td>694,242</td>
 <td>0.0152</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>698,918</td>
-<td>Deep Learning Embeddings</td>
+<td>187,333</td>
+<td>Postgres HNSW Extension</td>
 <td>7</td>
-<td>535,292</td>
+<td>125,779</td>
 <td>0.0149</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>280,069</td>
-<td>Postgres HNSW Extension</td>
-<td>547,426</td>
+<td>289,883</td>
+<td>Deep Learning Embeddings</td>
+<td>750,843</td>
 <td>7</td>
 <td>0.0149</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>589,820</td>
+<td>291,527</td>
 <td>Deep Learning Embeddings</td>
+<td>889,781</td>
 <td>8</td>
-<td>204,817</td>
 <td>0.0147</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>286,538</td>
-<td>Deep Learning Embeddings</td>
-<td>936,782</td>
+<td>501,663</td>
+<td>DuckDB Vector Search Guide</td>
 <td>8</td>
+<td>709,787</td>
 <td>0.0147</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>290,037</td>
+<td>296,682</td>
 <td>DuckDB Vector Search Guide</td>
-<td>13,125</td>
+<td>497,662</td>
 <td>9</td>
-<td>0.0146</td>
+<td>0.0145</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>329,148</td>
-<td>DuckDB Vector Search Guide</td>
+<td>461,234</td>
+<td>Deep Learning Embeddings</td>
 <td>9</td>
-<td>677,152</td>
+<td>656,509</td>
 <td>0.0145</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>297,183</td>
-<td>DuckDB Vector Search Guide</td>
-<td>284,322</td>
+<td>852,607</td>
+<td>Postgres HNSW Extension</td>
 <td>10</td>
+<td>95,344</td>
 <td>0.0143</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>861,834</td>
-<td>DuckDB Vector Search Guide</td>
+<td>308,722</td>
+<td>Postgres HNSW Extension</td>
+<td>895,066</td>
 <td>10</td>
-<td>819,488</td>
 <td>0.0143</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>706,609</td>
-<td>Postgres HNSW Extension</td>
+<td>778,991</td>
+<td>Deep Learning Embeddings</td>
 <td>11</td>
-<td>136,559</td>
+<td>133,659</td>
 <td>0.0141</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>308,817</td>
-<td>DuckDB Vector Search Guide</td>
-<td>725,275</td>
+<td>310,726</td>
+<td>Postgres HNSW Extension</td>
+<td>584,252</td>
 <td>11</td>
 <td>0.0141</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>875,002</td>
-<td>Postgres HNSW Extension</td>
+<td>335,007</td>
+<td>DuckDB Vector Search Guide</td>
+<td>178,141</td>
 <td>12</td>
-<td>396,923</td>
 <td>0.0139</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>312,724</td>
+<td>408,112</td>
 <td>Postgres HNSW Extension</td>
-<td>815,655</td>
 <td>12</td>
+<td>190,997</td>
 <td>0.0139</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>263,096</td>
+<td>337,223</td>
 <td>Deep Learning Embeddings</td>
-<td>174,595</td>
 <td>13</td>
+<td>156,333</td>
 <td>0.0137</td>
 </tr>
 </tbody></table></div>
@@ -1052,7 +935,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:28 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

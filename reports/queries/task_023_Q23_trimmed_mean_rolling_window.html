@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_023_Q23_trimmed_mean_rolling_window - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_023_Q23_trimmed_mean_rolling_window: Outlier-Resistant Rolling Window (Trimmed Mean Aggregation) | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_023_Q23_trimmed_mean_rolling_window (Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)). Category: Temporal &amp; Time-Series. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. Financial risk models compute a 7-day rolling average excluding the highest and lowest single observations in each 7-day window to">
+    <meta name="keywords" content="SQL Frontier Eval, Temporal &amp; Time-Series, task_023_Q23_trimmed_mean_rolling_window, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_023_Q23_trimmed_mean_rolling_window.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_023_Q23_trimmed_mean_rolling_window: Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_023_Q23_trimmed_mean_rolling_window.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_023_Q23_trimmed_mean_rolling_window.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_023_Q23_trimmed_mean_rolling_window: Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_023_Q23_trimmed_mean_rolling_window.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_023_Q23_trimmed_mean_rolling_window: Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)",
+      "identifier": "task_023_Q23_trimmed_mean_rolling_window",
+      "articleSection": "Temporal & Time-Series",
+      "description": "Financial risk models compute a 7-day rolling average excluding the highest and lowest single observations in each 7-day window to eliminate transient flash crashes.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_023_Q23_trimmed_mean_rolling_window.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Temporal & Time-Series",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_023_Q23_trimmed_mean_rolling_window",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_023_Q23_trimmed_mean_rolling_window.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_023_Q23_trimmed_mean_rolling_window Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Calculate trimmed rolling mean excluding min and max values within a 5-day window\n            WITH windowed_stats AS (\n                SELECT \n                    trade_date,\n                    settlement_amount,\n                    COUNT(*) OVER w AS win_count,\n                    SUM(settlement_amount) OVER w AS win_sum,\n                    MIN(settlement_amount) OVER w AS win_min,\n                    MAX(settlement_amount) OVER w AS win_max\n                FROM daily_settlement\n                WINDOW w AS (ORDER BY trade_date ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING)\n            )\n            SELECT \n                trade_date,\n                settlement_amount,\n                -- Subtract min and max from sum and divide by (count - 2)\n                CASE \n                    WHEN win_count > 2 THEN ROUND((win_sum - win_min - win_max) / (win_count - 2), 2)\n                    ELSE settlement_amount\n                END AS trimmed_mean_5d\n            FROM windowed_stats\n            ORDER BY trade_date;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_023_Q23_trimmed_mean_rolling_window')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_023_Q23_trimmed_mean_rolling_window')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_023_Q23_trimmed_mean_rolling_window%20%28Outlier-Resistant%20Rolling%20Window%20%28Trimmed%20Mean%20Aggregation%29%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_023_Q23_trimmed_mean_rolling_window.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_023_Q23_trimmed_mean_rolling_window.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_023_Q23_trimmed_mean_rolling_window.html&amp;title=task_023_Q23_trimmed_mean_rolling_window%3A%20Outlier-Resistant%20Rolling%20Window%20%28Trimmed%20Mean%20Aggregation%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_023_Q23_trimmed_mean_rolling_window.html&amp;t=task_023_Q23_trimmed_mean_rolling_window%3A%20Outlier-Resistant%20Rolling%20Window%20%28Trimmed%20Mean%20Aggregation%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_023_Q23_trimmed_mean_rolling_window.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-fail">✖ VALUE_MISMATCH</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)</h1>
+                <h1 class="task-title">
+                    Outlier-Resistant Rolling Window (Trimmed Mean Aggregation)
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">1203.97 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(6.9x slower than golden)</span></div>
+                    <div class="stat-val">1406.93 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(9.6x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">173.47 ms</div>
+                    <div class="stat-val">146.35 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -85,15 +199,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>Financial risk models compute a 7-day rolling average excluding the highest and lowest single observations in each 7-day window to eliminate transient flash crashes.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -114,9 +231,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 11.4 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -165,52 +285,52 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">6</td>
 <td>2026-01-01 00:00:00</td>
-<td>172.41</td>
+<td>0.01</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>2026-01-02 00:00:00</td>
-<td>0.01</td>
+<td>206.04</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>2026-01-03 00:00:00</td>
-<td>9.8</td>
+<td>310.77</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>2026-01-04 00:00:00</td>
-<td>4.06</td>
+<td>475.31</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>2026-01-05 00:00:00</td>
-<td>345.76</td>
+<td>8.22</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>2026-01-06 00:00:00</td>
-<td>0.01</td>
+<td>30.99</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>2026-01-07 00:00:00</td>
-<td>70.07</td>
+<td>472.22</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>2026-01-08 00:00:00</td>
-<td>0.01</td>
+<td>82.23</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>2026-01-09 00:00:00</td>
-<td>227.37</td>
+<td>0.01</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>2026-01-10 00:00:00</td>
-<td>347.32</td>
+<td>413.33</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -219,186 +339,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 4189.68 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 98.41022350401096%; background: #f85149;" title="WINDOW: 4123.07ms (98.4%)"></div><div class="cost-bar-seg" style="width: 1.1661235781985828%; background: #f85149;" title="ORDER_BY: 48.86ms (1.2%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="node-cost-tag">1.2%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">48.86 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.4%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">16.04 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">19.07 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;trade_date&#x27;, &#x27;settlement_amount&#x27;,">📁 Projections: [&#x27;trade_date&#x27;, &#x27;set...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.44 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;, &#x27;#5&#x27;">📁 Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, ...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">🪟 <strong>WINDOW</strong></span>
-                <span class="high-cost-tag">🔥 98.4% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">4123.07 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">41.96 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&quot;sum(settlement_amount) OVER (ORDE">📁 Projections: [&quot;sum(settlement_am...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (98.4% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">1.26 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">11.44 MB</span></div>
-                <div class="nm-tbl" title="memory.main.daily_settlement">📁 memory.main.daily_settlement</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>WINDOW</strong></td>
-            <td><strong>98.4%</strong></td>
-            <td>4123.07 ms</td>
-            <td>1,000,000</td>
-            <td>41.96 MB</td>
-            <td><small>Projections: [&quot;sum(settlement_amount) OVER (ORDE</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>1.2%</strong></td>
-            <td>48.86 ms</td>
-            <td>1,000,000</td>
-            <td>19.07 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.4%</strong></td>
-            <td>16.04 ms</td>
-            <td>1,000,000</td>
-            <td>19.07 MB</td>
-            <td><small>Projections: [&#x27;trade_date&#x27;, &#x27;settlement_amount&#x27;,</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>1.26 ms</td>
-            <td>1,000,000</td>
-            <td>11.44 MB</td>
-            <td><small>memory.main.daily_settlement</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.44 ms</td>
-            <td>1,000,000</td>
-            <td>41.96 MB</td>
-            <td><small>Projections: [&#x27;#0&#x27;, &#x27;#1&#x27;, &#x27;#2&#x27;, &#x27;#3&#x27;, &#x27;#4&#x27;, &#x27;#5&#x27;</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 1203.97 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 1406.93 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">rolling_data</span><span class="w"> </span><span class="k">AS</span>
@@ -423,7 +399,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 173.47 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 146.35 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Calculate trimmed rolling mean excluding min and max values within a 5-day window</span>
@@ -449,7 +425,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">daily_settlement</span><span class="w"> </span><span class="p">(</span><span class="n">trade_date</span><span class="w"> </span><span class="nb">DATE</span><span class="p">,</span><span class="w"> </span><span class="n">settlement_amount</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">);</span>
@@ -468,9 +444,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -489,152 +468,152 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">1</td>
 <td>2026-01-01 00:00:00</td>
-<td>172.41</td>
-<td>168.2876</td>
+<td>171.76</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>168.2876</td>
+<td>455.87</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>2026-01-01 00:00:00</td>
-<td>254.02</td>
-<td>168.2876</td>
+<td>185.43</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>2026-01-01 00:00:00</td>
-<td>395.34</td>
-<td>168.2876</td>
+<td>337.38</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>2026-01-01 00:00:00</td>
-<td>129.5</td>
-<td>168.2876</td>
+<td>0.01</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>2026-01-01 00:00:00</td>
-<td>399.58</td>
-<td>168.2876</td>
+<td>262.09</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>168.2876</td>
+<td>26.45</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>2026-01-01 00:00:00</td>
-<td>300.57</td>
-<td>168.2876</td>
+<td>55.34</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>2026-01-01 00:00:00</td>
-<td>369.3</td>
-<td>168.2876</td>
+<td>289.06</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>168.2876</td>
+<td>141.27</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>2026-01-01 00:00:00</td>
-<td>145.94</td>
-<td>168.2876</td>
+<td>164.31</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>2026-01-01 00:00:00</td>
-<td>277.6</td>
-<td>168.2876</td>
+<td>517.51</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>168.2876</td>
+<td>76.44</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>2026-01-01 00:00:00</td>
-<td>223.4</td>
-<td>168.2876</td>
+<td>0.01</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>2026-01-01 00:00:00</td>
-<td>370.14</td>
-<td>168.2876</td>
+<td>313.75</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>168.2876</td>
+<td>302.05</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>2026-01-01 00:00:00</td>
-<td>112.76</td>
-<td>168.2876</td>
+<td>205.33</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>2026-01-01 00:00:00</td>
-<td>455.85</td>
-<td>168.2876</td>
+<td>172.74</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>2026-01-01 00:00:00</td>
-<td>6.34</td>
-<td>168.2876</td>
+<td>253.64</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>2026-01-01 00:00:00</td>
-<td>122.33</td>
-<td>168.2876</td>
+<td>0.01</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>2026-01-01 00:00:00</td>
-<td>37.88</td>
-<td>168.2876</td>
+<td>0.01</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>2026-01-01 00:00:00</td>
-<td>315.91</td>
-<td>168.2876</td>
+<td>430.69</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>2026-01-01 00:00:00</td>
-<td>39.4</td>
-<td>168.2876</td>
+<td>282.08</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>168.2876</td>
+<td>83.47</td>
+<td>170.6189</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>2026-01-01 00:00:00</td>
-<td>204.08</td>
-<td>168.2876</td>
+<td>194.68</td>
+<td>170.6189</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
@@ -654,152 +633,152 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">1</td>
 <td>2026-01-01 00:00:00</td>
-<td>109.4</td>
-<td>177.33</td>
+<td>171.76</td>
+<td>185.43</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
 <td>2026-01-01 00:00:00</td>
-<td>197.34</td>
-<td>143.37</td>
+<td>455.87</td>
+<td>261.41</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>2026-01-01 00:00:00</td>
-<td>177.33</td>
-<td>161.36</td>
+<td>185.43</td>
+<td>231.52</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>157.57</td>
+<td>337.38</td>
+<td>261.63</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>2026-01-01 00:00:00</td>
-<td>289.06</td>
-<td>121.18</td>
+<td>0.01</td>
+<td>157.99</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>2026-01-01 00:00:00</td>
-<td>98.03</td>
-<td>158.42</td>
+<td>262.09</td>
+<td>114.63</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>2026-01-01 00:00:00</td>
-<td>88.18</td>
-<td>191.85</td>
+<td>26.45</td>
+<td>114.63</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>2026-01-01 00:00:00</td>
-<td>400.29</td>
-<td>124.89</td>
+<td>55.34</td>
+<td>152.9</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>2026-01-01 00:00:00</td>
-<td>188.47</td>
-<td>121.47</td>
+<td>289.06</td>
+<td>120.31</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>2026-01-01 00:00:00</td>
-<td>87.76</td>
-<td>186.29</td>
+<td>141.27</td>
+<td>198.21</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>102.37</td>
+<td>164.31</td>
+<td>198.21</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>2026-01-01 00:00:00</td>
-<td>282.63</td>
-<td>117.67</td>
+<td>517.51</td>
+<td>127.34</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>2026-01-01 00:00:00</td>
-<td>30.88</td>
-<td>182.62</td>
+<td>76.44</td>
+<td>184.83</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>2026-01-01 00:00:00</td>
-<td>234.36</td>
-<td>302.32</td>
+<td>0.01</td>
+<td>230.75</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>2026-01-01 00:00:00</td>
-<td>462.37</td>
-<td>262.02</td>
+<td>313.75</td>
+<td>194.61</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>2026-01-01 00:00:00</td>
-<td>389.96</td>
-<td>353.68</td>
+<td>302.05</td>
+<td>226.71</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>2026-01-01 00:00:00</td>
-<td>161.73</td>
-<td>429.68</td>
+<td>205.33</td>
+<td>253.67</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>2026-01-01 00:00:00</td>
-<td>436.71</td>
-<td>331.2</td>
+<td>172.74</td>
+<td>210.57</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>2026-01-01 00:00:00</td>
-<td>515.18</td>
-<td>255.13</td>
+<td>253.64</td>
+<td>126.03</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>2026-01-01 00:00:00</td>
-<td>166.94</td>
-<td>221</td>
+<td>0.01</td>
+<td>142.13</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>2026-01-01 00:00:00</td>
-<td>59.36</td>
-<td>127.18</td>
+<td>0.01</td>
+<td>178.58</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>127.18</td>
+<td>430.69</td>
+<td>121.85</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>2026-01-01 00:00:00</td>
-<td>155.24</td>
-<td>71.54</td>
+<td>282.08</td>
+<td>186.74</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>2026-01-01 00:00:00</td>
-<td>202.3</td>
-<td>65.91</td>
+<td>83.47</td>
+<td>198.13</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>2026-01-01 00:00:00</td>
-<td>0.01</td>
-<td>65.91</td>
+<td>194.68</td>
+<td>198.13</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
@@ -816,7 +795,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:13 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:28 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

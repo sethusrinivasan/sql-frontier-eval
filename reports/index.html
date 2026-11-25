@@ -3,7 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQL-Frontier-Eval: Benchmark Report & Query Deep-Dive Explorer (1M+ Records)</title>
+    <title>SQL-Frontier-Eval: Benchmark Report &amp; Query Deep-Dive Explorer (1M+ Records)</title>
+    <meta name="description" content="SQL-Frontier-Eval: Empirical benchmark evaluating Frontier AI models across 120 production-grade analytical SQL tasks scaled to 108M+ records in DuckDB, PostgreSQL, Databricks, and Amazon Aurora Serverless v2.">
+    <meta name="keywords" content="SQL Benchmark, Text-to-SQL, LLM Evaluation, DuckDB, PostgreSQL 19, Databricks SQL, Aurora Serverless v2, Execution Plans, Vector Search, Temporal SQL">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SQL-Frontier-Eval">
+    <meta property="og:title" content="SQL-Frontier-Eval: Benchmark Suite &amp; Query Deep-Dive Explorer (108M+ Records)">
+    <meta property="og:description" content="Empirical evaluation of Frontier AI Models across 120 complex analytical SQL tasks on 108M+ records in DuckDB, PostgreSQL, Databricks &amp; Aurora.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SQL-Frontier-Eval: Benchmark Suite (108M+ Records)">
+    <meta name="twitter:description" content="Empirical benchmark evaluating Frontier AI models on 120 complex analytical tasks across DuckDB, PostgreSQL, Databricks, and Aurora.">
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "name": "SQL-Frontier-Eval Benchmark",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/",
+      "description": "Empirical evaluation suite for Frontier AI models across production-grade analytical SQL, physical execution plans, and database engines."
+    },
+    {
+      "@type": "Dataset",
+      "name": "SQL-Frontier-Eval 108M Record Analytical Dataset",
+      "description": "Benchmark dataset consisting of 120 production-grade SQL tasks scaled to at least 1,000,000 records per table across DuckDB 2.0, PostgreSQL 18+, Databricks SQL, and Amazon Aurora Serverless v2.",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/",
+      "keywords": [
+        "SQL Benchmark",
+        "Text-to-SQL",
+        "Frontier LLM Evaluation",
+        "DuckDB",
+        "PostgreSQL",
+        "Aurora Serverless",
+        "Databricks SQL",
+        "Execution Plans",
+        "Physical Indexing"
+      ],
+      "license": "https://opensource.org/licenses/MIT",
+      "creator": {
+        "@type": "Person",
+        "name": "Sethu Srinivasan"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "headline": "SQL-Frontier-Eval: Empirical Benchmark Across 108M+ Records",
+      "description": "Executive report analyzing model standings, physical indexing paradoxes, and execution plan bottlenecks for 6 Frontier LLMs.",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="dashboard-page">
@@ -19,19 +78,57 @@
                     <button class="engine-pill active" data-engine="duckdb" onclick="switchEngine('duckdb')">⚡ DuckDB 2.0</button>
                     <button class="engine-pill" data-engine="postgres" onclick="switchEngine('postgres')">🐘 PostgreSQL 19.0</button>
                     <button class="engine-pill" data-engine="databricks" onclick="switchEngine('databricks')">🧱 Databricks SQL</button>
+                    <button class="engine-pill" data-engine="aurora" onclick="switchEngine('aurora')">☁️ Aurora Serverless</button>
                 </div>
                 <span class="engine-badge">⚡ DuckDB 2.0 In-Memory (1M+ Records/Table)</span>
-                <span class="timestamp-badge">UTC: 2026-11-24 18:30</span>
+                <span class="timestamp-badge">UTC: 2026-11-25 18:29</span>
             </div>
         </div>
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this benchmark dashboard to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this executive benchmark report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportBenchmarkSummaryCSV()" title="Download full 120-query benchmark dataset and results as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportBenchmarkMarkdown()" title="Download executive benchmark summary, leaderboard, and insights as GitHub-flavored Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20evaluation%20of%20Frontier%20AI%20Models%20across%20120%20complex%20analytical%20SQL%20tasks%20on%20108M%2B%20records%20in%20DuckDB%2C%20PostgreSQL%2C%20Databricks%20%26%20Aurora.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2F" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this benchmark on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2F" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical benchmark on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2F&amp;title=SQL-Frontier-Eval%3A%20Empirical%20Benchmark%20%28108M%2B%20Records%29%20%26%20Query%20Deep-Dive" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2F&amp;t=SQL-Frontier-Eval%3A%20Empirical%20Benchmark%20%28108M%2B%20Records%29%20%26%20Query%20Deep-Dive" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
         <!-- Dashboard Hero -->
-        <section class="dashboard-hero">
+        <section class="dashboard-hero" id="overview">
             <div class="hero-header-row">
                 <div>
-                    <h1 class="dashboard-title">SQL-Frontier-Eval Benchmark Suite</h1>
+                    <h1 class="dashboard-title">
+                        SQL-Frontier-Eval Benchmark Suite
+                        <a href="#overview" class="heading-anchor" title="Direct link to Overview">#</a>
+                    </h1>
                     <p class="dashboard-subtitle">
                         Comprehensive empirical evaluation of Frontier AI Models across Analytical SQL, Physical Execution Plans, and Database Architectures tested against <strong>1,000,000+ records per table</strong>.
                     </p>
@@ -50,13 +147,13 @@
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Underlying Data Volume</div>
-                    <div class="kpi-val" id="kpi-vol-val">3.04 GiB</div>
-                    <div class="kpi-sub">108,027,582 Records (148 Tables)</div>
+                    <div class="kpi-val" id="kpi-vol-val">3.00 GiB</div>
+                    <div class="kpi-sub">107,027,582 Records (147 Tables)</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Avg Execution Latency (1M Rows)</div>
-                    <div class="kpi-val" id="kpi-lat-val">232.2 ms</div>
-                    <div class="kpi-sub" id="kpi-lat-sub">Golden Avg: 217.8 ms</div>
+                    <div class="kpi-val" id="kpi-lat-val">208.2 ms</div>
+                    <div class="kpi-sub" id="kpi-lat-sub">Golden Avg: 192.8 ms</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Evaluated Model</div>
@@ -67,12 +164,15 @@
         </section>
 
         <!-- Database Engine Pivot Bar -->
-        <section class="engine-pivot-bar-section">
+        <section class="engine-pivot-bar-section" id="engine-pivot">
             <div class="engine-pivot-card">
                 <div class="engine-pivot-header">
                     <div class="engine-pivot-title-wrap">
                         <span class="engine-pivot-label">Interactive Engine Pivot</span>
-                        <h2 class="engine-pivot-title">Select Database Evaluation Engine</h2>
+                        <h2 class="engine-pivot-title">
+                            Select Database Evaluation Engine
+                            <a href="#engine-pivot" class="heading-anchor" title="Direct link to Engine Pivot">#</a>
+                        </h2>
                     </div>
                     <span class="engine-pivot-sub">Default view: DuckDB 2.0 In-Memory. Switch engine to update KPIs, leaderboard &amp; plans.</span>
                 </div>
@@ -122,6 +222,21 @@
                             </div>
                         </div>
                     </button>
+                    <button class="engine-pivot-btn" data-engine="aurora" onclick="switchEngine('aurora')">
+                        <div class="btn-icon-box">☁️</div>
+                        <div class="btn-info">
+                            <div class="btn-heading">
+                                <span class="btn-name">Amazon Aurora Serverless v2</span>
+                                <span class="btn-tag btn-tag-aws">AWS IAM Auth</span>
+                            </div>
+                            <span class="btn-desc">PostgreSQL-compatible AWS Serverless cluster with IAM DB authentication, 15 scoped category IAM roles, and isolated analytical schemas.</span>
+                            <div class="btn-specs">
+                                <span>Pass Rate: <strong>93.3%</strong></span>
+                                <span>Avg Latency: <strong>186.4 ms</strong></span>
+                                <span>Volume: <strong>AWS Cloud DB</strong></span>
+                            </div>
+                        </div>
+                    </button>
                 </div>
                 <div class="engine-status-banner" id="engine-status-banner">
                     Active Engine: <strong>⚡ DuckDB 2.0 In-Memory Engine</strong> &mdash; 120 benchmark queries evaluated against 108M+ records. Showing columnar vectorized execution plans, SIMD AVX2 acceleration, and in-memory aggregation benchmarks.
@@ -130,14 +245,17 @@
         </section>
 
         <!-- TL;DR Executive Summary Section -->
-        <section class="content-section tldr-section">
+        <section class="content-section tldr-section" id="tldr">
             <div class="section-header">
-                <h2>TL;DR &mdash; Benchmark Summary &amp; Frontier Takeaways</h2>
+                <h2>
+                    TL;DR &mdash; Benchmark Summary &amp; Frontier Takeaways
+                    <a href="#tldr" class="heading-anchor" title="Direct link to TL;DR">#</a>
+                </h2>
                 <span class="section-badge">At A Glance</span>
             </div>
             <div class="card tldr-card">
                 <div class="tldr-intro">
-                    <strong>Quick Summary:</strong> This benchmark evaluates 6 Frontier LLMs across <strong>120 production-grade analytical SQL tasks</strong> scaled to <strong>108,027,582 records (>3.0 GiB)</strong> with &ge;1,000,000 records per table across <strong>DuckDB 2.0</strong> and <strong>PostgreSQL 18.7</strong>. It inspects silent metric corruption, non-SARGable scans, and physical execution plans.
+                    <strong>Quick Summary:</strong> This benchmark evaluates 6 Frontier LLMs across <strong>120 production-grade analytical SQL tasks</strong> scaled to <strong>108,027,582 records (>3.0 GiB)</strong> with &ge;1,000,000 records per table across <strong>DuckDB 2.0</strong>, <strong>PostgreSQL 19.0</strong>, <strong>Databricks Serverless</strong>, and <strong>Amazon Aurora Serverless v2</strong>. It inspects silent metric corruption, non-SARGable scans, and physical execution plans.
                 </div>
                 <div class="tldr-grid">
                     <div class="tldr-box">
@@ -147,22 +265,22 @@
                         </div>
                         <div class="tldr-box-body">
                             <ul>
-                                <li><strong>Claude Opus 4.6 (Thinking)</strong> leads the frontier at <strong>98.3% pass rate</strong> (DuckDB) and <strong>96.7%</strong> (PostgreSQL), with flawless window calculations and zero core trap failures.</li>
+                                <li><strong>Claude Opus 4.6 (Thinking)</strong> leads the frontier at <strong>98.3% pass rate</strong> (DuckDB) and <strong>96.7%</strong> (PostgreSQL / Aurora), with flawless window calculations and zero core trap failures.</li>
                                 <li><strong>Gemini 3.8 Flash (Low)</strong> achieves top cost/performance Pareto efficiency: <strong>95.8% pass rate</strong> at a blazing <strong>4.6s inference latency</strong> (3.2x faster than Opus).</li>
-                                <li><strong>GPT-OSS 120B (Medium)</strong> falls to 90.8% / 86.7% due to recursive CTE runaway cycles and unindexed cross-joins.</li>
+                                <li><strong>GPT-OSS 120B (Medium)</strong> falls to 90.8% / 85.8% due to recursive CTE runaway cycles and unindexed cross-joins.</li>
                             </ul>
                         </div>
                     </div>
                     <div class="tldr-box">
                         <div class="tldr-box-header">
                             <span class="tldr-box-icon">⚡</span>
-                            <span class="tldr-box-title">Engine Comparison (DuckDB vs PG)</span>
+                            <span class="tldr-box-title">Engine Comparison (DuckDB vs PG vs Aurora)</span>
                         </div>
                         <div class="tldr-box-body">
                             <ul>
                                 <li><strong>DuckDB 2.0 (Columnar OLAP)</strong>: In-memory SIMD AVX2 vector chunks scan at memory bus speeds (~0.7 ms / 1M ints). Excels at analytical aggregations and ASOF joins (232.2 ms avg).</li>
-                                <li><strong>PostgreSQL 18.7 + Extensions</strong>: Evaluated in Docker Compose with <code>pgvector</code>, <code>pg_trgm</code>, and <code>btree_gist</code>. Achieves 198.7 ms average execution time with proper composite indexing.</li>
-                                <li><strong>Engine Pivot</strong>: Use the toggle above to instantly pivot scorecards and metrics between DuckDB and PostgreSQL.</li>
+                                <li><strong>PostgreSQL 19.0 + Extensions</strong>: Evaluated in Docker Compose with <code>pgvector</code>, <code>pg_trgm</code>, and <code>btree_gist</code>. Achieves 198.7 ms average execution time with proper composite indexing.</li>
+                                <li><strong>Amazon Aurora Serverless v2</strong>: AWS Serverless PostgreSQL with 15 IAM DB auth roles and schema scoping, achieving 186.4 ms average execution time with zero disk bottleneck.</li>
                             </ul>
                         </div>
                     </div>
@@ -197,9 +315,12 @@
         </section>
 
         <!-- Multi-Model Benchmark Scorecard -->
-        <section class="content-section">
+        <section class="content-section" id="leaderboard">
             <div class="section-header">
-                <h2>Multi-Model Frontier Leaderboard & Failure Summary</h2>
+                <h2>
+                    Multi-Model Frontier Leaderboard &amp; Failure Summary
+                    <a href="#leaderboard" class="heading-anchor" title="Direct link to Leaderboard">#</a>
+                </h2>
                 <span class="section-badge" id="leaderboard-engine-badge">DuckDB 2.0 Suite (120/120 Tasks)</span>
             </div>
             <div class="card leaderboard-card">
@@ -237,7 +358,7 @@
                                 <td><span class="badge badge-pass">95.8%</span></td>
                                 <td>115 / 120</td>
                                 <td><strong>4.6s</strong></td>
-                                <td>232.2 ms</td>
+                                <td>208.2 ms</td>
                                 <td>Full 120-task suite: 5 edge-case value/shape divergences (bitemporal limit, FX arbitrage)</td>
                             </tr>
                             <tr>
@@ -254,7 +375,7 @@
                                 <td>111 / 120</td>
                                 <td>38.6s</td>
                                 <td>236.4 ms</td>
-                                <td>9 edge cases: reasoning timeouts on microsecond ASOF bounds & non-SARGable predicate conversions</td>
+                                <td>9 edge cases: reasoning timeouts on microsecond ASOF bounds &amp; non-SARGable predicate conversions</td>
                             </tr>
                             <tr>
                                 <td><strong>GPT-OSS 120B (Medium)</strong></td>
@@ -262,14 +383,14 @@
                                 <td>109 / 120</td>
                                 <td>8.2s</td>
                                 <td>245.8 ms</td>
-                                <td>11 edge cases: unbounded recursive CTE cycles without acyclic guards & quadratic non-equi joins</td>
+                                <td>11 edge cases: unbounded recursive CTE cycles without acyclic guards &amp; quadratic non-equi joins</td>
                             </tr>
                             <tr class="baseline-row">
                                 <td><strong>Golden Ground Truth (Full 120 Suite)</strong></td>
                                 <td><span class="badge badge-golden">100.0%</span></td>
                                 <td>120 / 120</td>
                                 <td>N/A</td>
-                                <td>217.8 ms</td>
+                                <td>192.8 ms</td>
                                 <td>Ground Truth Baseline (0% False Negatives on 1M+ Records in DuckDB)</td>
                             </tr>
                         </tbody>
@@ -365,6 +486,56 @@
                                 <td>Ground Truth Baseline with Spark SQL Dialect Adaptation &amp; UDFs (0% False Negatives)</td>
                             </tr>
                         </tbody>
+                        <tbody id="tbody-aurora" style="display: none;">
+                            <tr class="leader-row">
+                                <td><strong>Claude Opus 4.6 (Thinking)</strong></td>
+                                <td><span class="badge badge-pass">96.7%</span></td>
+                                <td>116 / 120</td>
+                                <td>14.9s</td>
+                                <td>179.2 ms</td>
+                                <td>AWS Aurora Serverless: Flawless IAM DB auth across all 15 category roles; 4 minor bitemporal boundary edge cases</td>
+                            </tr>
+                            <tr class="leader-row">
+                                <td><strong>Gemini 3.8 Flash (Low)</strong></td>
+                                <td><span class="badge badge-pass">93.3%</span></td>
+                                <td>112 / 120</td>
+                                <td><strong>4.7s</strong></td>
+                                <td>186.4 ms</td>
+                                <td>Aurora Serverless: High throughput &amp; Pareto efficiency across 15 scoped schemas; 8 edge-case precision divergences</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Claude Sonnet 4.6 (Thinking)</strong></td>
+                                <td><span class="badge badge-warn">91.7%</span></td>
+                                <td>110 / 120</td>
+                                <td>9.2s</td>
+                                <td>195.8 ms</td>
+                                <td>10 edge cases: missing covering indexes causing nested loop degradation, strict funnel precedence</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Gemini 3.8 Flash (High)</strong></td>
+                                <td><span class="badge badge-warn">90.0%</span></td>
+                                <td>108 / 120</td>
+                                <td>39.1s</td>
+                                <td>204.6 ms</td>
+                                <td>12 edge cases: reasoning timeouts on multi-stage CTE graphs and complex window filters</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GPT-OSS 120B (Medium)</strong></td>
+                                <td><span class="badge badge-fail">85.8%</span></td>
+                                <td>103 / 120</td>
+                                <td>8.5s</td>
+                                <td>218.1 ms</td>
+                                <td>17 edge cases: statement timeouts on unindexed cross joins, recursive CTE depth limit triggers</td>
+                            </tr>
+                            <tr class="baseline-row">
+                                <td><strong>Golden Ground Truth (Aurora Serverless v2)</strong></td>
+                                <td><span class="badge badge-golden">100.0%</span></td>
+                                <td>120 / 120</td>
+                                <td>N/A</td>
+                                <td>172.5 ms</td>
+                                <td>Ground Truth Baseline on Aurora Serverless v2 PostgreSQL (15 Scoped Roles, 0% False Negatives)</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -425,7 +596,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">205.5ms</span>
+                    <span class="ds-val">160.6ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -447,7 +618,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">379.9ms</span>
+                    <span class="ds-val">333.0ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -469,7 +640,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">242.2ms</span>
+                    <span class="ds-val">297.2ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -491,7 +662,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">88.5ms</span>
+                    <span class="ds-val">4.0ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -513,7 +684,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">229.8ms</span>
+                    <span class="ds-val">290.3ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -535,7 +706,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">72.1ms</span>
+                    <span class="ds-val">44.2ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -557,7 +728,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">44.7ms</span>
+                    <span class="ds-val">35.1ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -579,7 +750,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">276.4ms</span>
+                    <span class="ds-val">238.1ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -601,7 +772,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">157.0ms</span>
+                    <span class="ds-val">102.5ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -623,7 +794,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">43.9ms</span>
+                    <span class="ds-val">27.3ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -645,7 +816,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">0.9ms</span>
+                    <span class="ds-val">2.1ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -667,7 +838,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">2.8ms</span>
+                    <span class="ds-val">3.1ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -689,7 +860,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">0.5ms</span>
+                    <span class="ds-val">1.0ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -711,7 +882,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">658.7ms</span>
+                    <span class="ds-val">378.0ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -733,7 +904,7 @@
                     <span class="ds-lbl">Passed</span>
                 </div>
                 <div class="domain-stat-item">
-                    <span class="ds-val">12.6ms</span>
+                    <span class="ds-val">7.0ms</span>
                     <span class="ds-lbl">Avg Latency (1M)</span>
                 </div>
             </div>
@@ -746,9 +917,12 @@
         </section>
 
         <!-- Interactive Query Explorer -->
-        <section class="content-section">
+        <section class="content-section" id="explorer">
             <div class="section-header">
-                <h2>Benchmark Query Deep-Dive Explorer</h2>
+                <h2>
+                    Benchmark Query Deep-Dive Explorer
+                    <a href="#explorer" class="heading-anchor" title="Direct link to Query Explorer">#</a>
+                </h2>
                 <span class="section-badge">120 Detailed Queries Available</span>
             </div>
 
@@ -771,6 +945,10 @@
                     <button class="status-pill status-pass" onclick="setStatusFilter('pass', this)">Passed (115)</button>
                     <button class="status-pill status-fail" onclick="setStatusFilter('fail', this)">Failed (5)</button>
                 </div>
+            </div>
+
+            <div class="filter-results-info">
+                <span class="filter-count-badge" id="queryFilterCount">Showing <strong>120</strong> of 120 benchmark queries</span>
             </div>
 
             <!-- Query Table -->
@@ -800,7 +978,7 @@
                 <div class="task-subdesc">In algorithmic trading, every buy or sell order must be evaluated against the most recent ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>452.4 ms</strong> <small class="text-muted">/ 450.0 ms</small></td>
+            <td class="td-num"><strong>302.5 ms</strong> <small class="text-muted">/ 282.2 ms</small></td>
             <td class="td-num"><strong>2,000,000 rows</strong> <small class="text-muted">(83.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_001_Q01_asof_trade_quote_matching.html" class="action-btn">Deep Dive →</a>
@@ -817,7 +995,7 @@
                 <div class="task-subdesc">Global payments systems record transactions in local currencies (EUR, JPY, GBP) that must ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>79.3 ms</strong> <small class="text-muted">/ 78.4 ms</small></td>
+            <td class="td-num"><strong>45.8 ms</strong> <small class="text-muted">/ 45.7 ms</small></td>
             <td class="td-num"><strong>1,000,003 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_002_Q02_dynamic_point_in_time_fx.html" class="action-btn">Deep Dive →</a>
@@ -834,7 +1012,7 @@
                 <div class="task-subdesc">Digital analytics platforms group raw user pageviews into &#x27;sessions&#x27;. If a user is inactiv...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>304.9 ms</strong> <small class="text-muted">/ 303.9 ms</small></td>
+            <td class="td-num"><strong>220.4 ms</strong> <small class="text-muted">/ 212.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_003_Q03_clickstream_sessionization_gaps.html" class="action-btn">Deep Dive →</a>
@@ -851,7 +1029,7 @@
                 <div class="task-subdesc">Real-world web sessions often need dual constraints: a 30-minute inactivity timeout AND a ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>408.1 ms</strong> <small class="text-muted">/ 399.7 ms</small></td>
+            <td class="td-num"><strong>278.2 ms</strong> <small class="text-muted">/ 277.3 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_004_Q04_dual_bound_session_capping.html" class="action-btn">Deep Dive →</a>
@@ -868,7 +1046,7 @@
                 <div class="task-subdesc">Industrial IoT sensors emit readings intermittently to save bandwidth. Downstream machine ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>0.6 ms</strong> <small class="text-muted">/ 0.4 ms</small></td>
+            <td class="td-num"><strong>2.2 ms</strong> <small class="text-muted">/ 2.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(19.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_005_Q05_iot_sensor_gap_fill_locf.html" class="action-btn">Deep Dive →</a>
@@ -885,7 +1063,7 @@
                 <div class="task-subdesc">Financial compliance requires knowing: &#x27;What did we believe customer Alice&#x27;s credit limit ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>0.0 ms</strong> <small class="text-muted">/ 0.0 ms</small></td>
+            <td class="td-num"><strong>0.9 ms</strong> <small class="text-muted">/ 0.8 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(42.0 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_006_Q06_bitemporal_state_reconstruction.html" class="action-btn">Deep Dive →</a>
@@ -902,7 +1080,7 @@
                 <div class="task-subdesc">Customers change addresses or account tiers over time. Joining historical orders to custom...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>0.4 ms</strong> <small class="text-muted">/ 0.4 ms</small></td>
+            <td class="td-num"><strong>1.4 ms</strong> <small class="text-muted">/ 1.4 ms</small></td>
             <td class="td-num"><strong>1,000,002 rows</strong> <small class="text-muted">(26.7 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_007_Q07_scd2_open_ended_intervals.html" class="action-btn">Deep Dive →</a>
@@ -919,7 +1097,7 @@
                 <div class="task-subdesc">Real-time surveillance monitors rolling 15-minute average latency stepped forward every 5 ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>0.6 ms</strong> <small class="text-muted">/ 0.6 ms</small></td>
+            <td class="td-num"><strong>1.7 ms</strong> <small class="text-muted">/ 1.6 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_008_Q08_hopping_sliding_time_buckets.html" class="action-btn">Deep Dive →</a>
@@ -936,7 +1114,7 @@
                 <div class="task-subdesc">Ledger entries can occur at the exact same millisecond. Financial ledgers must preserve st...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>163.3 ms</strong> <small class="text-muted">/ 146.8 ms</small></td>
+            <td class="td-num"><strong>115.1 ms</strong> <small class="text-muted">/ 111.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_009_Q09_ledger_balance_duplicate_timestamps.html" class="action-btn">Deep Dive →</a>
@@ -953,7 +1131,7 @@
                 <div class="task-subdesc">To detect anomalous spikes, analysts compare a metric against the average of neighboring d...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>307.2 ms</strong> <small class="text-muted">/ 309.6 ms</small></td>
+            <td class="td-num"><strong>202.3 ms</strong> <small class="text-muted">/ 200.4 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(26.7 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_010_Q10_peer_exclusion_moving_average.html" class="action-btn">Deep Dive →</a>
@@ -970,7 +1148,7 @@
                 <div class="task-subdesc">When evaluating employee sales performance, ties should not inflate the percentile score a...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>124.9 ms</strong> <small class="text-muted">/ 124.2 ms</small></td>
+            <td class="td-num"><strong>92.6 ms</strong> <small class="text-muted">/ 86.7 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(19.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_011_Q11_exclude_ties_ranking.html" class="action-btn">Deep Dive →</a>
@@ -987,7 +1165,7 @@
                 <div class="task-subdesc">High-speed network telemetry measures packet arrival jitter (variance in inter-packet dela...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>152.4 ms</strong> <small class="text-muted">/ 145.3 ms</small></td>
+            <td class="td-num"><strong>108.6 ms</strong> <small class="text-muted">/ 99.7 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_012_Q12_microsecond_latency_jitter.html" class="action-btn">Deep Dive →</a>
@@ -1004,7 +1182,7 @@
                 <div class="task-subdesc">Market microstructure researchers need to reconstruct the exact bids and asks available at...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>18.9 ms</strong> <small class="text-muted">/ 17.9 ms</small></td>
+            <td class="td-num"><strong>13.6 ms</strong> <small class="text-muted">/ 12.6 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(64.8 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_013_Q13_order_book_snapshot_reconstruction.html" class="action-btn">Deep Dive →</a>
@@ -1021,7 +1199,7 @@
                 <div class="task-subdesc">TWAP measures the average price of an asset weighted by the duration of time that each pri...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>92.0 ms</strong> <small class="text-muted">/ 83.5 ms</small></td>
+            <td class="td-num"><strong>47.4 ms</strong> <small class="text-muted">/ 47.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_014_Q14_time_weighted_average_price_twap.html" class="action-btn">Deep Dive →</a>
@@ -1038,7 +1216,7 @@
                 <div class="task-subdesc">VWAP provides institutional traders the definitive benchmark price weighted by traded volu...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>448.4 ms</strong> <small class="text-muted">/ 434.5 ms</small></td>
+            <td class="td-num"><strong>335.2 ms</strong> <small class="text-muted">/ 330.6 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_015_Q15_volume_weighted_average_price_vwap.html" class="action-btn">Deep Dive →</a>
@@ -1055,7 +1233,7 @@
                 <div class="task-subdesc">In product funnels (Signup -&gt; Verify -&gt; Purchase), events must occur in exact chronologica...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>36.0 ms</strong> <small class="text-muted">/ 31.1 ms</small></td>
+            <td class="td-num"><strong>25.8 ms</strong> <small class="text-muted">/ 28.4 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_016_Q16_sequential_funnel_precedence.html" class="action-btn">Deep Dive →</a>
@@ -1072,7 +1250,7 @@
                 <div class="task-subdesc">SaaS analytics track weekly retention curves (Day 0, Day 7, Day 14, Day 30) based on user ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>139.8 ms</strong> <small class="text-muted">/ 148.6 ms</small></td>
+            <td class="td-num"><strong>90.0 ms</strong> <small class="text-muted">/ 90.1 ms</small></td>
             <td class="td-num"><strong>2,000,000 rows</strong> <small class="text-muted">(15.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_017_Q17_retention_cohort_survival.html" class="action-btn">Deep Dive →</a>
@@ -1089,7 +1267,7 @@
                 <div class="task-subdesc">Recommendation systems score user interest where recent clicks count significantly more th...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>209.3 ms</strong> <small class="text-muted">/ 216.0 ms</small></td>
+            <td class="td-num"><strong>156.3 ms</strong> <small class="text-muted">/ 149.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_018_Q18_time_decay_user_affinity.html" class="action-btn">Deep Dive →</a>
@@ -1106,7 +1284,7 @@
                 <div class="task-subdesc">A customer who normally buys every 3 days is at risk if they haven&#x27;t bought in 10 days. Bu...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>323.2 ms</strong> <small class="text-muted">/ 314.7 ms</small></td>
+            <td class="td-num"><strong>178.5 ms</strong> <small class="text-muted">/ 175.2 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(7.6 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_019_Q19_intermittent_inactivity_anomaly.html" class="action-btn">Deep Dive →</a>
@@ -1123,7 +1301,7 @@
                 <div class="task-subdesc">Demonstrates the Chasm Trap where joining multiple 1-to-many child tables (discounts and s...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Metric Inflation / Chasm Trap</span></td>
-            <td class="td-num"><strong>88.5 ms</strong> <small class="text-muted">/ 6.1 ms</small></td>
+            <td class="td-num"><strong>4.0 ms</strong> <small class="text-muted">/ 3.0 ms</small></td>
             <td class="td-num"><strong>1,003,000 rows</strong> <small class="text-muted">(23.0 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_01_fanout.html" class="action-btn">Deep Dive →</a>
@@ -1140,7 +1318,7 @@
                 <div class="task-subdesc">Workforce managers must calculate maximum concurrent staffing levels from employee shift s...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>157.3 ms</strong> <small class="text-muted">/ 113.5 ms</small></td>
+            <td class="td-num"><strong>108.3 ms</strong> <small class="text-muted">/ 115.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_020_Q20_interval_overlap_concurrency.html" class="action-btn">Deep Dive →</a>
@@ -1157,7 +1335,7 @@
                 <div class="task-subdesc">Fleet managers track commercial vehicles to find idle &#x27;unrented&#x27; gaps between back-to-back...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>46.3 ms</strong> <small class="text-muted">/ 41.0 ms</small></td>
+            <td class="td-num"><strong>25.1 ms</strong> <small class="text-muted">/ 30.7 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_021_Q21_temporal_gap_detection.html" class="action-btn">Deep Dive →</a>
@@ -1174,7 +1352,7 @@
                 <div class="task-subdesc">When a sensor drops offline for 30 minutes, data scientists prefer linear interpolation be...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>161.7 ms</strong> <small class="text-muted">/ 124.2 ms</small></td>
+            <td class="td-num"><strong>78.9 ms</strong> <small class="text-muted">/ 76.9 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(15.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_022_Q22_linear_interpolation_missing_points.html" class="action-btn">Deep Dive →</a>
@@ -1191,7 +1369,7 @@
                 <div class="task-subdesc">Financial risk models compute a 7-day rolling average excluding the highest and lowest sin...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>1204.0 ms</strong> <small class="text-muted">/ 173.5 ms</small></td>
+            <td class="td-num"><strong>1406.9 ms</strong> <small class="text-muted">/ 146.3 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_023_Q23_trimmed_mean_rolling_window.html" class="action-btn">Deep Dive →</a>
@@ -1208,7 +1386,7 @@
                 <div class="task-subdesc">Data warehouses partition petabyte event tables by date. Wrapping date columns in function...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>192.7 ms</strong> <small class="text-muted">/ 181.1 ms</small></td>
+            <td class="td-num"><strong>167.5 ms</strong> <small class="text-muted">/ 162.2 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_024_Q24_sargable_fiscal_partition_prune.html" class="action-btn">Deep Dive →</a>
@@ -1225,7 +1403,7 @@
                 <div class="task-subdesc">CMOs need to compare 3 attribution models (First-Touch, Last-Touch, and Uniform Linear) fo...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>147.4 ms</strong> <small class="text-muted">/ 157.7 ms</small></td>
+            <td class="td-num"><strong>99.6 ms</strong> <small class="text-muted">/ 97.1 ms</small></td>
             <td class="td-num"><strong>2,000,000 rows</strong> <small class="text-muted">(57.2 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_025_Q25_multi_touch_marketing_attribution.html" class="action-btn">Deep Dive →</a>
@@ -1242,7 +1420,7 @@
                 <div class="task-subdesc">When a user asks a question in an AI assistant, the query is embedded into a dense vector ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>9.4 ms</strong> <small class="text-muted">/ 9.2 ms</small></td>
+            <td class="td-num"><strong>5.5 ms</strong> <small class="text-muted">/ 5.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_026_Q26_cosine_similarity_top_k.html" class="action-btn">Deep Dive →</a>
@@ -1259,7 +1437,7 @@
                 <div class="task-subdesc">In computer vision feature retrieval (facial recognition, product image matching), feature...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>14.9 ms</strong> <small class="text-muted">/ 19.1 ms</small></td>
+            <td class="td-num"><strong>10.3 ms</strong> <small class="text-muted">/ 10.4 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_027_Q27_euclidean_l2_nearest_neighbors.html" class="action-btn">Deep Dive →</a>
@@ -1276,7 +1454,7 @@
                 <div class="task-subdesc">For unit-normalized vectors (e.g. OpenAI text-embedding-3 or Cohere embeddings), cosine si...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>15.6 ms</strong> <small class="text-muted">/ 18.8 ms</small></td>
+            <td class="td-num"><strong>10.4 ms</strong> <small class="text-muted">/ 10.4 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_028_Q28_inner_product_mips.html" class="action-btn">Deep Dive →</a>
@@ -1293,7 +1471,7 @@
                 <div class="task-subdesc">A user searches for &#x27;cheap mechanical keyboard under $50&#x27;. If you run vector search Top-K ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>8.0 ms</strong> <small class="text-muted">/ 8.1 ms</small></td>
+            <td class="td-num"><strong>4.9 ms</strong> <small class="text-muted">/ 4.9 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(50.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_029_Q29_pre_filter_vs_post_filter_trap.html" class="action-btn">Deep Dive →</a>
@@ -1310,7 +1488,7 @@
                 <div class="task-subdesc">Groups web analytics events into browsing sessions where an inactivity gap greater than 30...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Sessionization (Gaps &amp; Islands)</span></td>
-            <td class="td-num"><strong>265.0 ms</strong> <small class="text-muted">/ 248.3 ms</small></td>
+            <td class="td-num"><strong>158.6 ms</strong> <small class="text-muted">/ 157.3 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_02_sessionization.html" class="action-btn">Deep Dive →</a>
@@ -1327,7 +1505,7 @@
                 <div class="task-subdesc">RAG systems want high-confidence matches (similarity &gt; 0.85) to avoid hallucinations, but ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>504.2 ms</strong> <small class="text-muted">/ 435.5 ms</small></td>
+            <td class="td-num"><strong>309.2 ms</strong> <small class="text-muted">/ 302.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_030_Q30_adaptive_similarity_threshold.html" class="action-btn">Deep Dive →</a>
@@ -1344,7 +1522,7 @@
                 <div class="task-subdesc">During service outages, hundreds of users submit identically phrased IT support tickets (&#x27;...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>2009.9 ms</strong> <small class="text-muted">/ 2118.6 ms</small></td>
+            <td class="td-num"><strong>1357.4 ms</strong> <small class="text-muted">/ 1356.2 ms</small></td>
             <td class="td-num"><strong>2,500 rows</strong> <small class="text-muted">(87.9 KiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_031_Q31_semantic_deduplication_support_tickets.html" class="action-btn">Deep Dive →</a>
@@ -1361,7 +1539,7 @@
                 <div class="task-subdesc">Marketplaces aggregate catalogs from thousands of sellers. Matching identical items requir...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>495.9 ms</strong> <small class="text-muted">/ 477.4 ms</small></td>
+            <td class="td-num"><strong>309.0 ms</strong> <small class="text-muted">/ 305.6 ms</small></td>
             <td class="td-num"><strong>2,500 rows</strong> <small class="text-muted">(175.8 KiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_032_Q32_near_duplicate_product_catalog.html" class="action-btn">Deep Dive →</a>
@@ -1378,7 +1556,7 @@
                 <div class="task-subdesc">Advanced retrieval models (ColBERT / Sanity) represent queries and documents as collection...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>211.5 ms</strong> <small class="text-muted">/ 186.7 ms</small></td>
+            <td class="td-num"><strong>118.1 ms</strong> <small class="text-muted">/ 114.8 ms</small></td>
             <td class="td-num"><strong>1,000,002 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_033_Q33_colbert_late_interaction_maxsim.html" class="action-btn">Deep Dive →</a>
@@ -1395,7 +1573,7 @@
                 <div class="task-subdesc">To personalize feeds, recommendation engines compute a dynamic user preference vector by c...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>937.0 ms</strong> <small class="text-muted">/ 955.9 ms</small></td>
+            <td class="td-num"><strong>1213.2 ms</strong> <small class="text-muted">/ 1235.4 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(19.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_034_Q34_user_profile_embedding_centroid.html" class="action-btn">Deep Dive →</a>
@@ -1412,7 +1590,7 @@
                 <div class="task-subdesc">Unsupervised customer segmentation can be run directly inside DuckDB by assigning customer...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>299.1 ms</strong> <small class="text-muted">/ 247.7 ms</small></td>
+            <td class="td-num"><strong>159.4 ms</strong> <small class="text-muted">/ 158.6 ms</small></td>
             <td class="td-num"><strong>1,000,002 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_035_Q35_kmeans_cluster_assignment_step.html" class="action-btn">Deep Dive →</a>
@@ -1429,7 +1607,7 @@
                 <div class="task-subdesc">Anomalous sensor readings or fraudulent transaction vectors reside in sparse regions of th...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>802.8 ms</strong> <small class="text-muted">/ 821.7 ms</small></td>
+            <td class="td-num"><strong>613.1 ms</strong> <small class="text-muted">/ 590.7 ms</small></td>
             <td class="td-num"><strong>2,500 rows</strong> <small class="text-muted">(29.3 KiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_036_Q36_knn_vector_anomaly_detection.html" class="action-btn">Deep Dive →</a>
@@ -1446,7 +1624,7 @@
                 <div class="task-subdesc">Real-world matchmaking (dating apps, gig-economy driver matching) requires vector personal...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>98.8 ms</strong> <small class="text-muted">/ 91.7 ms</small></td>
+            <td class="td-num"><strong>64.6 ms</strong> <small class="text-muted">/ 65.6 ms</small></td>
             <td class="td-num"><strong>1,000,001 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_037_Q37_hybrid_relational_vector_cohort_join.html" class="action-btn">Deep Dive →</a>
@@ -1463,7 +1641,7 @@
                 <div class="task-subdesc">In e-commerce search, users submit a photo and a text clarification (e.g. photo of dress +...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>240.9 ms</strong> <small class="text-muted">/ 231.7 ms</small></td>
+            <td class="td-num"><strong>189.7 ms</strong> <small class="text-muted">/ 186.9 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_038_Q38_multimodal_image_text_fusion.html" class="action-btn">Deep Dive →</a>
@@ -1480,7 +1658,7 @@
                 <div class="task-subdesc">Standard vector retrieval often returns 5 virtually identical articles. MMR penalizes redu...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>297.3 ms</strong> <small class="text-muted">/ 299.1 ms</small></td>
+            <td class="td-num"><strong>219.0 ms</strong> <small class="text-muted">/ 213.6 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_039_Q39_maximal_marginal_relevance_mmr.html" class="action-btn">Deep Dive →</a>
@@ -1497,7 +1675,7 @@
                 <div class="task-subdesc">Joins financial transactions to Slowly Changing Dimension (SCD Type 2) exchange rate table...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">SCD Type 2 Point-in-Time Joins</span></td>
-            <td class="td-num"><strong>72.1 ms</strong> <small class="text-muted">/ 68.8 ms</small></td>
+            <td class="td-num"><strong>44.2 ms</strong> <small class="text-muted">/ 43.0 ms</small></td>
             <td class="td-num"><strong>1,000,003 rows</strong> <small class="text-muted">(45.8 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_03_scd2_join.html" class="action-btn">Deep Dive →</a>
@@ -1514,7 +1692,7 @@
                 <div class="task-subdesc">Finding all similar document pairs across 100,000 docs is O(N^2) (10 billion checks). Part...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>0.7 ms</strong> <small class="text-muted">/ 0.6 ms</small></td>
+            <td class="td-num"><strong>1.5 ms</strong> <small class="text-muted">/ 1.6 ms</small></td>
             <td class="td-num"><strong>2,500 rows</strong> <small class="text-muted">(39.1 KiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_040_Q40_cosine_matrix_cluster_pruning.html" class="action-btn">Deep Dive →</a>
@@ -1531,7 +1709,7 @@
                 <div class="task-subdesc">Matrix factorization (SVD / ALS) maps users and movies to latent factor vectors. Predicted...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>462.1 ms</strong> <small class="text-muted">/ 395.8 ms</small></td>
+            <td class="td-num"><strong>336.0 ms</strong> <small class="text-muted">/ 325.7 ms</small></td>
             <td class="td-num"><strong>2,000,000 rows</strong> <small class="text-muted">(64.8 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_041_Q41_collaborative_filtering_latent_dot.html" class="action-btn">Deep Dive →</a>
@@ -1548,7 +1726,7 @@
                 <div class="task-subdesc">In image generation and semantic search, users supply positive and negative prompts (e.g. ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>262.4 ms</strong> <small class="text-muted">/ 256.4 ms</small></td>
+            <td class="td-num"><strong>203.3 ms</strong> <small class="text-muted">/ 213.6 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_042_Q42_negative_prompting_vector_repulsion.html" class="action-btn">Deep Dive →</a>
@@ -1565,7 +1743,7 @@
                 <div class="task-subdesc">Long PDF manuals are split into 50 chunks each. To avoid returning 5 chunks from the exact...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>459.2 ms</strong> <small class="text-muted">/ 464.2 ms</small></td>
+            <td class="td-num"><strong>472.0 ms</strong> <small class="text-muted">/ 492.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(53.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_043_Q43_best_chunk_pooling_retrieval.html" class="action-btn">Deep Dive →</a>
@@ -1582,7 +1760,7 @@
                 <div class="task-subdesc">When assembling retrieved chunks for an LLM prompt, you have a strict token limit (e.g. 1,...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>98.3 ms</strong> <small class="text-muted">/ 111.7 ms</small></td>
+            <td class="td-num"><strong>67.8 ms</strong> <small class="text-muted">/ 69.4 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(15.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_044_Q44_token_budget_context_truncation.html" class="action-btn">Deep Dive →</a>
@@ -1599,7 +1777,7 @@
                 <div class="task-subdesc">Modern enterprise search uses a 2-stage pipeline: Fast bi-encoder vector search retrieves ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>21.8 ms</strong> <small class="text-muted">/ 15.4 ms</small></td>
+            <td class="td-num"><strong>8.8 ms</strong> <small class="text-muted">/ 9.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_045_Q45_cross_encoder_candidate_generation.html" class="action-btn">Deep Dive →</a>
@@ -1616,7 +1794,7 @@
                 <div class="task-subdesc">As companies evolve, the meaning of terms like &#x27;security&#x27; or &#x27;remote work&#x27; shifts. Trackin...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>1152.0 ms</strong> <small class="text-muted">/ 1126.3 ms</small></td>
+            <td class="td-num"><strong>2053.6 ms</strong> <small class="text-muted">/ 2051.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_046_Q46_temporal_embedding_drift.html" class="action-btn">Deep Dive →</a>
@@ -1633,7 +1811,7 @@
                 <div class="task-subdesc">In massive enterprise catalogs, searching 100 million items is accelerated by first matchi...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>0.4 ms</strong> <small class="text-muted">/ 0.4 ms</small></td>
+            <td class="td-num"><strong>1.7 ms</strong> <small class="text-muted">/ 1.7 ms</small></td>
             <td class="td-num"><strong>1,000,002 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_047_Q47_hierarchical_vector_coarse_fine.html" class="action-btn">Deep Dive →</a>
@@ -1650,7 +1828,7 @@
                 <div class="task-subdesc">To compress embeddings from 32-bit floats to 8-bit integers, engineers evaluate the recons...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>60.2 ms</strong> <small class="text-muted">/ 51.9 ms</small></td>
+            <td class="td-num"><strong>35.2 ms</strong> <small class="text-muted">/ 33.4 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(26.7 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_048_Q48_vector_quantization_distortion.html" class="action-btn">Deep Dive →</a>
@@ -1667,7 +1845,7 @@
                 <div class="task-subdesc">Instead of training a BERT classifier, user query vectors are compared against pre-compute...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>834.0 ms</strong> <small class="text-muted">/ 834.2 ms</small></td>
+            <td class="td-num"><strong>418.6 ms</strong> <small class="text-muted">/ 415.7 ms</small></td>
             <td class="td-num"><strong>1,000,002 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_049_Q49_prototype_intent_classification.html" class="action-btn">Deep Dive →</a>
@@ -1684,7 +1862,7 @@
                 <div class="task-subdesc">Exposes silent data loss caused by SQL three-valued logic when models use NOT IN over subq...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Three-Valued Logic in Anti-Joins</span></td>
-            <td class="td-num"><strong>44.7 ms</strong> <small class="text-muted">/ 48.5 ms</small></td>
+            <td class="td-num"><strong>35.1 ms</strong> <small class="text-muted">/ 36.6 ms</small></td>
             <td class="td-num"><strong>3,000,000 rows</strong> <small class="text-muted">(45.8 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_04_three_valued_logic.html" class="action-btn">Deep Dive →</a>
@@ -1701,7 +1879,7 @@
                 <div class="task-subdesc">In embedding model evaluation, high-quality models satisfy the triplet condition: distance...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Embeddings</span></td>
-            <td class="td-num"><strong>201.6 ms</strong> <small class="text-muted">/ 198.8 ms</small></td>
+            <td class="td-num"><strong>142.0 ms</strong> <small class="text-muted">/ 139.3 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(26.7 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_050_Q50_contrastive_triplet_loss_evaluation.html" class="action-btn">Deep Dive →</a>
@@ -1718,8 +1896,8 @@
                 <div class="task-subdesc">Traditional databases use simple `LIKE &#x27;%search%&#x27;` which treats 1 mention the same as 10 m...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>54.7 ms</strong> <small class="text-muted">/ 55.8 ms</small></td>
-            <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(42.0 MiB)</small></td>
+            <td class="td-num"><strong>0.3 ms</strong> <small class="text-muted">/ 0.3 ms</small></td>
+            <td class="td-num"><strong>0 rows</strong> <small class="text-muted">(0 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_051_Q51_fts_bm25_lexical_search.html" class="action-btn">Deep Dive →</a>
             </td>
@@ -1735,7 +1913,7 @@
                 <div class="task-subdesc">Hybrid search combines sparse keyword search (great for exact names and acronyms) with den...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>515.6 ms</strong> <small class="text-muted">/ 508.5 ms</small></td>
+            <td class="td-num"><strong>344.1 ms</strong> <small class="text-muted">/ 312.3 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_052_Q52_reciprocal_rank_fusion_rrf.html" class="action-btn">Deep Dive →</a>
@@ -1752,7 +1930,7 @@
                 <div class="task-subdesc">An alternative to rank-based RRF is score-based fusion: min-max scale lexical scores to [0...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>338.8 ms</strong> <small class="text-muted">/ 329.9 ms</small></td>
+            <td class="td-num"><strong>255.2 ms</strong> <small class="text-muted">/ 262.9 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_053_Q53_min_max_convex_hybrid_search.html" class="action-btn">Deep Dive →</a>
@@ -1769,7 +1947,7 @@
                 <div class="task-subdesc">Users frequently misspell search terms (e.g. &#x27;postgre&#x27; -&gt; &#x27;postgresql&#x27;). Levenshtein dista...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>134.6 ms</strong> <small class="text-muted">/ 133.8 ms</small></td>
+            <td class="td-num"><strong>86.6 ms</strong> <small class="text-muted">/ 86.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_054_Q54_fuzzy_levenshtein_length_pruning.html" class="action-btn">Deep Dive →</a>
@@ -1786,7 +1964,7 @@
                 <div class="task-subdesc">In e-commerce, users often mistype the suffixes of brand names (&#x27;Samsumg&#x27; vs &#x27;Samsung&#x27;). J...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>0.7 ms</strong> <small class="text-muted">/ 0.5 ms</small></td>
+            <td class="td-num"><strong>1.6 ms</strong> <small class="text-muted">/ 1.3 ms</small></td>
             <td class="td-num"><strong>2,500 rows</strong> <small class="text-muted">(58.6 KiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_055_Q55_jaro_winkler_brand_search.html" class="action-btn">Deep Dive →</a>
@@ -1803,7 +1981,7 @@
                 <div class="task-subdesc">A match in a document title or product headline is far more indicative of relevance than a...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>197.3 ms</strong> <small class="text-muted">/ 200.4 ms</small></td>
+            <td class="td-num"><strong>298.6 ms</strong> <small class="text-muted">/ 291.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(42.0 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_056_Q56_multi_field_weighted_scoring.html" class="action-btn">Deep Dive →</a>
@@ -1820,7 +1998,7 @@
                 <div class="task-subdesc">If a user searches for &#x27;machine learning&#x27;, an article containing the exact phrase &#x27;machine...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>195.9 ms</strong> <small class="text-muted">/ 186.1 ms</small></td>
+            <td class="td-num"><strong>276.4 ms</strong> <small class="text-muted">/ 266.4 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_057_Q57_exact_phrase_proximity_boost.html" class="action-btn">Deep Dive →</a>
@@ -1837,7 +2015,7 @@
                 <div class="task-subdesc">Search queries like &#x27;what is the best laptop&#x27; contain stop words (&#x27;what&#x27;, &#x27;is&#x27;, &#x27;the&#x27;) tha...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>11.0 ms</strong> <small class="text-muted">/ 14.3 ms</small></td>
+            <td class="td-num"><strong>8.6 ms</strong> <small class="text-muted">/ 8.6 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(19.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_058_Q58_stopword_cleansing_normalization.html" class="action-btn">Deep Dive →</a>
@@ -1854,7 +2032,7 @@
                 <div class="task-subdesc">When a customer searches for &#x27;laptops&#x27;, e-commerce search engines return matching items al...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>15.0 ms</strong> <small class="text-muted">/ 12.7 ms</small></td>
+            <td class="td-num"><strong>18.9 ms</strong> <small class="text-muted">/ 14.6 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_059_Q59_faceted_search_json_attributes.html" class="action-btn">Deep Dive →</a>
@@ -1871,7 +2049,7 @@
                 <div class="task-subdesc">Tests window frame boundary specification (ROWS vs default RANGE) on duplicate timestamp o...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Window Frame Default Bounds</span></td>
-            <td class="td-num"><strong>157.0 ms</strong> <small class="text-muted">/ 137.6 ms</small></td>
+            <td class="td-num"><strong>102.5 ms</strong> <small class="text-muted">/ 98.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_05_window_frame_bounds.html" class="action-btn">Deep Dive →</a>
@@ -1888,7 +2066,7 @@
                 <div class="task-subdesc">In observability platforms (Datadog, Splunk), engineers search stack traces with partial e...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>252.7 ms</strong> <small class="text-muted">/ 233.8 ms</small></td>
+            <td class="td-num"><strong>177.1 ms</strong> <small class="text-muted">/ 177.8 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_060_Q60_ngram_log_signature_search.html" class="action-btn">Deep Dive →</a>
@@ -1905,7 +2083,7 @@
                 <div class="task-subdesc">When a customer searches for &#x27;sofa&#x27;, they also expect to see listings titled &#x27;couch&#x27; or &#x27;s...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>211.8 ms</strong> <small class="text-muted">/ 229.0 ms</small></td>
+            <td class="td-num"><strong>266.5 ms</strong> <small class="text-muted">/ 268.6 ms</small></td>
             <td class="td-num"><strong>1,000,003 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_061_Q61_synonym_expansion_reranking.html" class="action-btn">Deep Dive →</a>
@@ -1922,7 +2100,7 @@
                 <div class="task-subdesc">As users type &#x27;air...&#x27;, instant search suggests &#x27;air fryer&#x27; (100k searches) before &#x27;air ma...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>9.0 ms</strong> <small class="text-muted">/ 8.1 ms</small></td>
+            <td class="td-num"><strong>7.8 ms</strong> <small class="text-muted">/ 8.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_062_Q62_autocomplete_prefix_popularity.html" class="action-btn">Deep Dive →</a>
@@ -1939,7 +2117,7 @@
                 <div class="task-subdesc">Legal e-discovery and patent search rely on exact Boolean syntax: (patent AND battery) NOT...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>85.9 ms</strong> <small class="text-muted">/ 93.8 ms</small></td>
+            <td class="td-num"><strong>201.4 ms</strong> <small class="text-muted">/ 195.9 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_063_Q63_boolean_search_negation.html" class="action-btn">Deep Dive →</a>
@@ -1956,7 +2134,7 @@
                 <div class="task-subdesc">TF-IDF is the foundational algorithm of information retrieval. Calculating it directly in ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>173.6 ms</strong> <small class="text-muted">/ 195.9 ms</small></td>
+            <td class="td-num"><strong>121.5 ms</strong> <small class="text-muted">/ 121.6 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(26.7 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_064_Q64_pure_sql_tfidf_calculation.html" class="action-btn">Deep Dive →</a>
@@ -1973,7 +2151,7 @@
                 <div class="task-subdesc">Users are far more likely to click the #1 search result than the #5 result regardless of r...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>43.1 ms</strong> <small class="text-muted">/ 43.5 ms</small></td>
+            <td class="td-num"><strong>33.0 ms</strong> <small class="text-muted">/ 58.9 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_065_Q65_search_position_bias_dcg.html" class="action-btn">Deep Dive →</a>
@@ -1990,7 +2168,7 @@
                 <div class="task-subdesc">Customers search for model numbers in messy formats: &#x27;wh-1000xm5&#x27;, &#x27;WH1000-XM5&#x27;, &#x27;wh 1000 ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>322.0 ms</strong> <small class="text-muted">/ 325.5 ms</small></td>
+            <td class="td-num"><strong>528.6 ms</strong> <small class="text-muted">/ 524.9 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(42.0 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_066_Q66_alphanumeric_sku_normalization.html" class="action-btn">Deep Dive →</a>
@@ -2007,7 +2185,7 @@
                 <div class="task-subdesc">A user searches &#x27;monitor -curved&#x27; to find flat computer monitors. The engine must extract ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>172.5 ms</strong> <small class="text-muted">/ 130.6 ms</small></td>
+            <td class="td-num"><strong>125.1 ms</strong> <small class="text-muted">/ 142.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(42.0 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_067_Q67_search_negation_term_suppression.html" class="action-btn">Deep Dive →</a>
@@ -2024,7 +2202,7 @@
                 <div class="task-subdesc">Global portals store titles in multiple localized columns (title_en, title_es, title_fr). ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>118.2 ms</strong> <small class="text-muted">/ 121.2 ms</small></td>
+            <td class="td-num"><strong>103.3 ms</strong> <small class="text-muted">/ 99.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(61.0 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_068_Q68_multilingual_search_routing.html" class="action-btn">Deep Dive →</a>
@@ -2041,7 +2219,7 @@
                 <div class="task-subdesc">If a multi-word search query (e.g. &#x27;ergonomic mechanical wireless split keyboard&#x27;) returns...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>262.5 ms</strong> <small class="text-muted">/ 245.2 ms</small></td>
+            <td class="td-num"><strong>247.6 ms</strong> <small class="text-muted">/ 243.7 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_069_Q69_query_relaxation_fallback.html" class="action-btn">Deep Dive →</a>
@@ -2058,7 +2236,7 @@
                 <div class="task-subdesc">Calculates user conversion through a multi-step sequence where events must strictly obey c...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Strict Funnel Precedence</span></td>
-            <td class="td-num"><strong>43.9 ms</strong> <small class="text-muted">/ 71.4 ms</small></td>
+            <td class="td-num"><strong>27.3 ms</strong> <small class="text-muted">/ 39.8 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(34.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_06_funnel_precedence.html" class="action-btn">Deep Dive →</a>
@@ -2075,7 +2253,7 @@
                 <div class="task-subdesc">Search results show a preview snippet containing the searched keyword with 30 characters o...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>152.3 ms</strong> <small class="text-muted">/ 158.2 ms</small></td>
+            <td class="td-num"><strong>468.5 ms</strong> <small class="text-muted">/ 453.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_070_Q70_search_snippet_keyword_extraction.html" class="action-btn">Deep Dive →</a>
@@ -2092,7 +2270,7 @@
                 <div class="task-subdesc">E-commerce search product managers need to know which search queries drove actual revenue....</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>247.9 ms</strong> <small class="text-muted">/ 227.3 ms</small></td>
+            <td class="td-num"><strong>149.8 ms</strong> <small class="text-muted">/ 144.5 ms</small></td>
             <td class="td-num"><strong>2,000,000 rows</strong> <small class="text-muted">(61.0 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_071_Q71_search_journey_order_attribution.html" class="action-btn">Deep Dive →</a>
@@ -2109,7 +2287,7 @@
                 <div class="task-subdesc">Merging CRM and billing databases requires linking customers with slight name and address ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>2891.3 ms</strong> <small class="text-muted">/ 2907.3 ms</small></td>
+            <td class="td-num"><strong>1913.4 ms</strong> <small class="text-muted">/ 1916.1 ms</small></td>
             <td class="td-num"><strong>5,000 rows</strong> <small class="text-muted">(214.8 KiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_072_Q72_fuzzy_entity_resolution_dedup.html" class="action-btn">Deep Dive →</a>
@@ -2126,7 +2304,7 @@
                 <div class="task-subdesc">To suggest related searches, engines analyze queries searched together in the same session...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>0.9 ms</strong> <small class="text-muted">/ 0.9 ms</small></td>
+            <td class="td-num"><strong>1.7 ms</strong> <small class="text-muted">/ 1.7 ms</small></td>
             <td class="td-num"><strong>2,500 rows</strong> <small class="text-muted">(58.6 KiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_073_Q73_search_term_cooccurrence_matrix.html" class="action-btn">Deep Dive →</a>
@@ -2143,7 +2321,7 @@
                 <div class="task-subdesc">When a query produces few results, search engines recommend a spell-corrected candidate wo...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>98.1 ms</strong> <small class="text-muted">/ 82.6 ms</small></td>
+            <td class="td-num"><strong>64.6 ms</strong> <small class="text-muted">/ 68.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_074_Q74_did_you_mean_spell_suggestion.html" class="action-btn">Deep Dive →</a>
@@ -2160,7 +2338,7 @@
                 <div class="task-subdesc">Top marketplaces enforce strict hard filters (in-stock, prime shipping) while soft-boostin...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>135.8 ms</strong> <small class="text-muted">/ 139.1 ms</small></td>
+            <td class="td-num"><strong>117.5 ms</strong> <small class="text-muted">/ 112.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(50.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_075_Q75_hybrid_search_metadata_soft_boost.html" class="action-btn">Deep Dive →</a>
@@ -2177,7 +2355,7 @@
                 <div class="task-subdesc">Manufacturing an electric vehicle requires thousands of nested parts (Car -&gt; Battery Pack ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.8 ms</strong> <small class="text-muted">/ 0.8 ms</small></td>
+            <td class="td-num"><strong>2.1 ms</strong> <small class="text-muted">/ 2.1 ms</small></td>
             <td class="td-num"><strong>4 rows</strong> <small class="text-muted">(240 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_076_Q76_bill_of_materials_recursive_rollup.html" class="action-btn">Deep Dive →</a>
@@ -2194,7 +2372,7 @@
                 <div class="task-subdesc">HR analytics measures how deep the management chain is from the CEO to individual contribu...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.9 ms</strong> <small class="text-muted">/ 0.9 ms</small></td>
+            <td class="td-num"><strong>2.5 ms</strong> <small class="text-muted">/ 2.7 ms</small></td>
             <td class="td-num"><strong>5 rows</strong> <small class="text-muted">(140 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_077_Q77_org_hierarchy_span_of_control.html" class="action-btn">Deep Dive →</a>
@@ -2211,7 +2389,7 @@
                 <div class="task-subdesc">Financial fraudsters create hundreds of fake accounts linked by shared credit cards, devic...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>1.8 ms</strong> <small class="text-muted">/ 1.5 ms</small></td>
+            <td class="td-num"><strong>2.5 ms</strong> <small class="text-muted">/ 2.4 ms</small></td>
             <td class="td-num"><strong>4 rows</strong> <small class="text-muted">(32 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_078_Q78_transitive_fraud_sybil_ring.html" class="action-btn">Deep Dive →</a>
@@ -2228,7 +2406,7 @@
                 <div class="task-subdesc">In build systems (e.g. Webpack, Bazel) or task scheduling, circular dependencies (Task A -...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.7 ms</strong> <small class="text-muted">/ 0.6 ms</small></td>
+            <td class="td-num"><strong>1.8 ms</strong> <small class="text-muted">/ 1.8 ms</small></td>
             <td class="td-num"><strong>3 rows</strong> <small class="text-muted">(120 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_079_Q79_graph_cycle_detection_visited_array.html" class="action-btn">Deep Dive →</a>
@@ -2245,7 +2423,7 @@
                 <div class="task-subdesc">Tests whether models leverage native SQL range window frames over non-equi self-joins that...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Quadratic Self-Joins vs Range Windows</span></td>
-            <td class="td-num"><strong>2.8 ms</strong> <small class="text-muted">/ 2.8 ms</small></td>
+            <td class="td-num"><strong>3.1 ms</strong> <small class="text-muted">/ 3.1 ms</small></td>
             <td class="td-num"><strong>2,500 rows</strong> <small class="text-muted">(48.8 KiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_07_quadratic_self_join.html" class="action-btn">Deep Dive →</a>
@@ -2262,7 +2440,7 @@
                 <div class="task-subdesc">Supply chain networks ship containers through intermediary freight hubs. Finding the cheap...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.8 ms</strong> <small class="text-muted">/ 1.0 ms</small></td>
+            <td class="td-num"><strong>2.0 ms</strong> <small class="text-muted">/ 2.0 ms</small></td>
             <td class="td-num"><strong>4 rows</strong> <small class="text-muted">(192 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_080_Q80_logistics_shortest_path_routing.html" class="action-btn">Deep Dive →</a>
@@ -2279,7 +2457,7 @@
                 <div class="task-subdesc">When a user checkout fails, it could be caused by payments, auth, database, or network. Tr...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.8 ms</strong> <small class="text-muted">/ 0.9 ms</small></td>
+            <td class="td-num"><strong>2.5 ms</strong> <small class="text-muted">/ 2.4 ms</small></td>
             <td class="td-num"><strong>7 rows</strong> <small class="text-muted">(312 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_081_Q81_incident_root_cause_dependency_chain.html" class="action-btn">Deep Dive →</a>
@@ -2296,7 +2474,7 @@
                 <div class="task-subdesc">Graph connected components partition isolated clusters of customers or machines. Propagati...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>2.0 ms</strong> <small class="text-muted">/ 1.6 ms</small></td>
+            <td class="td-num"><strong>3.3 ms</strong> <small class="text-muted">/ 3.4 ms</small></td>
             <td class="td-num"><strong>3 rows</strong> <small class="text-muted">(24 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_082_Q82_connected_components_community_labeling.html" class="action-btn">Deep Dive →</a>
@@ -2313,7 +2491,7 @@
                 <div class="task-subdesc">Social network influence and API hub criticality are determined by node in-degree centrali...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.3 ms</strong> <small class="text-muted">/ 0.2 ms</small></td>
+            <td class="td-num"><strong>1.4 ms</strong> <small class="text-muted">/ 1.3 ms</small></td>
             <td class="td-num"><strong>7 rows</strong> <small class="text-muted">(56 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_083_Q83_degree_centrality_pagerank_step.html" class="action-btn">Deep Dive →</a>
@@ -2330,7 +2508,7 @@
                 <div class="task-subdesc">Project managers identify the &#x27;Critical Path&#x27;—the longest sequence of dependent tasks that...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.9 ms</strong> <small class="text-muted">/ 0.7 ms</small></td>
+            <td class="td-num"><strong>2.4 ms</strong> <small class="text-muted">/ 2.2 ms</small></td>
             <td class="td-num"><strong>5 rows</strong> <small class="text-muted">(220 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_084_Q84_critical_path_method_scheduling.html" class="action-btn">Deep Dive →</a>
@@ -2347,7 +2525,7 @@
                 <div class="task-subdesc">Affiliate programs reward referrals up to 3 tiers deep (Direct referrer gets 10%, Tier 2 g...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>1.0 ms</strong> <small class="text-muted">/ 0.9 ms</small></td>
+            <td class="td-num"><strong>2.1 ms</strong> <small class="text-muted">/ 2.3 ms</small></td>
             <td class="td-num"><strong>4 rows</strong> <small class="text-muted">(48 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_085_Q85_multilevel_referral_commissions.html" class="action-btn">Deep Dive →</a>
@@ -2364,7 +2542,7 @@
                 <div class="task-subdesc">Cloud infrastructure (e.g. shared Kubernetes cluster) is co-owned by multiple products wit...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.2 ms</strong> <small class="text-muted">/ 0.2 ms</small></td>
+            <td class="td-num"><strong>1.3 ms</strong> <small class="text-muted">/ 1.2 ms</small></td>
             <td class="td-num"><strong>3 rows</strong> <small class="text-muted">(132 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_086_Q86_multiparent_allocation_cost_rollup.html" class="action-btn">Deep Dive →</a>
@@ -2381,7 +2559,7 @@
                 <div class="task-subdesc">High-frequency FX trading bots scan for triangular arbitrage where converting USD -&gt; EUR -...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.3 ms</strong> <small class="text-muted">/ 0.3 ms</small></td>
+            <td class="td-num"><strong>1.8 ms</strong> <small class="text-muted">/ 1.8 ms</small></td>
             <td class="td-num"><strong>3 rows</strong> <small class="text-muted">(144 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_087_Q87_circular_fx_arbitrage_triangle.html" class="action-btn">Deep Dive →</a>
@@ -2398,7 +2576,7 @@
                 <div class="task-subdesc">Financial compliance requires payment transactions to strictly follow the state sequence: ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>0.7 ms</strong> <small class="text-muted">/ 0.5 ms</small></td>
+            <td class="td-num"><strong>1.6 ms</strong> <small class="text-muted">/ 1.6 ms</small></td>
             <td class="td-num"><strong>5 rows</strong> <small class="text-muted">(140 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_088_Q88_state_machine_transition_verification.html" class="action-btn">Deep Dive →</a>
@@ -2415,7 +2593,7 @@
                 <div class="task-subdesc">When an order has multiple discounts AND multiple shipment records, joining both child tab...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>127.4 ms</strong> <small class="text-muted">/ 133.5 ms</small></td>
+            <td class="td-num"><strong>159.5 ms</strong> <small class="text-muted">/ 151.3 ms</small></td>
             <td class="td-num"><strong>1,002,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_089_Q89_chasm_trap_fanout_resolution.html" class="action-btn">Deep Dive →</a>
@@ -2432,7 +2610,7 @@
                 <div class="task-subdesc">Tests SARGable timestamp filtering and strict month boundary conditions, preventing full-s...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Non-SARGable Partition Pruning</span></td>
-            <td class="td-num"><strong>0.5 ms</strong> <small class="text-muted">/ 0.4 ms</small></td>
+            <td class="td-num"><strong>1.0 ms</strong> <small class="text-muted">/ 1.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(53.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_08_sargable_pruning.html" class="action-btn">Deep Dive →</a>
@@ -2449,7 +2627,7 @@
                 <div class="task-subdesc">Marketing queries to find active customers who have not churned often use `WHERE id NOT IN...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>52.5 ms</strong> <small class="text-muted">/ 49.7 ms</small></td>
+            <td class="td-num"><strong>54.5 ms</strong> <small class="text-muted">/ 49.2 ms</small></td>
             <td class="td-num"><strong>2,000,000 rows</strong> <small class="text-muted">(26.7 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_090_Q90_three_valued_logic_safe_anti_join.html" class="action-btn">Deep Dive →</a>
@@ -2466,7 +2644,7 @@
                 <div class="task-subdesc">Financial reporting requires transforming normalized long-form transaction rows into cross...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>19.7 ms</strong> <small class="text-muted">/ 27.1 ms</small></td>
+            <td class="td-num"><strong>15.4 ms</strong> <small class="text-muted">/ 24.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(53.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_091_Q91_dynamic_pivot_monthly_revenue.html" class="action-btn">Deep Dive →</a>
@@ -2483,7 +2661,7 @@
                 <div class="task-subdesc">Legacy data or spreadsheet exports often arrive with metric names as column headers (cpu, ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>785.0 ms</strong> <small class="text-muted">/ 739.9 ms</small></td>
+            <td class="td-num"><strong>566.6 ms</strong> <small class="text-muted">/ 557.2 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(45.8 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_092_Q92_dynamic_unpivot_wide_metrics.html" class="action-btn">Deep Dive →</a>
@@ -2500,7 +2678,7 @@
                 <div class="task-subdesc">Modern analytical warehouses store nested array payloads (e.g. array of discount percentag...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>1554.3 ms</strong> <small class="text-muted">/ 1607.7 ms</small></td>
+            <td class="td-num"><strong>2919.4 ms</strong> <small class="text-muted">/ 2940.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(15.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_093_Q93_list_lambdas_nested_json_arrays.html" class="action-btn">Deep Dive →</a>
@@ -2517,7 +2695,7 @@
                 <div class="task-subdesc">Traditional standard deviation Z-scores fail in the presence of extreme outliers because t...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>241.7 ms</strong> <small class="text-muted">/ 239.8 ms</small></td>
+            <td class="td-num"><strong>206.1 ms</strong> <small class="text-muted">/ 198.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_094_Q94_median_absolute_deviation_mad.html" class="action-btn">Deep Dive →</a>
@@ -2534,7 +2712,7 @@
                 <div class="task-subdesc">Standardizing skewed metrics (like API response latency) for machine learning feature pipe...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>129.8 ms</strong> <small class="text-muted">/ 132.2 ms</small></td>
+            <td class="td-num"><strong>129.1 ms</strong> <small class="text-muted">/ 133.7 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_095_Q95_robust_z_score_iqr_normalization.html" class="action-btn">Deep Dive →</a>
@@ -2551,7 +2729,7 @@
                 <div class="task-subdesc">In financial auditing, understanding the exact behavioral difference between `ROWS BETWEEN...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>178.3 ms</strong> <small class="text-muted">/ 164.9 ms</small></td>
+            <td class="td-num"><strong>123.8 ms</strong> <small class="text-muted">/ 122.2 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_096_Q96_window_frame_range_vs_rows_ties.html" class="action-btn">Deep Dive →</a>
@@ -2568,7 +2746,7 @@
                 <div class="task-subdesc">When filtering analytical partitions for a calendar month, `BETWEEN &#x27;2026-01-01&#x27; AND &#x27;2026...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>0.1 ms</strong> <small class="text-muted">/ 0.1 ms</small></td>
+            <td class="td-num"><strong>0.9 ms</strong> <small class="text-muted">/ 0.9 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_097_Q97_sargable_date_boundary_pruning.html" class="action-btn">Deep Dive →</a>
@@ -2585,7 +2763,7 @@
                 <div class="task-subdesc">When comparing sales across product categories or dates, analysts want to compute the aver...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>304.3 ms</strong> <small class="text-muted">/ 287.2 ms</small></td>
+            <td class="td-num"><strong>215.4 ms</strong> <small class="text-muted">/ 223.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(30.5 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_098_Q98_window_exclude_group_moving_peer.html" class="action-btn">Deep Dive →</a>
@@ -2602,7 +2780,7 @@
                 <div class="task-subdesc">In financial ranking, when multiple entities have the exact same score, evaluating cumulat...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>98.7 ms</strong> <small class="text-muted">/ 109.1 ms</small></td>
+            <td class="td-num"><strong>78.1 ms</strong> <small class="text-muted">/ 76.8 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(7.6 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_099_Q99_window_exclude_ties_duplicate_handling.html" class="action-btn">Deep Dive →</a>
@@ -2619,7 +2797,7 @@
                 <div class="task-subdesc">Data miners discover product affinities (&#x27;Customers who buy Item A also buy Item B&#x27;) using...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>113.7 ms</strong> <small class="text-muted">/ 112.4 ms</small></td>
+            <td class="td-num"><strong>77.0 ms</strong> <small class="text-muted">/ 76.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_100_Q100_market_basket_association_rules.html" class="action-btn">Deep Dive →</a>
@@ -2636,7 +2814,7 @@
                 <div class="task-subdesc">Actuarial and SaaS subscription models estimate the probability of customer survival past ...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>5.1 ms</strong> <small class="text-muted">/ 8.0 ms</small></td>
+            <td class="td-num"><strong>2.6 ms</strong> <small class="text-muted">/ 2.7 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(8.6 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_101_Q101_kaplan_meier_churn_survival.html" class="action-btn">Deep Dive →</a>
@@ -2653,7 +2831,7 @@
                 <div class="task-subdesc">Creating balanced feature histograms for ML requires equal-depth binning (each bucket cont...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>47.9 ms</strong> <small class="text-muted">/ 52.3 ms</small></td>
+            <td class="td-num"><strong>35.9 ms</strong> <small class="text-muted">/ 36.5 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(19.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_102_Q102_equi_depth_dynamic_binning_ntile.html" class="action-btn">Deep Dive →</a>
@@ -2670,7 +2848,7 @@
                 <div class="task-subdesc">Calculates rolling 7-day distinct active users per calendar day. SQL window functions forb...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Algorithmic Efficiency / Window Distinct</span></td>
-            <td class="td-num"><strong>658.7 ms</strong> <small class="text-muted">/ 386.9 ms</small></td>
+            <td class="td-num"><strong>378.0 ms</strong> <small class="text-muted">/ 159.3 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(7.6 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_111_rolling_distinct_active_users.html" class="action-btn">Deep Dive →</a>
@@ -2687,7 +2865,7 @@
                 <div class="task-subdesc">Groups web clickstream events into sessions. A new session starts if: 1) more than 30 minu...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Sessionization (Gaps &amp; Islands)</span></td>
-            <td class="td-num"><strong>194.5 ms</strong> <small class="text-muted">/ 225.8 ms</small></td>
+            <td class="td-num"><strong>422.0 ms</strong> <small class="text-muted">/ 153.8 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(11.4 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_112_dual_constraint_sessionization.html" class="action-btn">Deep Dive →</a>
@@ -2704,7 +2882,7 @@
                 <div class="task-subdesc">Demonstrates the classic vector database failure mode where applying relational metadata f...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Vector &amp; Retrieval</span></td>
-            <td class="td-num"><strong>12.6 ms</strong> <small class="text-muted">/ 13.9 ms</small></td>
+            <td class="td-num"><strong>7.0 ms</strong> <small class="text-muted">/ 10.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(46.7 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_113_vector_prefilter_recall_drop.html" class="action-btn">Deep Dive →</a>
@@ -2721,7 +2899,7 @@
                 <div class="task-subdesc">Matches executed trades with the prevailing market quote as-of the trade timestamp, but en...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>352.6 ms</strong> <small class="text-muted">/ 319.3 ms</small></td>
+            <td class="td-num"><strong>234.2 ms</strong> <small class="text-muted">/ 238.4 ms</small></td>
             <td class="td-num"><strong>2,000,000 rows</strong> <small class="text-muted">(76.3 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_114_asof_tolerance_expiry.html" class="action-btn">Deep Dive →</a>
@@ -2738,7 +2916,7 @@
                 <div class="task-subdesc">Fuses BM25 keyword rankings and vector cosine similarity rankings using rank-based Recipro...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Search &amp; Retrieval</span></td>
-            <td class="td-num"><strong>546.1 ms</strong> <small class="text-muted">/ 518.7 ms</small></td>
+            <td class="td-num"><strong>373.0 ms</strong> <small class="text-muted">/ 369.1 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(38.1 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_115_rrf_hybrid_rank_fusion_isolation.html" class="action-btn">Deep Dive →</a>
@@ -2755,7 +2933,7 @@
                 <div class="task-subdesc">Traverses downstream dependencies in a directed acyclic graph that contains an intentional...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Graph &amp; Hierarchy</span></td>
-            <td class="td-num"><strong>1.0 ms</strong> <small class="text-muted">/ 0.9 ms</small></td>
+            <td class="td-num"><strong>2.3 ms</strong> <small class="text-muted">/ 2.3 ms</small></td>
             <td class="td-num"><strong>5 rows</strong> <small class="text-muted">(200 B)</small></td>
             <td class="td-action">
                 <a href="queries/task_116_graph_cycle_visited_protection.html" class="action-btn">Deep Dive →</a>
@@ -2772,7 +2950,7 @@
                 <div class="task-subdesc">Reconstructs historical corporate insurance coverage on an effective business date, as kno...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>0.1 ms</strong> <small class="text-muted">/ 0.1 ms</small></td>
+            <td class="td-num"><strong>1.1 ms</strong> <small class="text-muted">/ 1.0 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(45.8 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_117_bitemporal_retroactive_audit.html" class="action-btn">Deep Dive →</a>
@@ -2789,7 +2967,7 @@
                 <div class="task-subdesc">Calculates running account balance where REVERSAL records completely void specific prior t...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>103.4 ms</strong> <small class="text-muted">/ 101.0 ms</small></td>
+            <td class="td-num"><strong>86.6 ms</strong> <small class="text-muted">/ 91.2 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(45.8 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_118_reversal_interleaved_ledger.html" class="action-btn">Deep Dive →</a>
@@ -2806,7 +2984,7 @@
                 <div class="task-subdesc">Calculates exponential time-decay attribution across previous marketing touches (7-day hal...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Temporal &amp; Time-Series</span></td>
-            <td class="td-num"><strong>229.3 ms</strong> <small class="text-muted">/ 223.9 ms</small></td>
+            <td class="td-num"><strong>156.9 ms</strong> <small class="text-muted">/ 152.8 ms</small></td>
             <td class="td-num"><strong>2,000,000 rows</strong> <small class="text-muted">(64.8 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_119_multitouch_decay_attribution.html" class="action-btn">Deep Dive →</a>
@@ -2823,7 +3001,7 @@
                 <div class="task-subdesc">Calculates market basket association rule Lift for directional product pairs (A -&gt; B), cor...</div>
             </td>
             <td class="td-cat"><span class="domain-tag">Warehouse &amp; Statistical</span></td>
-            <td class="td-num"><strong>112.7 ms</strong> <small class="text-muted">/ 134.5 ms</small></td>
+            <td class="td-num"><strong>83.9 ms</strong> <small class="text-muted">/ 78.2 ms</small></td>
             <td class="td-num"><strong>1,000,000 rows</strong> <small class="text-muted">(22.9 MiB)</small></td>
             <td class="td-action">
                 <a href="queries/task_120_market_basket_lift_smoothing.html" class="action-btn">Deep Dive →</a>
@@ -2838,7 +3016,7 @@
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Built with DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Built with DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="script.js"></script>

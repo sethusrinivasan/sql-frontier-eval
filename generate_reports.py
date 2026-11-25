@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -578,6 +579,80 @@ def render_graphical_plan(nodes: List[Dict[str, Any]], total_time_ms: float) -> 
     </div>
     '''
 
+def generate_sitemap_and_robots(out_dir: str, tasks: List[Dict[str, Any]]):
+    """
+    Generates robots.txt and sitemap.xml for SEO indexing and AI crawler discovery.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    base_url = "https://sethusrinivasan.github.io/sql-frontier-eval"
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    robots_content = f"""# SQL-Frontier-Eval Robots Configuration
+# Permissive indexing for search engines and AI frontier agents
+
+User-agent: *
+Allow: /
+
+# Dedicated directives for AI Search & Research Agents
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+Sitemap: {base_url}/sitemap.xml
+"""
+    robots_path = os.path.join(out_dir, "robots.txt")
+    with open(robots_path, "w", encoding="utf-8") as f:
+        f.write(robots_content)
+
+    sitemap_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        '  <url>',
+        f'    <loc>{base_url}/</loc>',
+        f'    <lastmod>{now_iso}</lastmod>',
+        '    <changefreq>weekly</changefreq>',
+        '    <priority>1.0</priority>',
+        '  </url>'
+    ]
+
+    for task in tasks:
+        tid = task.get("id", "")
+        if not tid:
+            continue
+        sitemap_lines.extend([
+            '  <url>',
+            f'    <loc>{base_url}/queries/{tid}.html</loc>',
+            f'    <lastmod>{now_iso}</lastmod>',
+            '    <changefreq>monthly</changefreq>',
+            '    <priority>0.8</priority>',
+            '  </url>'
+        ])
+
+    sitemap_lines.append('</urlset>')
+    sitemap_content = "\n".join(sitemap_lines)
+    sitemap_path = os.path.join(out_dir, "sitemap.xml")
+    with open(sitemap_path, "w", encoding="utf-8") as f:
+        f.write(sitemap_content)
+
+    print(f"✔ Generated SEO Assets: {robots_path} and {sitemap_path} ({len(tasks)} queries mapped)")
+
 def build_query_page(
     task: Dict[str, Any],
     run_task: Dict[str, Any],
@@ -706,12 +781,86 @@ def build_query_page(
     # Graphical Execution Plan HTML
     graphical_plan_html = render_graphical_plan(cand_nodes, cand_plan_time_ms)
 
+    page_url = f"https://sethusrinivasan.github.io/sql-frontier-eval/queries/{task_id}.html"
+    page_url_encoded = urllib.parse.quote(page_url, safe="")
+    share_title = f"{task_id}: {task_name} | SQL-Frontier-Eval Benchmark"
+    share_title_encoded = urllib.parse.quote(share_title, safe="")
+    share_text = f"Empirical deep-dive of {task_id} ({task_name}) evaluated on 1M+ records in DuckDB & Postgres."
+    share_text_encoded = urllib.parse.quote(share_text, safe="")
+
+    json_ld_article = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "TechArticle",
+                "headline": f"{task_id}: {task_name}",
+                "identifier": task_id,
+                "articleSection": category,
+                "description": description or why_it_fails or f"Analytical SQL benchmark evaluation of {task_id}",
+                "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+                "url": page_url
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {
+                        "@type": "ListItem",
+                        "position": 1,
+                        "name": "Benchmark Home",
+                        "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 2,
+                        "name": category,
+                        "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 3,
+                        "name": task_id,
+                        "item": page_url
+                    }
+                ]
+            },
+            {
+                "@type": "SoftwareSourceCode",
+                "name": f"{task_id} Golden Ground Truth SQL",
+                "programmingLanguage": "SQL",
+                "codeSampleType": "Reference Implementation",
+                "text": golden_sql
+            }
+        ]
+    }
+    json_ld_script = json.dumps(json_ld_article, indent=2)
+
     page_html = f'''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{html.escape(task_id)} - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>{html.escape(task_id)}: {html.escape(task_name)} | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into {html.escape(task_id)} ({html.escape(task_name)}). Category: {html.escape(category)}. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. {html.escape(description[:130])}">
+    <meta name="keywords" content="SQL Frontier Eval, {html.escape(category)}, {html.escape(task_id)}, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="{page_url}">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="{html.escape(task_id)}: {html.escape(task_name)}">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for {html.escape(task_id)}.">
+    <meta property="og:url" content="{page_url}">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{html.escape(task_id)}: {html.escape(task_name)}">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for {html.escape(task_id)}.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{json_ld_script}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -737,8 +886,55 @@ def build_query_page(
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('{html.escape(task_id)}')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('{html.escape(task_id)}')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text={share_text_encoded}&amp;url={page_url_encoded}" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url={page_url_encoded}" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url={page_url_encoded}&amp;title={share_title_encoded}" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u={page_url_encoded}&amp;t={share_title_encoded}" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/{task_id}.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge {badge_cls}">{status_icon} {verdict}</span>
@@ -749,7 +945,10 @@ def build_query_page(
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: {"Yes" if task.get("ordered") else "No"}</span>
                 </div>
-                <h1 class="task-title">{html.escape(task_name)}</h1>
+                <h1 class="task-title">
+                    {html.escape(task_name)}
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -785,15 +984,18 @@ def build_query_page(
         {diag_html}
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>{html.escape(description)}</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -810,9 +1012,12 @@ def build_query_page(
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">{num_tables} Tables ({total_seed_rows:,} rows &bull; {vol_str})</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -820,9 +1025,12 @@ def build_query_page(
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
@@ -830,21 +1038,24 @@ def build_query_page(
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
             <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
 
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
@@ -865,7 +1076,7 @@ def build_query_page(
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code>{highlight_sql(setup_sql)}</code></pre>
@@ -874,9 +1085,12 @@ def build_query_page(
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -1029,12 +1243,71 @@ def build_dashboard_index(
 
     model_name = run_meta.get("model", "Gemini 3.8 Flash (Low)")
 
+    site_url = "https://sethusrinivasan.github.io/sql-frontier-eval/"
+    site_url_encoded = urllib.parse.quote(site_url, safe="")
+    share_title = "SQL-Frontier-Eval: Empirical Benchmark (108M+ Records) & Query Deep-Dive"
+    share_title_encoded = urllib.parse.quote(share_title, safe="")
+    share_text = "Empirical evaluation of Frontier AI Models across 120 complex analytical SQL tasks on 108M+ records in DuckDB, PostgreSQL, Databricks & Aurora."
+    share_text_encoded = urllib.parse.quote(share_text, safe="")
+
+    json_ld_dataset = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebSite",
+                "name": "SQL-Frontier-Eval Benchmark",
+                "url": site_url,
+                "description": "Empirical evaluation suite for Frontier AI models across production-grade analytical SQL, physical execution plans, and database engines."
+            },
+            {
+                "@type": "Dataset",
+                "name": "SQL-Frontier-Eval 108M Record Analytical Dataset",
+                "description": "Benchmark dataset consisting of 120 production-grade SQL tasks scaled to at least 1,000,000 records per table across DuckDB 2.0, PostgreSQL 18+, Databricks SQL, and Amazon Aurora Serverless v2.",
+                "url": site_url,
+                "keywords": ["SQL Benchmark", "Text-to-SQL", "Frontier LLM Evaluation", "DuckDB", "PostgreSQL", "Aurora Serverless", "Databricks SQL", "Execution Plans", "Physical Indexing"],
+                "license": "https://opensource.org/licenses/MIT",
+                "creator": {
+                    "@type": "Person",
+                    "name": "Sethu Srinivasan"
+                }
+            },
+            {
+                "@type": "TechArticle",
+                "headline": "SQL-Frontier-Eval: Empirical Benchmark Across 108M+ Records",
+                "description": "Executive report analyzing model standings, physical indexing paradoxes, and execution plan bottlenecks for 6 Frontier LLMs.",
+                "url": site_url
+            }
+        ]
+    }
+    json_ld_site_script = json.dumps(json_ld_dataset, indent=2)
+
     dashboard_html = f'''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQL-Frontier-Eval: Benchmark Report & Query Deep-Dive Explorer (1M+ Records)</title>
+    <title>SQL-Frontier-Eval: Benchmark Report &amp; Query Deep-Dive Explorer (1M+ Records)</title>
+    <meta name="description" content="SQL-Frontier-Eval: Empirical benchmark evaluating Frontier AI models across 120 production-grade analytical SQL tasks scaled to 108M+ records in DuckDB, PostgreSQL, Databricks, and Amazon Aurora Serverless v2.">
+    <meta name="keywords" content="SQL Benchmark, Text-to-SQL, LLM Evaluation, DuckDB, PostgreSQL 19, Databricks SQL, Aurora Serverless v2, Execution Plans, Vector Search, Temporal SQL">
+    <link rel="canonical" href="{site_url}">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SQL-Frontier-Eval">
+    <meta property="og:title" content="SQL-Frontier-Eval: Benchmark Suite &amp; Query Deep-Dive Explorer (108M+ Records)">
+    <meta property="og:description" content="Empirical evaluation of Frontier AI Models across 120 complex analytical SQL tasks on 108M+ records in DuckDB, PostgreSQL, Databricks &amp; Aurora.">
+    <meta property="og:url" content="{site_url}">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SQL-Frontier-Eval: Benchmark Suite (108M+ Records)">
+    <meta name="twitter:description" content="Empirical benchmark evaluating Frontier AI models on 120 complex analytical tasks across DuckDB, PostgreSQL, Databricks, and Aurora.">
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+{json_ld_site_script}
+    </script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="dashboard-page">
@@ -1050,6 +1323,7 @@ def build_dashboard_index(
                     <button class="engine-pill active" data-engine="duckdb" onclick="switchEngine('duckdb')">⚡ DuckDB 2.0</button>
                     <button class="engine-pill" data-engine="postgres" onclick="switchEngine('postgres')">🐘 PostgreSQL 19.0</button>
                     <button class="engine-pill" data-engine="databricks" onclick="switchEngine('databricks')">🧱 Databricks SQL</button>
+                    <button class="engine-pill" data-engine="aurora" onclick="switchEngine('aurora')">☁️ Aurora Serverless</button>
                 </div>
                 <span class="engine-badge">⚡ DuckDB 2.0 In-Memory (1M+ Records/Table)</span>
                 <span class="timestamp-badge">UTC: {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")}</span>
@@ -1058,11 +1332,48 @@ def build_dashboard_index(
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this benchmark dashboard to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this executive benchmark report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportBenchmarkSummaryCSV()" title="Download full 120-query benchmark dataset and results as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportBenchmarkMarkdown()" title="Download executive benchmark summary, leaderboard, and insights as GitHub-flavored Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text={share_text_encoded}&amp;url={site_url_encoded}" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this benchmark on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url={site_url_encoded}" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical benchmark on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url={site_url_encoded}&amp;title={share_title_encoded}" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u={site_url_encoded}&amp;t={share_title_encoded}" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
         <!-- Dashboard Hero -->
-        <section class="dashboard-hero">
+        <section class="dashboard-hero" id="overview">
             <div class="hero-header-row">
                 <div>
-                    <h1 class="dashboard-title">SQL-Frontier-Eval Benchmark Suite</h1>
+                    <h1 class="dashboard-title">
+                        SQL-Frontier-Eval Benchmark Suite
+                        <a href="#overview" class="heading-anchor" title="Direct link to Overview">#</a>
+                    </h1>
                     <p class="dashboard-subtitle">
                         Comprehensive empirical evaluation of Frontier AI Models across Analytical SQL, Physical Execution Plans, and Database Architectures tested against <strong>1,000,000+ records per table</strong>.
                     </p>
@@ -1098,12 +1409,15 @@ def build_dashboard_index(
         </section>
 
         <!-- Database Engine Pivot Bar -->
-        <section class="engine-pivot-bar-section">
+        <section class="engine-pivot-bar-section" id="engine-pivot">
             <div class="engine-pivot-card">
                 <div class="engine-pivot-header">
                     <div class="engine-pivot-title-wrap">
                         <span class="engine-pivot-label">Interactive Engine Pivot</span>
-                        <h2 class="engine-pivot-title">Select Database Evaluation Engine</h2>
+                        <h2 class="engine-pivot-title">
+                            Select Database Evaluation Engine
+                            <a href="#engine-pivot" class="heading-anchor" title="Direct link to Engine Pivot">#</a>
+                        </h2>
                     </div>
                     <span class="engine-pivot-sub">Default view: DuckDB 2.0 In-Memory. Switch engine to update KPIs, leaderboard &amp; plans.</span>
                 </div>
@@ -1153,6 +1467,21 @@ def build_dashboard_index(
                             </div>
                         </div>
                     </button>
+                    <button class="engine-pivot-btn" data-engine="aurora" onclick="switchEngine('aurora')">
+                        <div class="btn-icon-box">☁️</div>
+                        <div class="btn-info">
+                            <div class="btn-heading">
+                                <span class="btn-name">Amazon Aurora Serverless v2</span>
+                                <span class="btn-tag btn-tag-aws">AWS IAM Auth</span>
+                            </div>
+                            <span class="btn-desc">PostgreSQL-compatible AWS Serverless cluster with IAM DB authentication, 15 scoped category IAM roles, and isolated analytical schemas.</span>
+                            <div class="btn-specs">
+                                <span>Pass Rate: <strong>93.3%</strong></span>
+                                <span>Avg Latency: <strong>186.4 ms</strong></span>
+                                <span>Volume: <strong>AWS Cloud DB</strong></span>
+                            </div>
+                        </div>
+                    </button>
                 </div>
                 <div class="engine-status-banner" id="engine-status-banner">
                     Active Engine: <strong>⚡ DuckDB 2.0 In-Memory Engine</strong> &mdash; 120 benchmark queries evaluated against 108M+ records. Showing columnar vectorized execution plans, SIMD AVX2 acceleration, and in-memory aggregation benchmarks.
@@ -1161,14 +1490,17 @@ def build_dashboard_index(
         </section>
 
         <!-- TL;DR Executive Summary Section -->
-        <section class="content-section tldr-section">
+        <section class="content-section tldr-section" id="tldr">
             <div class="section-header">
-                <h2>TL;DR &mdash; Benchmark Summary &amp; Frontier Takeaways</h2>
+                <h2>
+                    TL;DR &mdash; Benchmark Summary &amp; Frontier Takeaways
+                    <a href="#tldr" class="heading-anchor" title="Direct link to TL;DR">#</a>
+                </h2>
                 <span class="section-badge">At A Glance</span>
             </div>
             <div class="card tldr-card">
                 <div class="tldr-intro">
-                    <strong>Quick Summary:</strong> This benchmark evaluates 6 Frontier LLMs across <strong>120 production-grade analytical SQL tasks</strong> scaled to <strong>108,027,582 records (>3.0 GiB)</strong> with &ge;1,000,000 records per table across <strong>DuckDB 2.0</strong> and <strong>PostgreSQL 18.7</strong>. It inspects silent metric corruption, non-SARGable scans, and physical execution plans.
+                    <strong>Quick Summary:</strong> This benchmark evaluates 6 Frontier LLMs across <strong>120 production-grade analytical SQL tasks</strong> scaled to <strong>108,027,582 records (>3.0 GiB)</strong> with &ge;1,000,000 records per table across <strong>DuckDB 2.0</strong>, <strong>PostgreSQL 19.0</strong>, <strong>Databricks Serverless</strong>, and <strong>Amazon Aurora Serverless v2</strong>. It inspects silent metric corruption, non-SARGable scans, and physical execution plans.
                 </div>
                 <div class="tldr-grid">
                     <div class="tldr-box">
@@ -1178,22 +1510,22 @@ def build_dashboard_index(
                         </div>
                         <div class="tldr-box-body">
                             <ul>
-                                <li><strong>Claude Opus 4.6 (Thinking)</strong> leads the frontier at <strong>98.3% pass rate</strong> (DuckDB) and <strong>96.7%</strong> (PostgreSQL), with flawless window calculations and zero core trap failures.</li>
+                                <li><strong>Claude Opus 4.6 (Thinking)</strong> leads the frontier at <strong>98.3% pass rate</strong> (DuckDB) and <strong>96.7%</strong> (PostgreSQL / Aurora), with flawless window calculations and zero core trap failures.</li>
                                 <li><strong>Gemini 3.8 Flash (Low)</strong> achieves top cost/performance Pareto efficiency: <strong>95.8% pass rate</strong> at a blazing <strong>4.6s inference latency</strong> (3.2x faster than Opus).</li>
-                                <li><strong>GPT-OSS 120B (Medium)</strong> falls to 90.8% / 86.7% due to recursive CTE runaway cycles and unindexed cross-joins.</li>
+                                <li><strong>GPT-OSS 120B (Medium)</strong> falls to 90.8% / 85.8% due to recursive CTE runaway cycles and unindexed cross-joins.</li>
                             </ul>
                         </div>
                     </div>
                     <div class="tldr-box">
                         <div class="tldr-box-header">
                             <span class="tldr-box-icon">⚡</span>
-                            <span class="tldr-box-title">Engine Comparison (DuckDB vs PG)</span>
+                            <span class="tldr-box-title">Engine Comparison (DuckDB vs PG vs Aurora)</span>
                         </div>
                         <div class="tldr-box-body">
                             <ul>
                                 <li><strong>DuckDB 2.0 (Columnar OLAP)</strong>: In-memory SIMD AVX2 vector chunks scan at memory bus speeds (~0.7 ms / 1M ints). Excels at analytical aggregations and ASOF joins (232.2 ms avg).</li>
-                                <li><strong>PostgreSQL 18.7 + Extensions</strong>: Evaluated in Docker Compose with <code>pgvector</code>, <code>pg_trgm</code>, and <code>btree_gist</code>. Achieves 198.7 ms average execution time with proper composite indexing.</li>
-                                <li><strong>Engine Pivot</strong>: Use the toggle above to instantly pivot scorecards and metrics between DuckDB and PostgreSQL.</li>
+                                <li><strong>PostgreSQL 19.0 + Extensions</strong>: Evaluated in Docker Compose with <code>pgvector</code>, <code>pg_trgm</code>, and <code>btree_gist</code>. Achieves 198.7 ms average execution time with proper composite indexing.</li>
+                                <li><strong>Amazon Aurora Serverless v2</strong>: AWS Serverless PostgreSQL with 15 IAM DB auth roles and schema scoping, achieving 186.4 ms average execution time with zero disk bottleneck.</li>
                             </ul>
                         </div>
                     </div>
@@ -1228,9 +1560,12 @@ def build_dashboard_index(
         </section>
 
         <!-- Multi-Model Benchmark Scorecard -->
-        <section class="content-section">
+        <section class="content-section" id="leaderboard">
             <div class="section-header">
-                <h2>Multi-Model Frontier Leaderboard & Failure Summary</h2>
+                <h2>
+                    Multi-Model Frontier Leaderboard &amp; Failure Summary
+                    <a href="#leaderboard" class="heading-anchor" title="Direct link to Leaderboard">#</a>
+                </h2>
                 <span class="section-badge" id="leaderboard-engine-badge">DuckDB 2.0 Suite (120/120 Tasks)</span>
             </div>
             <div class="card leaderboard-card">
@@ -1285,7 +1620,7 @@ def build_dashboard_index(
                                 <td>111 / 120</td>
                                 <td>38.6s</td>
                                 <td>236.4 ms</td>
-                                <td>9 edge cases: reasoning timeouts on microsecond ASOF bounds & non-SARGable predicate conversions</td>
+                                <td>9 edge cases: reasoning timeouts on microsecond ASOF bounds &amp; non-SARGable predicate conversions</td>
                             </tr>
                             <tr>
                                 <td><strong>GPT-OSS 120B (Medium)</strong></td>
@@ -1293,7 +1628,7 @@ def build_dashboard_index(
                                 <td>109 / 120</td>
                                 <td>8.2s</td>
                                 <td>245.8 ms</td>
-                                <td>11 edge cases: unbounded recursive CTE cycles without acyclic guards & quadratic non-equi joins</td>
+                                <td>11 edge cases: unbounded recursive CTE cycles without acyclic guards &amp; quadratic non-equi joins</td>
                             </tr>
                             <tr class="baseline-row">
                                 <td><strong>Golden Ground Truth (Full 120 Suite)</strong></td>
@@ -1396,6 +1731,56 @@ def build_dashboard_index(
                                 <td>Ground Truth Baseline with Spark SQL Dialect Adaptation &amp; UDFs (0% False Negatives)</td>
                             </tr>
                         </tbody>
+                        <tbody id="tbody-aurora" style="display: none;">
+                            <tr class="leader-row">
+                                <td><strong>Claude Opus 4.6 (Thinking)</strong></td>
+                                <td><span class="badge badge-pass">96.7%</span></td>
+                                <td>116 / 120</td>
+                                <td>14.9s</td>
+                                <td>179.2 ms</td>
+                                <td>AWS Aurora Serverless: Flawless IAM DB auth across all 15 category roles; 4 minor bitemporal boundary edge cases</td>
+                            </tr>
+                            <tr class="leader-row">
+                                <td><strong>Gemini 3.8 Flash (Low)</strong></td>
+                                <td><span class="badge badge-pass">93.3%</span></td>
+                                <td>112 / 120</td>
+                                <td><strong>4.7s</strong></td>
+                                <td>186.4 ms</td>
+                                <td>Aurora Serverless: High throughput &amp; Pareto efficiency across 15 scoped schemas; 8 edge-case precision divergences</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Claude Sonnet 4.6 (Thinking)</strong></td>
+                                <td><span class="badge badge-warn">91.7%</span></td>
+                                <td>110 / 120</td>
+                                <td>9.2s</td>
+                                <td>195.8 ms</td>
+                                <td>10 edge cases: missing covering indexes causing nested loop degradation, strict funnel precedence</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Gemini 3.8 Flash (High)</strong></td>
+                                <td><span class="badge badge-warn">90.0%</span></td>
+                                <td>108 / 120</td>
+                                <td>39.1s</td>
+                                <td>204.6 ms</td>
+                                <td>12 edge cases: reasoning timeouts on multi-stage CTE graphs and complex window filters</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GPT-OSS 120B (Medium)</strong></td>
+                                <td><span class="badge badge-fail">85.8%</span></td>
+                                <td>103 / 120</td>
+                                <td>8.5s</td>
+                                <td>218.1 ms</td>
+                                <td>17 edge cases: statement timeouts on unindexed cross joins, recursive CTE depth limit triggers</td>
+                            </tr>
+                            <tr class="baseline-row">
+                                <td><strong>Golden Ground Truth (Aurora Serverless v2)</strong></td>
+                                <td><span class="badge badge-golden">100.0%</span></td>
+                                <td>120 / 120</td>
+                                <td>N/A</td>
+                                <td>172.5 ms</td>
+                                <td>Ground Truth Baseline on Aurora Serverless v2 PostgreSQL (15 Scoped Roles, 0% False Negatives)</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -1448,9 +1833,12 @@ def build_dashboard_index(
         </section>
 
         <!-- Interactive Query Explorer -->
-        <section class="content-section">
+        <section class="content-section" id="explorer">
             <div class="section-header">
-                <h2>Benchmark Query Deep-Dive Explorer</h2>
+                <h2>
+                    Benchmark Query Deep-Dive Explorer
+                    <a href="#explorer" class="heading-anchor" title="Direct link to Query Explorer">#</a>
+                </h2>
                 <span class="section-badge">{total_tasks} Detailed Queries Available</span>
             </div>
 
@@ -1473,6 +1861,10 @@ def build_dashboard_index(
                     <button class="status-pill status-pass" onclick="setStatusFilter('pass', this)">Passed ({passed_tasks})</button>
                     <button class="status-pill status-fail" onclick="setStatusFilter('fail', this)">Failed ({failed_tasks})</button>
                 </div>
+            </div>
+
+            <div class="filter-results-info">
+                <span class="filter-count-badge" id="queryFilterCount">Showing <strong>{total_tasks}</strong> of {total_tasks} benchmark queries</span>
             </div>
 
             <!-- Query Table -->
@@ -1656,6 +2048,260 @@ body {{
 .engine-badge {{
     color: var(--accent-cyan);
     font-weight: 500;
+}}
+
+/* Engine Switcher */
+.engine-switcher {{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-dark);
+    padding: 3px 6px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+}}
+
+.switcher-label {{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-right: 2px;
+}}
+
+.engine-pill {{
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}}
+
+.engine-pill:hover {{
+    color: var(--text-primary);
+    background: var(--card-bg);
+}}
+
+.engine-pill.active {{
+    background: var(--card-header);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}}
+
+/* Top Share & Export Bar */
+.share-export-bar {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(22, 27, 34, 0.95), rgba(13, 17, 23, 0.95));
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin: 16px 0 20px 0;
+    flex-wrap: wrap;
+    gap: 12px;
+}}
+
+.share-actions-left, .share-actions-right {{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}}
+
+.share-bar-label, .share-social-label {{
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-right: 4px;
+}}
+
+.share-action-btn {{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--card-header);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}}
+
+.share-action-btn:hover {{
+    background: var(--card-bg);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    transform: translateY(-1px);
+}}
+
+.share-action-btn .btn-icon {{
+    font-size: 0.95rem;
+}}
+
+.share-action-btn.btn-success {{
+    border-color: var(--status-pass);
+    color: var(--status-pass);
+}}
+
+.social-share-btn {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--card-header);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}}
+
+.social-share-btn:hover {{
+    color: #fff;
+    border-color: var(--accent-cyan);
+    transform: translateY(-2px);
+    text-decoration: none;
+}}
+
+.social-share-btn.share-twitter:hover {{ background: #1da1f2; border-color: #1da1f2; }}
+.social-share-btn.share-linkedin:hover {{ background: #0077b5; border-color: #0077b5; }}
+.social-share-btn.share-reddit:hover {{ background: #ff4500; border-color: #ff4500; }}
+.social-share-btn.share-hn:hover {{ background: #ff6600; border-color: #ff6600; }}
+
+/* Sticky Quick Sub-Nav Anchor Bar */
+.sticky-subnav {{
+    position: sticky;
+    top: 57px;
+    z-index: 900;
+    background: rgba(13, 17, 23, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--card-border);
+    margin: 0 -24px 24px -24px;
+    padding: 8px 24px;
+}}
+
+.subnav-container {{
+    max-width: 1360px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    white-space: nowrap;
+}}
+
+.subnav-link {{
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}}
+
+.subnav-link:hover {{
+    background: var(--card-header);
+    color: var(--accent-blue);
+    border-color: var(--accent-blue);
+    text-decoration: none;
+}}
+
+.subnav-github {{
+    margin-left: auto;
+    background: rgba(188, 140, 255, 0.12);
+    color: var(--accent-purple);
+    border-color: rgba(188, 140, 255, 0.3);
+}}
+
+.subnav-github:hover {{
+    color: #fff;
+    background: rgba(188, 140, 255, 0.25);
+    border-color: var(--accent-purple);
+}}
+
+/* Heading Anchors */
+.heading-anchor {{
+    opacity: 0.3;
+    font-weight: 400;
+    font-size: 0.85em;
+    margin-left: 8px;
+    text-decoration: none;
+    color: var(--text-muted);
+    transition: opacity 0.2s;
+}}
+
+h1:hover .heading-anchor, h2:hover .heading-anchor {{
+    opacity: 1;
+    color: var(--accent-blue);
+}}
+
+.filter-results-info {{
+    margin-bottom: 16px;
+}}
+
+.filter-count-badge {{
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}}
+
+.filter-count-badge strong {{
+    color: var(--accent-cyan);
+}}
+
+.badge-aurora {{
+    background: rgba(255, 153, 0, 0.12);
+    color: #ff9900;
+    border: 1px solid rgba(255, 153, 0, 0.3);
+}}
+
+.btn-tag-aws {{ background: rgba(255, 153, 0, 0.2); color: #ff9900; }}
+
+.domain-engine-pill.aurora {{
+    color: #ff9900;
+    background: rgba(255, 153, 0, 0.1);
+}}
+
+/* Print Stylesheet for High-Fidelity PDF Export */
+@media print {{
+    body {{
+        background: #fff !important;
+        color: #000 !important;
+        padding-bottom: 0 !important;
+    }}
+    .top-nav, .share-export-bar, .sticky-subnav, .filter-bar, .bottom-nav, .action-btn, .copy-btn, .footer {{
+        display: none !important;
+    }}
+    .dashboard-hero, .task-hero, .card, .engine-pivot-card, .tldr-box, .analysis-finding-box {{
+        background: #fff !important;
+        border: 1px solid #ccc !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+    }}
+    .data-table th, .data-table td {{
+        border: 1px solid #ddd !important;
+        color: #000 !important;
+    }}
+    pre.highlight {{
+        background: #f8f8f8 !important;
+        color: #000 !important;
+        border: 1px solid #eee !important;
+    }}
 }}
 
 /* Main Container */
@@ -2757,6 +3403,133 @@ function copyCode(elementId) {
     });
 }
 
+function copyCurrentUrl(btn) {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+        const origText = btn.innerHTML;
+        btn.innerHTML = '<span class="btn-icon">✔</span> Copied!';
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerHTML = origText;
+            btn.classList.remove('btn-success');
+        }, 2000);
+    }).catch(err => {
+        alert('Copied URL: ' + url);
+    });
+}
+
+function exportPDF() {
+    window.print();
+}
+
+function exportQueryDataAsCSV(taskId) {
+    const table = document.querySelector('.result-column table.data-table') || document.querySelector('table.data-table');
+    if (!table) {
+        alert('No tabular data available to export.');
+        return;
+    }
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+        const cols = row.querySelectorAll('th, td');
+        let rowData = [];
+        cols.forEach(col => {
+            let val = col.innerText.replace(/"/g, '""').trim();
+            rowData.push('"' + val + '"');
+        });
+        csv.push(rowData.join(','));
+    });
+    const blob = new Blob([csv.join('\\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = taskId + "_dataset_results.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportQueryAsMarkdown(taskId) {
+    const title = document.querySelector('.task-title')?.innerText?.replace('#', '')?.trim() || taskId;
+    const cat = document.querySelector('.nav-cat')?.innerText || '';
+    const desc = document.querySelector('#trap .analysis-item p')?.innerText || '';
+    const prompt = document.querySelector('#trap pre.prompt-code')?.innerText || '';
+    const candidateSql = document.querySelector('#code-candidate')?.innerText || '';
+    const goldenSql = document.querySelector('#code-golden')?.innerText || '';
+    const setupSql = document.querySelector('#code-setup')?.innerText || '';
+
+    let md = `# ${taskId}: ${title}\\n\\n`;
+    md += `**Category:** ${cat}\\n`;
+    md += `**Benchmark:** [SQL-Frontier-Eval](https://sethusrinivasan.github.io/sql-frontier-eval/)\\n\\n`;
+    md += `## Problem Description & Analytical Trap\\n${desc}\\n\\n`;
+    md += `## Prompt Given to Model\\n\\`\\`\\`\\n${prompt}\\n\\`\\`\\`\\n\\n`;
+    md += `## Candidate SQL (Evaluated)\\n\\`\\`\\`sql\\n${candidateSql}\\n\\`\\`\\`\\n\\n`;
+    md += `## Golden SQL (Ground Truth)\\n\\`\\`\\`sql\\n${goldenSql}\\n\\`\\`\\`\\n\\n`;
+    md += `## Setup DDL & Data Fixture\\n\\`\\`\\`sql\\n${setupSql}\\n\\`\\`\\`\\n\\n`;
+    md += `---\\n*Exported from [SQL-Frontier-Eval Deep-Dive](https://sethusrinivasan.github.io/sql-frontier-eval/queries/${taskId}.html)*\\n`;
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = taskId + "_specification.md";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportBenchmarkSummaryCSV() {
+    const table = document.getElementById('queriesTable');
+    if (!table) return;
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+        if (row.style.display === 'none') return;
+        const cols = row.querySelectorAll('th, td');
+        let rowData = [];
+        cols.forEach((col, idx) => {
+            if (idx === cols.length - 1 && row.parentElement.tagName === 'TBODY') return; // skip action button
+            let val = col.innerText.replace(/"/g, '""').trim();
+            rowData.push('"' + val + '"');
+        });
+        csv.push(rowData.join(','));
+    });
+    const blob = new Blob([csv.join('\\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "sql_frontier_eval_benchmark_queries.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportBenchmarkMarkdown() {
+    let md = `# SQL-Frontier-Eval: Benchmark Executive Summary\\n\\n`;
+    md += `Empirical evaluation of Frontier AI models across **120 production-grade analytical SQL tasks** scaled to **108,027,582 records** across DuckDB 2.0, PostgreSQL 19.0, Databricks SQL, and Amazon Aurora Serverless v2.\\n\\n`;
+    md += `## Multi-Model Frontier Standings\\n\\n`;
+    md += `| Model / Baseline | Pass Rate | Correct / Total | Avg Model Latency | Engine Exec Latency (1M) |\\n`;
+    md += `| :--- | :---: | :---: | :---: | :---: |\\n`;
+    md += `| **Claude Opus 4.6 (Thinking)** | **98.3%** | 118 / 120 | 14.8s | 219.4 ms |\\n`;
+    md += `| **Gemini 3.8 Flash (Medium)** | **96.7%** | 116 / 120 | 12.4s | 224.1 ms |\\n`;
+    md += `| **Gemini 3.8 Flash (Low)** | **95.8%** | 115 / 120 | 4.6s | 232.2 ms |\\n`;
+    md += `| **Claude Sonnet 4.6 (Thinking)** | **94.2%** | 113 / 120 | 9.1s | 228.6 ms |\\n`;
+    md += `| **Gemini 3.8 Flash (High)** | **92.5%** | 111 / 120 | 38.6s | 236.4 ms |\\n`;
+    md += `| **GPT-OSS 120B (Medium)** | **90.8%** | 109 / 120 | 8.2s | 245.8 ms |\\n`;
+    md += `| **Golden Ground Truth** | **100.0%** | 120 / 120 | N/A | 217.8 ms |\\n\\n`;
+    md += `## Evaluated Database Engines\\n`;
+    md += `- **DuckDB 2.0 In-Memory Engine**: Columnar OLAP with SIMD AVX2 vector execution chunks.\\n`;
+    md += `- **PostgreSQL 19.0 + Extensions**: Relational row-store with pgvector, pg_trgm, btree_gist.\\n`;
+    md += `- **Databricks Serverless SQL Warehouse**: Cloud Lakehouse with Unity Catalog and Photon.\\n`;
+    md += `- **Amazon Aurora Serverless v2 PostgreSQL**: AWS Serverless cluster with IAM DB authentication and 15 isolated category schemas.\\n\\n`;
+    md += `Explore all interactive query plans and deep dives at: https://sethusrinivasan.github.io/sql-frontier-eval/\\n`;
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "sql_frontier_eval_executive_summary.md";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 let activeDomainFilter = 'ALL';
 let activeStatusFilter = 'ALL';
 
@@ -2764,6 +3537,7 @@ function filterQueries() {
     const searchInput = document.getElementById('searchInput');
     const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
     const rows = document.querySelectorAll('.task-row');
+    let visibleCount = 0;
 
     rows.forEach(row => {
         const rowId = (row.getAttribute('data-id') || '').toLowerCase();
@@ -2777,10 +3551,16 @@ function filterQueries() {
 
         if (matchDomain && matchStatus && matchSearch) {
             row.style.display = '';
+            visibleCount++;
         } else {
             row.style.display = 'none';
         }
     });
+
+    const countElem = document.getElementById('queryFilterCount');
+    if (countElem) {
+        countElem.innerHTML = `Showing <strong>${visibleCount}</strong> of ${rows.length} benchmark queries`;
+    }
 }
 
 function setDomainFilter(domain, btn) {
@@ -2812,6 +3592,183 @@ function setStatusFilter(status, btn) {
     if (btn) btn.classList.add('active');
     filterQueries();
 }
+
+// Multi-Database Engine Switcher (DuckDB vs PostgreSQL vs Databricks vs Aurora Serverless)
+const ENGINE_CONFIGS = {
+    duckdb: {
+        name: "DuckDB 2.0 In-Memory (Columnar OLAP)",
+        navBadge: "⚡ DuckDB 2.0 In-Memory (1M+ Records/Table)",
+        statusBanner: 'Active Engine: <strong>⚡ DuckDB 2.0 In-Memory Engine</strong> &mdash; 120 benchmark queries evaluated against 108M+ records. Showing columnar vectorized execution plans, SIMD AVX2 acceleration, and in-memory aggregation benchmarks.',
+        domainBadge: "⚡ Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table)",
+        domainPillText: "⚡ DuckDB 2.0",
+        tableBadgeText: "⚡ DuckDB 2.0",
+        tableBadgeClass: "badge-duckdb",
+        passRate: "95.8%",
+        tasksPassed: "115 Passed • 5 Diverged",
+        avgLatency: "232.2 ms",
+        goldenLatency: "Golden Avg: 217.8 ms",
+        dataVolume: "3.04 GiB",
+        recordsVolume: "108,027,582 Records (148 Tables)",
+        modelName: "agy/gemini-3.8-flash-low"
+    },
+    postgres: {
+        name: "PostgreSQL 19.0 (Relational + pgvector + FTS)",
+        navBadge: "🐘 PostgreSQL 19.0 + Extensions (Docker Compose)",
+        statusBanner: 'Active Engine: <strong>🐘 PostgreSQL 19.0 + Extensions</strong> &mdash; 120 benchmark queries evaluated in Docker Compose. Showing relational row-store execution plans, pgvector distance indexing, GIN trigram matching, and ACID multi-session isolation.',
+        domainBadge: "🐘 Evaluated on PostgreSQL 19.0 + Extensions (Docker Compose)",
+        domainPillText: "🐘 PostgreSQL 19.0",
+        tableBadgeText: "🐘 PostgreSQL 19.0",
+        tableBadgeClass: "badge-postgres",
+        passRate: "93.3%",
+        tasksPassed: "112 Passed • 8 Diverged",
+        avgLatency: "198.7 ms",
+        goldenLatency: "Golden Avg: 178.6 ms",
+        dataVolume: "3.48 GiB",
+        recordsVolume: "108,027,582 Records (148 Tables)",
+        modelName: "agy/gemini-3.8-flash-low"
+    },
+    databricks: {
+        name: "Databricks SQL Warehouse (Serverless Cloud Analytics)",
+        navBadge: "🧱 Databricks SQL Warehouse (Unity Catalog / Serverless)",
+        statusBanner: 'Active Engine: <strong>🧱 Databricks Serverless SQL Warehouse</strong> &mdash; 120 benchmark queries audited against live cloud warehouse (<code>workspace.sql_frontier_eval_sandbox</code>). Showing serverless execution latency, higher-order array functions, and Spark SQL dialect analysis.',
+        domainBadge: "🧱 Evaluated on Databricks Serverless Warehouse (Unity Catalog)",
+        domainPillText: "🧱 Databricks SQL",
+        tableBadgeText: "🧱 Databricks SQL",
+        tableBadgeClass: "badge-databricks",
+        passRate: "80.8%",
+        tasksPassed: "97 Passed • 23 Diverged",
+        avgLatency: "248.5 ms",
+        goldenLatency: "Golden Avg: 386.4 ms",
+        dataVolume: "Serverless Cloud",
+        recordsVolume: "108M+ Records (Serverless Warehouse)",
+        modelName: "agy/claude-opus-4-6-thinking"
+    },
+    aurora: {
+        name: "Amazon Aurora Serverless v2 PostgreSQL (AWS IAM DB Auth)",
+        navBadge: "☁️ Aurora Serverless v2 PostgreSQL (IAM DB Auth)",
+        statusBanner: 'Active Engine: <strong>☁️ Amazon Aurora Serverless v2 PostgreSQL</strong> &mdash; 120 benchmark queries evaluated on AWS with IAM Database Authentication across 15 category-isolated IAM roles and scoped schemas. Showing auto-scaling Aurora compute, zero-credential token rotation, and distributed storage performance.',
+        domainBadge: "☁️ Evaluated on Amazon Aurora Serverless v2 PostgreSQL (IAM DB Auth)",
+        domainPillText: "☁️ Aurora PostgreSQL",
+        tableBadgeText: "☁️ Aurora PostgreSQL",
+        tableBadgeClass: "badge-aurora",
+        passRate: "93.3%",
+        tasksPassed: "112 Passed • 8 Diverged",
+        avgLatency: "186.4 ms",
+        goldenLatency: "Golden Avg: 172.5 ms",
+        dataVolume: "AWS Cloud DB",
+        recordsVolume: "108M+ Records (Aurora Serverless)",
+        modelName: "agy/gemini-3.8-flash-low"
+    }
+};
+
+function switchEngine(engine) {
+    if (!ENGINE_CONFIGS[engine]) return;
+    const cfg = ENGINE_CONFIGS[engine];
+    try {
+        localStorage.setItem('sql_frontier_active_engine', engine);
+    } catch (e) {}
+
+    // Update switcher pills (top nav)
+    document.querySelectorAll('.engine-pill').forEach(btn => {
+        if (btn.getAttribute('data-engine') === engine) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Update prominent engine pivot bar buttons
+    document.querySelectorAll('.engine-pivot-btn').forEach(btn => {
+        if (btn.getAttribute('data-engine') === engine) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Update engine status banner
+    const statusBanner = document.getElementById('engine-status-banner');
+    if (statusBanner) {
+        statusBanner.innerHTML = cfg.statusBanner;
+    }
+
+    // Update nav badge
+    const navBadge = document.querySelector('.engine-badge');
+    if (navBadge) navBadge.textContent = cfg.navBadge;
+
+    // Update hero KPIs
+    const passRateElem = document.querySelector('.hsb-rate');
+    if (passRateElem) passRateElem.textContent = cfg.passRate;
+
+    const latVal = document.getElementById('kpi-lat-val');
+    if (latVal) latVal.textContent = cfg.avgLatency;
+
+    const latSub = document.getElementById('kpi-lat-sub');
+    if (latSub) latSub.textContent = cfg.goldenLatency;
+
+    const volVal = document.getElementById('kpi-vol-val');
+    if (volVal) volVal.textContent = cfg.dataVolume;
+
+    const modelSub = document.getElementById('kpi-model-sub');
+    if (modelSub) modelSub.textContent = cfg.tasksPassed;
+
+    // Toggle leaderboard table bodies
+    const duckdbTbody = document.getElementById('tbody-duckdb');
+    const pgTbody = document.getElementById('tbody-postgres');
+    const dbxTbody = document.getElementById('tbody-databricks');
+    const auroraTbody = document.getElementById('tbody-aurora');
+    const badgeEngine = document.getElementById('leaderboard-engine-badge');
+
+    if (duckdbTbody) duckdbTbody.style.display = 'none';
+    if (pgTbody) pgTbody.style.display = 'none';
+    if (dbxTbody) dbxTbody.style.display = 'none';
+    if (auroraTbody) auroraTbody.style.display = 'none';
+
+    if (engine === 'postgres') {
+        if (pgTbody) pgTbody.style.display = '';
+        if (badgeEngine) badgeEngine.textContent = 'PostgreSQL 19.0 Suite (120/120 Tasks)';
+    } else if (engine === 'databricks') {
+        if (dbxTbody) dbxTbody.style.display = '';
+        if (badgeEngine) badgeEngine.textContent = 'Databricks SQL Suite (120/120 Tasks)';
+    } else if (engine === 'aurora') {
+        if (auroraTbody) auroraTbody.style.display = '';
+        if (badgeEngine) badgeEngine.textContent = 'Amazon Aurora Serverless v2 Suite (120/120 Tasks)';
+    } else {
+        if (duckdbTbody) duckdbTbody.style.display = '';
+        if (badgeEngine) badgeEngine.textContent = 'DuckDB 2.0 Suite (120/120 Tasks)';
+    }
+
+    // Update analytical domains badge & domain pills
+    const domainBadge = document.getElementById('domain-engine-badge');
+    if (domainBadge) {
+        domainBadge.textContent = cfg.domainBadge;
+    }
+
+    document.querySelectorAll('.domain-engine-pill').forEach(pill => {
+        pill.textContent = cfg.domainPillText;
+        pill.classList.remove('postgres', 'aurora');
+        if (engine === 'postgres') {
+            pill.classList.add('postgres');
+        } else if (engine === 'aurora') {
+            pill.classList.add('aurora');
+        }
+    });
+
+    // Update query explorer table engine badges
+    document.querySelectorAll('.engine-table-badge').forEach(badge => {
+        badge.textContent = cfg.tableBadgeText;
+        badge.className = 'engine-table-badge ' + cfg.tableBadgeClass;
+    });
+}
+
+// Restore saved engine preference on load
+document.addEventListener('DOMContentLoaded', () => {
+    let saved = 'duckdb';
+    try {
+        saved = localStorage.getItem('sql_frontier_active_engine') || 'duckdb';
+    } catch (e) {}
+    switchEngine(saved);
+});
 '''
 
     os.makedirs(out_dir, exist_ok=True)
@@ -2991,6 +3948,9 @@ def main():
         run_meta=run_data,
         out_path=dashboard_filename
     )
+
+    # 5b. Generate SEO sitemap.xml and robots.txt
+    generate_sitemap_and_robots(args.out_dir, tasks)
 
     # 6. Clean up temporary DuckDB files and compress generated report archive to save disk space
     if os.path.exists(".tmp"):

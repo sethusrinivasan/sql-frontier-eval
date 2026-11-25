@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_074_Q74_did_you_mean_spell_suggestion - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_074_Q74_did_you_mean_spell_suggestion: &#x27;Did You Mean?&#x27; Query Spell-Correction Suggestion Engine | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_074_Q74_did_you_mean_spell_suggestion (&#x27;Did You Mean?&#x27; Query Spell-Correction Suggestion Engine). Category: Search &amp; Retrieval. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. When a query produces few results, search engines recommend a spell-corrected candidate word from the catalog vocabulary that has ">
+    <meta name="keywords" content="SQL Frontier Eval, Search &amp; Retrieval, task_074_Q74_did_you_mean_spell_suggestion, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_074_Q74_did_you_mean_spell_suggestion.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_074_Q74_did_you_mean_spell_suggestion: &#x27;Did You Mean?&#x27; Query Spell-Correction Suggestion Engine">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_074_Q74_did_you_mean_spell_suggestion.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_074_Q74_did_you_mean_spell_suggestion.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_074_Q74_did_you_mean_spell_suggestion: &#x27;Did You Mean?&#x27; Query Spell-Correction Suggestion Engine">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_074_Q74_did_you_mean_spell_suggestion.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_074_Q74_did_you_mean_spell_suggestion: 'Did You Mean?' Query Spell-Correction Suggestion Engine",
+      "identifier": "task_074_Q74_did_you_mean_spell_suggestion",
+      "articleSection": "Search & Retrieval",
+      "description": "When a query produces few results, search engines recommend a spell-corrected candidate word from the catalog vocabulary that has the lowest edit distance and highest document frequency.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_074_Q74_did_you_mean_spell_suggestion.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Search & Retrieval",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_074_Q74_did_you_mean_spell_suggestion",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_074_Q74_did_you_mean_spell_suggestion.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_074_Q74_did_you_mean_spell_suggestion Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Given misspelled query 'wireles', propose top dictionary replacement with edit distance <= 1\n            SELECT \n                term AS suggested_correction,\n                doc_frequency,\n                levenshtein(term, 'wireles') AS edit_distance\n            FROM dictionary_terms\n            WHERE levenshtein(term, 'wireles') <= 2\n            ORDER BY edit_distance ASC, doc_frequency DESC\n            LIMIT 1;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_074_Q74_did_you_mean_spell_suggestion')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_074_Q74_did_you_mean_spell_suggestion')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_074_Q74_did_you_mean_spell_suggestion%20%28%27Did%20You%20Mean%3F%27%20Query%20Spell-Correction%20Suggestion%20Engine%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_074_Q74_did_you_mean_spell_suggestion.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_074_Q74_did_you_mean_spell_suggestion.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_074_Q74_did_you_mean_spell_suggestion.html&amp;title=task_074_Q74_did_you_mean_spell_suggestion%3A%20%27Did%20You%20Mean%3F%27%20Query%20Spell-Correction%20Suggestion%20Engine%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_074_Q74_did_you_mean_spell_suggestion.html&amp;t=task_074_Q74_did_you_mean_spell_suggestion%3A%20%27Did%20You%20Mean%3F%27%20Query%20Spell-Correction%20Suggestion%20Engine%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_074_Q74_did_you_mean_spell_suggestion.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">&#x27;Did You Mean?&#x27; Query Spell-Correction Suggestion Engine</h1>
+                <h1 class="task-title">
+                    &#x27;Did You Mean?&#x27; Query Spell-Correction Suggestion Engine
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">98.10 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(1.2x slower than golden)</span></div>
+                    <div class="stat-val">64.64 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.1x faster than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">82.56 ms</div>
+                    <div class="stat-val">68.47 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>When a query produces few results, search engines recommend a spell-corrected candidate word from the catalog vocabulary that has the lowest edit distance and highest document frequency.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 22.9 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -154,62 +274,62 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">4</td>
 <td>wireless</td>
-<td>1</td>
+<td>8,425</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>wiretap</td>
-<td>13,820</td>
+<td>8,758</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>tireless</td>
-<td>19,206</td>
+<td>9,781</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>wireless</td>
-<td>22,310</td>
+<td>55,215</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>wiretap</td>
-<td>16,215</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>tireless</td>
-<td>5,523</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>wireless</td>
-<td>9,290</td>
+<td>54,766</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>wiretap</td>
-<td>25,055</td>
+<td>9,791</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>tireless</td>
-<td>27,618</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>wireless</td>
-<td>1</td>
+<td>57,999</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>wiretap</td>
-<td>6,809</td>
+<td>1</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>tireless</td>
-<td>3,277</td>
+<td>19,499</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -218,138 +338,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 373.61 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 59.72515102357505%; background: #f85149;" title="TABLE_SCAN: 223.14ms (59.7%)"></div><div class="cost-bar-seg" style="width: 38.94344165746026%; background: #f85149;" title="PROJECTION: 145.50ms (38.9%)"></div><div class="cost-bar-seg" style="width: 1.3314073189646962%; background: #3fb950;" title="TOP_N: 4.97ms (1.3%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">✂️ <strong>TOP_N</strong></span>
-                <span class="node-cost-tag">1.3%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">4.97 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">28 B</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="high-cost-tag">🔥 38.9% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">145.50 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">666,667</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">17.80 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;suggested_correction&#x27;, &#x27;doc_frequ">📁 Projections: [&#x27;suggested_correct...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (38.9% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="high-cost-tag">🔥 59.7% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">223.14 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">666,667</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">12.72 MB</span></div>
-                <div class="nm-tbl" title="memory.main.dictionary_terms">📁 memory.main.dictionary_terms</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (59.7% of query runtime)</div>
-        </div>
-        </div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>59.7%</strong></td>
-            <td>223.14 ms</td>
-            <td>666,667</td>
-            <td>12.72 MB</td>
-            <td><small>memory.main.dictionary_terms</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>38.9%</strong></td>
-            <td>145.50 ms</td>
-            <td>666,667</td>
-            <td>17.80 MB</td>
-            <td><small>Projections: [&#x27;suggested_correction&#x27;, &#x27;doc_frequ</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TOP_N</strong></td>
-            <td><strong>1.3%</strong></td>
-            <td>4.97 ms</td>
-            <td>1</td>
-            <td>0.00 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 98.10 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 64.64 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="c1">-- Given misspelled query 'wireles', propose top dictionary replacement with edit distance &lt;= 1</span>
@@ -367,7 +391,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 82.56 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 68.47 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Given misspelled query 'wireles', propose top dictionary replacement with edit distance &lt;= 1</span>
@@ -385,7 +409,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">dictionary_terms</span><span class="w"> </span><span class="p">(</span><span class="n">term</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">doc_frequency</span><span class="w"> </span><span class="nb">INT</span><span class="p">);</span>
@@ -401,9 +425,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -422,7 +449,7 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">1</td>
 <td>wireless</td>
-<td>139,488</td>
+<td>147,090</td>
 <td>1</td>
 </tr>
 </tbody></table></div>
@@ -442,7 +469,7 @@ Results should be ordered as specified.</pre>
 <tr>
 <td class="td-idx">1</td>
 <td>wireless</td>
-<td>139,488</td>
+<td>147,090</td>
 <td>1</td>
 </tr>
 </tbody></table></div>
@@ -459,7 +486,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_038_Q38_multimodal_image_text_fusion - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_038_Q38_multimodal_image_text_fusion: Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion) | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_038_Q38_multimodal_image_text_fusion (Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)). Category: Vector &amp; Embeddings. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. In e-commerce search, users submit a photo and a text clarification (e.g. photo of dress + &#x27;in floral silk&#x27;). We compute a weighte">
+    <meta name="keywords" content="SQL Frontier Eval, Vector &amp; Embeddings, task_038_Q38_multimodal_image_text_fusion, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_038_Q38_multimodal_image_text_fusion.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_038_Q38_multimodal_image_text_fusion: Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_038_Q38_multimodal_image_text_fusion.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_038_Q38_multimodal_image_text_fusion.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_038_Q38_multimodal_image_text_fusion: Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_038_Q38_multimodal_image_text_fusion.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_038_Q38_multimodal_image_text_fusion: Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)",
+      "identifier": "task_038_Q38_multimodal_image_text_fusion",
+      "articleSection": "Vector & Embeddings",
+      "description": "In e-commerce search, users submit a photo and a text clarification (e.g. photo of dress + 'in floral silk'). We compute a weighted combination of image-vector and text-vector similarity.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_038_Q38_multimodal_image_text_fusion.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Vector & Embeddings",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_038_Q38_multimodal_image_text_fusion",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_038_Q38_multimodal_image_text_fusion.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_038_Q38_multimodal_image_text_fusion Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Joint multi-modal score: 60% image vector similarity + 40% text vector similarity\n            SELECT \n                item_id,\n                title,\n                ROUND(array_cosine_similarity(img_vec, [0.82, 0.18]::FLOAT[2]), 4) AS img_sim,\n                ROUND(array_cosine_similarity(txt_vec, [0.92, 0.08]::FLOAT[2]), 4) AS txt_sim,\n                ROUND(\n                    0.60 * array_cosine_similarity(img_vec, [0.82, 0.18]::FLOAT[2]) +\n                    0.40 * array_cosine_similarity(txt_vec, [0.92, 0.08]::FLOAT[2]), 4\n                ) AS joint_multimodal_score\n            FROM fashion_items\n            ORDER BY joint_multimodal_score DESC;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_038_Q38_multimodal_image_text_fusion')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_038_Q38_multimodal_image_text_fusion')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_038_Q38_multimodal_image_text_fusion%20%28Multi-Modal%20Joint%20Retrieval%20%28Image%20%2B%20Text%20Query%20Embedding%20Fusion%29%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_038_Q38_multimodal_image_text_fusion.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_038_Q38_multimodal_image_text_fusion.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_038_Q38_multimodal_image_text_fusion.html&amp;title=task_038_Q38_multimodal_image_text_fusion%3A%20Multi-Modal%20Joint%20Retrieval%20%28Image%20%2B%20Text%20Query%20Embedding%20Fusion%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_038_Q38_multimodal_image_text_fusion.html&amp;t=task_038_Q38_multimodal_image_text_fusion%3A%20Multi-Modal%20Joint%20Retrieval%20%28Image%20%2B%20Text%20Query%20Embedding%20Fusion%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_038_Q38_multimodal_image_text_fusion.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)</h1>
+                <h1 class="task-title">
+                    Multi-Modal Joint Retrieval (Image + Text Query Embedding Fusion)
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">240.90 ms</div>
+                    <div class="stat-val">189.74 ms</div>
                     <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">231.72 ms</div>
+                    <div class="stat-val">186.95 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>In e-commerce search, users submit a photo and a text clarification (e.g. photo of dress + &#x27;in floral silk&#x27;). We compute a weighted combination of image-vector and text-vector similarity.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 38.1 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -163,85 +283,85 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">4</td>
 <td>3</td>
 <td>Silk Floral Summer Dress</td>
-<td>[0.8906 0.1058]</td>
-<td>[0.8906 0.1058]</td>
+<td>[0.8362 0.0707]</td>
+<td>[0.8362 0.0707]</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>Cotton Floral Blouse</td>
-<td>[0.8351 0.0917]</td>
-<td>[0.8351 0.0917]</td>
+<td>[0.8706 0.1326]</td>
+<td>[0.8706 0.1326]</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>Leather Biker Jacket</td>
-<td>[0.8029 0.1437]</td>
-<td>[0.8029 0.1437]</td>
+<td>[0.8698 0.0085]</td>
+<td>[0.8698 0.0085]</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>Silk Floral Summer Dress</td>
-<td>[0.9339 0.0836]</td>
-<td>[0.9339 0.0836]</td>
+<td>[0.8224 0.1344]</td>
+<td>[0.8224 0.1344]</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>Cotton Floral Blouse</td>
-<td>[0.8292 0.1046]</td>
-<td>[0.8292 0.1046]</td>
+<td>[0.8433 0.1146]</td>
+<td>[0.8433 0.1146]</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>Leather Biker Jacket</td>
-<td>[0.8312 0.0219]</td>
-<td>[0.8312 0.0219]</td>
+<td>[0.8703 0.0737]</td>
+<td>[0.8703 0.0737]</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>Silk Floral Summer Dress</td>
-<td>[0.8443 0.1036]</td>
-<td>[0.8443 0.1036]</td>
+<td>[0.8923 0.1572]</td>
+<td>[0.8923 0.1572]</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>Cotton Floral Blouse</td>
-<td>[0.854  0.1027]</td>
-<td>[0.854  0.1027]</td>
+<td>[0.7875 0.1523]</td>
+<td>[0.7875 0.1523]</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>Leather Biker Jacket</td>
-<td>[0.9218 0.094 ]</td>
-<td>[0.9218 0.094 ]</td>
+<td>[0.8827 0.071 ]</td>
+<td>[0.8827 0.071 ]</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>Silk Floral Summer Dress</td>
-<td>[0.8348 0.1071]</td>
-<td>[0.8348 0.1071]</td>
+<td>[0.8404 0.136 ]</td>
+<td>[0.8404 0.136 ]</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>Cotton Floral Blouse</td>
-<td>[0.8719 0.0936]</td>
-<td>[0.8719 0.0936]</td>
+<td>[0.8333 0.0716]</td>
+<td>[0.8333 0.0716]</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>Leather Biker Jacket</td>
-<td>[0.824  0.1314]</td>
-<td>[0.824  0.1314]</td>
+<td>[0.7468 0.061 ]</td>
+<td>[0.7468 0.061 ]</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -250,162 +370,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 280.48 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 51.93667556062831%; background: #f85149;" title="ORDER_BY: 145.67ms (51.9%)"></div><div class="cost-bar-seg" style="width: 30.725588309620584%; background: #f85149;" title="PROJECTION: 86.18ms (30.7%)"></div><div class="cost-bar-seg" style="width: 13.262387427581007%; background: #3fb950;" title="PROJECTION: 37.20ms (13.3%)"></div><div class="cost-bar-seg" style="width: 4.075348702170089%; background: #d29922;" title="TABLE_SCAN: 11.43ms (4.1%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="high-cost-tag">🔥 51.9% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">145.67 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (51.9% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="high-cost-tag">🔥 30.7% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">86.18 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;, &#x27;img_sim&#x27;, &#x27;tx">📁 Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (30.7% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">13.3%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">37.20 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;, &#x27;array_cosine_">📁 Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">4.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">11.43 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">34.33 MB</span></div>
-                <div class="nm-tbl" title="memory.main.fashion_items">📁 memory.main.fashion_items</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>51.9%</strong></td>
-            <td>145.67 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>30.7%</strong></td>
-            <td>86.18 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;, &#x27;img_sim&#x27;, &#x27;tx</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>13.3%</strong></td>
-            <td>37.20 ms</td>
-            <td>1,000,000</td>
-            <td>26.70 MB</td>
-            <td><small>Projections: [&#x27;item_id&#x27;, &#x27;title&#x27;, &#x27;array_cosine_</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>4.1%</strong></td>
-            <td>11.43 ms</td>
-            <td>1,000,000</td>
-            <td>34.33 MB</td>
-            <td><small>memory.main.fashion_items</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 240.90 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 189.74 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="c1">-- Joint multi-modal score: 60% image vector similarity + 40% text vector similarity</span>
@@ -422,7 +422,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 231.72 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 186.95 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Joint multi-modal score: 60% image vector similarity + 40% text vector similarity</span>
@@ -439,7 +439,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">fashion_items</span><span class="w"> </span><span class="p">(</span><span class="n">item_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">img_vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="n">txt_vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
@@ -455,9 +455,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -485,194 +488,194 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>245,770</td>
+<td>122,887</td>
 <td>Cotton Floral Blouse</td>
+<td>0.9985</td>
+<td>0.9972</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">3</td>
+<td>122,891</td>
+<td>Leather Biker Jacket</td>
+<td>0.9982</td>
+<td>0.9976</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">4</td>
+<td>122,902</td>
+<td>Cotton Floral Blouse</td>
+<td>0.9984</td>
+<td>0.9973</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">5</td>
+<td>122,903</td>
+<td>Leather Biker Jacket</td>
+<td>0.9991</td>
+<td>0.9963</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>122,910</td>
+<td>Silk Floral Summer Dress</td>
 <td>0.9986</td>
 <td>0.997</td>
 <td>0.998</td>
 </tr>
 <tr>
-<td class="td-idx">3</td>
-<td>245,777</td>
-<td>Leather Biker Jacket</td>
-<td>0.9986</td>
-<td>0.9971</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">4</td>
-<td>245,786</td>
-<td>Leather Biker Jacket</td>
-<td>0.9987</td>
-<td>0.9969</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">5</td>
-<td>245,812</td>
+<td class="td-idx">7</td>
+<td>122,923</td>
 <td>Cotton Floral Blouse</td>
 <td>0.9988</td>
-<td>0.9969</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">6</td>
-<td>245,820</td>
-<td>Silk Floral Summer Dress</td>
-<td>0.999</td>
-<td>0.9964</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">7</td>
-<td>245,822</td>
-<td>Leather Biker Jacket</td>
-<td>0.9983</td>
-<td>0.9975</td>
+<td>0.9967</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>245,868</td>
-<td>Silk Floral Summer Dress</td>
+<td>122,927</td>
+<td>Leather Biker Jacket</td>
 <td>0.9985</td>
 <td>0.9972</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>245,882</td>
-<td>Leather Biker Jacket</td>
-<td>0.9988</td>
-<td>0.9968</td>
+<td>122,941</td>
+<td>Cotton Floral Blouse</td>
+<td>0.9989</td>
+<td>0.9966</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>245,890</td>
-<td>Cotton Floral Blouse</td>
-<td>0.9988</td>
-<td>0.9968</td>
+<td>122,946</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9985</td>
+<td>0.9973</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>245,900</td>
-<td>Leather Biker Jacket</td>
+<td>122,952</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9985</td>
+<td>0.9972</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">12</td>
+<td>122,955</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9982</td>
+<td>0.9976</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>122,967</td>
+<td>Silk Floral Summer Dress</td>
 <td>0.9984</td>
 <td>0.9973</td>
 <td>0.998</td>
 </tr>
 <tr>
-<td class="td-idx">12</td>
-<td>245,914</td>
-<td>Cotton Floral Blouse</td>
-<td>0.9985</td>
-<td>0.9972</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">13</td>
-<td>245,915</td>
-<td>Leather Biker Jacket</td>
-<td>0.9983</td>
-<td>0.9975</td>
-<td>0.998</td>
-</tr>
-<tr>
 <td class="td-idx">14</td>
-<td>245,922</td>
-<td>Silk Floral Summer Dress</td>
-<td>0.9988</td>
-<td>0.9967</td>
+<td>122,969</td>
+<td>Leather Biker Jacket</td>
+<td>0.9986</td>
+<td>0.9971</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>245,923</td>
-<td>Cotton Floral Blouse</td>
-<td>0.9984</td>
-<td>0.9974</td>
+<td>122,976</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9986</td>
+<td>0.9971</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>245,941</td>
+<td>122,983</td>
 <td>Cotton Floral Blouse</td>
-<td>0.9983</td>
-<td>0.9975</td>
+<td>0.9985</td>
+<td>0.9973</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>245,958</td>
+<td>122,991</td>
 <td>Silk Floral Summer Dress</td>
-<td>0.9989</td>
-<td>0.9966</td>
+<td>0.9982</td>
+<td>0.9976</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>245,976</td>
+<td>122,997</td>
 <td>Silk Floral Summer Dress</td>
-<td>0.9988</td>
-<td>0.9968</td>
+<td>0.999</td>
+<td>0.9964</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>245,984</td>
-<td>Leather Biker Jacket</td>
-<td>0.9985</td>
-<td>0.9972</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">20</td>
-<td>245,996</td>
-<td>Leather Biker Jacket</td>
-<td>0.9985</td>
-<td>0.9972</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">21</td>
-<td>246,027</td>
-<td>Silk Floral Summer Dress</td>
-<td>0.9988</td>
-<td>0.9968</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">22</td>
-<td>246,045</td>
-<td>Silk Floral Summer Dress</td>
+<td>123,001</td>
+<td>Cotton Floral Blouse</td>
 <td>0.9987</td>
 <td>0.9969</td>
 <td>0.998</td>
 </tr>
 <tr>
-<td class="td-idx">23</td>
-<td>246,056</td>
+<td class="td-idx">20</td>
+<td>123,002</td>
 <td>Leather Biker Jacket</td>
 <td>0.9986</td>
+<td>0.9971</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">21</td>
+<td>123,003</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9985</td>
 <td>0.9972</td>
 <td>0.998</td>
 </tr>
 <tr>
-<td class="td-idx">24</td>
-<td>246,073</td>
+<td class="td-idx">22</td>
+<td>123,018</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9983</td>
+<td>0.9974</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">23</td>
+<td>123,022</td>
 <td>Cotton Floral Blouse</td>
-<td>0.9989</td>
-<td>0.9966</td>
+<td>0.9986</td>
+<td>0.9971</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">24</td>
+<td>123,024</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9986</td>
+<td>0.9971</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>246,075</td>
+<td>123,030</td>
 <td>Silk Floral Summer Dress</td>
-<td>0.9988</td>
-<td>0.9967</td>
+<td>0.9983</td>
+<td>0.9975</td>
 <td>0.998</td>
 </tr>
 </tbody></table></div>
@@ -702,55 +705,55 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>245,770</td>
-<td>Cotton Floral Blouse</td>
-<td>0.9986</td>
-<td>0.997</td>
+<td>6</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9985</td>
+<td>0.9972</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>245,777</td>
-<td>Leather Biker Jacket</td>
-<td>0.9986</td>
-<td>0.9971</td>
+<td>12</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9985</td>
+<td>0.9973</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>245,786</td>
-<td>Leather Biker Jacket</td>
-<td>0.9987</td>
-<td>0.9969</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">5</td>
-<td>245,812</td>
-<td>Cotton Floral Blouse</td>
-<td>0.9988</td>
-<td>0.9969</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">6</td>
-<td>245,820</td>
+<td>36</td>
 <td>Silk Floral Summer Dress</td>
-<td>0.999</td>
-<td>0.9964</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">7</td>
-<td>245,822</td>
-<td>Leather Biker Jacket</td>
-<td>0.9983</td>
+<td>0.9982</td>
 <td>0.9975</td>
 <td>0.998</td>
 </tr>
 <tr>
+<td class="td-idx">5</td>
+<td>54</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9983</td>
+<td>0.9974</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">6</td>
+<td>64</td>
+<td>Cotton Floral Blouse</td>
+<td>0.999</td>
+<td>0.9965</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">7</td>
+<td>91</td>
+<td>Cotton Floral Blouse</td>
+<td>0.9982</td>
+<td>0.9976</td>
+<td>0.998</td>
+</tr>
+<tr>
 <td class="td-idx">8</td>
-<td>245,868</td>
+<td>93</td>
 <td>Silk Floral Summer Dress</td>
 <td>0.9985</td>
 <td>0.9972</td>
@@ -758,127 +761,127 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>245,882</td>
-<td>Leather Biker Jacket</td>
-<td>0.9988</td>
-<td>0.9968</td>
+<td>99</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.9987</td>
+<td>0.997</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>245,890</td>
+<td>100</td>
 <td>Cotton Floral Blouse</td>
-<td>0.9988</td>
-<td>0.9968</td>
+<td>0.9986</td>
+<td>0.9971</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>245,900</td>
+<td>110</td>
 <td>Leather Biker Jacket</td>
-<td>0.9984</td>
-<td>0.9973</td>
+<td>0.9986</td>
+<td>0.9971</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>245,914</td>
+<td>118</td>
 <td>Cotton Floral Blouse</td>
+<td>0.9985</td>
+<td>0.9973</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>123</td>
+<td>Silk Floral Summer Dress</td>
 <td>0.9985</td>
 <td>0.9972</td>
 <td>0.998</td>
 </tr>
 <tr>
-<td class="td-idx">13</td>
-<td>245,915</td>
-<td>Leather Biker Jacket</td>
-<td>0.9983</td>
-<td>0.9975</td>
-<td>0.998</td>
-</tr>
-<tr>
 <td class="td-idx">14</td>
-<td>245,922</td>
-<td>Silk Floral Summer Dress</td>
+<td>133</td>
+<td>Cotton Floral Blouse</td>
 <td>0.9988</td>
 <td>0.9967</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>245,923</td>
-<td>Cotton Floral Blouse</td>
-<td>0.9984</td>
-<td>0.9974</td>
+<td>138</td>
+<td>Silk Floral Summer Dress</td>
+<td>0.999</td>
+<td>0.9964</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>245,941</td>
+<td>152</td>
+<td>Leather Biker Jacket</td>
+<td>0.9984</td>
+<td>0.9973</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>155</td>
+<td>Leather Biker Jacket</td>
+<td>0.9986</td>
+<td>0.9971</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">18</td>
+<td>163</td>
+<td>Cotton Floral Blouse</td>
+<td>0.999</td>
+<td>0.9964</td>
+<td>0.998</td>
+</tr>
+<tr>
+<td class="td-idx">19</td>
+<td>178</td>
 <td>Cotton Floral Blouse</td>
 <td>0.9983</td>
 <td>0.9975</td>
 <td>0.998</td>
 </tr>
 <tr>
-<td class="td-idx">17</td>
-<td>245,958</td>
-<td>Silk Floral Summer Dress</td>
-<td>0.9989</td>
-<td>0.9966</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">18</td>
-<td>245,976</td>
-<td>Silk Floral Summer Dress</td>
-<td>0.9988</td>
-<td>0.9968</td>
-<td>0.998</td>
-</tr>
-<tr>
-<td class="td-idx">19</td>
-<td>245,984</td>
-<td>Leather Biker Jacket</td>
-<td>0.9985</td>
-<td>0.9972</td>
-<td>0.998</td>
-</tr>
-<tr>
 <td class="td-idx">20</td>
-<td>245,996</td>
-<td>Leather Biker Jacket</td>
-<td>0.9985</td>
-<td>0.9972</td>
+<td>220</td>
+<td>Cotton Floral Blouse</td>
+<td>0.9983</td>
+<td>0.9974</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>246,027</td>
-<td>Silk Floral Summer Dress</td>
-<td>0.9988</td>
-<td>0.9968</td>
+<td>227</td>
+<td>Leather Biker Jacket</td>
+<td>0.9985</td>
+<td>0.9973</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>246,045</td>
-<td>Silk Floral Summer Dress</td>
+<td>232</td>
+<td>Cotton Floral Blouse</td>
 <td>0.9987</td>
 <td>0.9969</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>246,056</td>
-<td>Leather Biker Jacket</td>
-<td>0.9986</td>
-<td>0.9972</td>
+<td>262</td>
+<td>Cotton Floral Blouse</td>
+<td>0.9983</td>
+<td>0.9975</td>
 <td>0.998</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>246,073</td>
+<td>292</td>
 <td>Cotton Floral Blouse</td>
 <td>0.9989</td>
 <td>0.9966</td>
@@ -886,10 +889,10 @@ Results should be ordered as specified.</pre>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>246,075</td>
-<td>Silk Floral Summer Dress</td>
-<td>0.9988</td>
-<td>0.9967</td>
+<td>304</td>
+<td>Cotton Floral Blouse</td>
+<td>0.9985</td>
+<td>0.9972</td>
 <td>0.998</td>
 </tr>
 </tbody></table></div>
@@ -907,7 +910,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:28 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

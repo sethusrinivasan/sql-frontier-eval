@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_042_Q42_negative_prompting_vector_repulsion - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_042_Q42_negative_prompting_vector_repulsion: Vector Repulsion Scoring (Positive vs Negative Query Guidance) | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_042_Q42_negative_prompting_vector_repulsion (Vector Repulsion Scoring (Positive vs Negative Query Guidance)). Category: Vector &amp; Embeddings. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. In image generation and semantic search, users supply positive and negative prompts (e.g. &#x27;cyberpunk city&#x27; NOT &#x27;blurry / low quali">
+    <meta name="keywords" content="SQL Frontier Eval, Vector &amp; Embeddings, task_042_Q42_negative_prompting_vector_repulsion, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_042_Q42_negative_prompting_vector_repulsion.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_042_Q42_negative_prompting_vector_repulsion: Vector Repulsion Scoring (Positive vs Negative Query Guidance)">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_042_Q42_negative_prompting_vector_repulsion.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_042_Q42_negative_prompting_vector_repulsion.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_042_Q42_negative_prompting_vector_repulsion: Vector Repulsion Scoring (Positive vs Negative Query Guidance)">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_042_Q42_negative_prompting_vector_repulsion.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_042_Q42_negative_prompting_vector_repulsion: Vector Repulsion Scoring (Positive vs Negative Query Guidance)",
+      "identifier": "task_042_Q42_negative_prompting_vector_repulsion",
+      "articleSection": "Vector & Embeddings",
+      "description": "In image generation and semantic search, users supply positive and negative prompts (e.g. 'cyberpunk city' NOT 'blurry / low quality'). The score boosts positive similarity and penalizes negative similarity.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_042_Q42_negative_prompting_vector_repulsion.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Vector & Embeddings",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_042_Q42_negative_prompting_vector_repulsion",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_042_Q42_negative_prompting_vector_repulsion.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_042_Q42_negative_prompting_vector_repulsion Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Positive query: [1.0, 0.0] (cyberpunk neon), Negative query: [0.0, 1.0] (blurry/rustic)\n            -- Net Score = Cosine(vec, pos) - (0.5 * Cosine(vec, neg))\n            SELECT \n                asset_id,\n                name,\n                ROUND(array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]), 4) AS pos_sim,\n                ROUND(array_cosine_similarity(vec, [0.0, 1.0]::FLOAT[2]), 4) AS neg_sim,\n                ROUND(\n                    array_cosine_similarity(vec, [1.0, 0.0]::FLOAT[2]) - \n                    (0.50 * array_cosine_similarity(vec, [0.0, 1.0]::FLOAT[2])), 4\n                ) AS net_guided_score\n            FROM generative_assets\n            ORDER BY net_guided_score DESC;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_042_Q42_negative_prompting_vector_repulsion')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_042_Q42_negative_prompting_vector_repulsion')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_042_Q42_negative_prompting_vector_repulsion%20%28Vector%20Repulsion%20Scoring%20%28Positive%20vs%20Negative%20Query%20Guidance%29%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_042_Q42_negative_prompting_vector_repulsion.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_042_Q42_negative_prompting_vector_repulsion.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_042_Q42_negative_prompting_vector_repulsion.html&amp;title=task_042_Q42_negative_prompting_vector_repulsion%3A%20Vector%20Repulsion%20Scoring%20%28Positive%20vs%20Negative%20Query%20Guidance%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_042_Q42_negative_prompting_vector_repulsion.html&amp;t=task_042_Q42_negative_prompting_vector_repulsion%3A%20Vector%20Repulsion%20Scoring%20%28Positive%20vs%20Negative%20Query%20Guidance%29%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_042_Q42_negative_prompting_vector_repulsion.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: Yes</span>
                 </div>
-                <h1 class="task-title">Vector Repulsion Scoring (Positive vs Negative Query Guidance)</h1>
+                <h1 class="task-title">
+                    Vector Repulsion Scoring (Positive vs Negative Query Guidance)
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">262.37 ms</div>
-                    <div class="stat-sub"><span class="latency-diff slower">(1.0x slower than golden)</span></div>
+                    <div class="stat-val">203.33 ms</div>
+                    <div class="stat-sub"><span class="latency-diff faster">(1.1x faster than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">256.42 ms</div>
+                    <div class="stat-val">213.64 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>In image generation and semantic search, users supply positive and negative prompts (e.g. &#x27;cyberpunk city&#x27; NOT &#x27;blurry / low quality&#x27;). The score boosts positive similarity and penalizes negative similarity.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">1 Tables (1,000,000 rows &bull; 30.5 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -159,73 +279,73 @@ Results should be ordered as specified.</pre>
 <td class="td-idx">4</td>
 <td>3</td>
 <td>Sharp Neon Skyline</td>
-<td>[0.9156 0.0837]</td>
+<td>[0.8932 0.0832]</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>Blurry Neon Streetscape</td>
-<td>[0.8852 0.1337]</td>
+<td>[0.8741 0.0723]</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>Rustic Wooden Cabin</td>
-<td>[0.8744 0.1242]</td>
+<td>[0.761  0.0776]</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>Sharp Neon Skyline</td>
-<td>[0.9135 0.0987]</td>
+<td>[0.8592 0.1412]</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>Blurry Neon Streetscape</td>
-<td>[0.8887 0.1472]</td>
+<td>[0.8066 0.0761]</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>Rustic Wooden Cabin</td>
-<td>[0.8848 0.0686]</td>
+<td>[0.8474 0.1333]</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>Sharp Neon Skyline</td>
-<td>[0.8603 0.0646]</td>
+<td>[0.8327 0.137 ]</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>Blurry Neon Streetscape</td>
-<td>[0.7757 0.0407]</td>
+<td>[0.866  0.1123]</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>Rustic Wooden Cabin</td>
-<td>[0.8216 0.1476]</td>
+<td>[0.887 0.057]</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>Sharp Neon Skyline</td>
-<td>[0.8509 0.0848]</td>
+<td>[0.9228 0.1809]</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>Blurry Neon Streetscape</td>
-<td>[0.762  0.1005]</td>
+<td>[0.748  0.1195]</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>Rustic Wooden Cabin</td>
-<td>[0.8194 0.0965]</td>
+<td>[0.7909 0.1002]</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -234,162 +354,42 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 297.62 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 56.23528024282714%; background: #f85149;" title="ORDER_BY: 167.37ms (56.2%)"></div><div class="cost-bar-seg" style="width: 28.539789907654633%; background: #f85149;" title="PROJECTION: 84.94ms (28.5%)"></div><div class="cost-bar-seg" style="width: 11.746780385837093%; background: #3fb950;" title="PROJECTION: 34.96ms (11.7%)"></div><div class="cost-bar-seg" style="width: 3.478149463681139%; background: #d29922;" title="TABLE_SCAN: 10.35ms (3.5%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">⏳ <strong>ORDER_BY</strong></span>
-                <span class="high-cost-tag">🔥 56.2% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">167.37 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (56.2% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="high-cost-tag">🔥 28.5% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">84.94 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.52 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;, &#x27;pos_sim&#x27;, &#x27;ne">📁 Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;...</div>
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (28.5% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">11.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">34.96 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;, &#x27;array_cosine_">📁 Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">3.5%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">10.35 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">26.70 MB</span></div>
-                <div class="nm-tbl" title="memory.main.generative_assets">📁 memory.main.generative_assets</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>ORDER_BY</strong></td>
-            <td><strong>56.2%</strong></td>
-            <td>167.37 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>28.5%</strong></td>
-            <td>84.94 ms</td>
-            <td>1,000,000</td>
-            <td>30.52 MB</td>
-            <td><small>Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;, &#x27;pos_sim&#x27;, &#x27;ne</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>11.7%</strong></td>
-            <td>34.96 ms</td>
-            <td>1,000,000</td>
-            <td>26.70 MB</td>
-            <td><small>Projections: [&#x27;asset_id&#x27;, &#x27;name&#x27;, &#x27;array_cosine_</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>3.5%</strong></td>
-            <td>10.35 ms</td>
-            <td>1,000,000</td>
-            <td>26.70 MB</td>
-            <td><small>memory.main.generative_assets</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 262.37 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 203.33 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="c1">-- Positive query: [1.0, 0.0] (cyberpunk neon), Negative query: [0.0, 1.0] (blurry/rustic)</span>
@@ -407,7 +407,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 256.42 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 213.64 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Positive query: [1.0, 0.0] (cyberpunk neon), Negative query: [0.0, 1.0] (blurry/rustic)</span>
@@ -425,7 +425,7 @@ Results should be ordered as specified.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">generative_assets</span><span class="w"> </span><span class="p">(</span><span class="n">asset_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">,</span><span class="w"> </span><span class="n">vec</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
@@ -441,9 +441,12 @@ Results should be ordered as specified.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -463,203 +466,203 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>720,289</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.993</td>
-<td>-0.1185</td>
-<td>1.0522</td>
+<td>70,247</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9943</td>
+<td>-0.1069</td>
+<td>1.0477</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>724,362</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9937</td>
-<td>-0.1121</td>
-<td>1.0497</td>
+<td>973,262</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9946</td>
+<td>-0.1036</td>
+<td>1.0464</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>962,196</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9947</td>
-<td>-0.1028</td>
-<td>1.0461</td>
+<td>929,218</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9948</td>
+<td>-0.102</td>
+<td>1.0458</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>630,022</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.9949</td>
-<td>-0.1009</td>
-<td>1.0454</td>
+<td>211,608</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9953</td>
+<td>-0.0965</td>
+<td>1.0436</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>666,507</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9951</td>
-<td>-0.0992</td>
-<td>1.0447</td>
+<td>414,256</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9955</td>
+<td>-0.0949</td>
+<td>1.0429</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>879,949</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.9951</td>
-<td>-0.099</td>
-<td>1.0446</td>
+<td>655,767</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9959</td>
+<td>-0.0903</td>
+<td>1.0411</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>411,414</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9955</td>
-<td>-0.0945</td>
-<td>1.0428</td>
+<td>742,808</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.996</td>
+<td>-0.0891</td>
+<td>1.0406</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>106,762</td>
+<td>649,834</td>
 <td>Blurry Neon Streetscape</td>
-<td>0.9961</td>
-<td>-0.0885</td>
-<td>1.0403</td>
-</tr>
-<tr>
-<td class="td-idx">9</td>
-<td>986,598</td>
-<td>Sharp Neon Skyline</td>
 <td>0.9962</td>
-<td>-0.0873</td>
+<td>-0.0872</td>
 <td>1.0398</td>
 </tr>
 <tr>
-<td class="td-idx">10</td>
-<td>594,405</td>
-<td>Sharp Neon Skyline</td>
+<td class="td-idx">9</td>
+<td>104,678</td>
+<td>Rustic Wooden Cabin</td>
 <td>0.9962</td>
-<td>-0.0867</td>
-<td>1.0396</td>
+<td>-0.0866</td>
+<td>1.0395</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>515,056</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9963</td>
+<td>-0.0859</td>
+<td>1.0393</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>936,960</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9963</td>
-<td>-0.0854</td>
-<td>1.0391</td>
-</tr>
-<tr>
-<td class="td-idx">12</td>
-<td>387,353</td>
+<td>437,438</td>
 <td>Rustic Wooden Cabin</td>
-<td>0.9964</td>
-<td>-0.0845</td>
-<td>1.0387</td>
-</tr>
-<tr>
-<td class="td-idx">13</td>
-<td>415,980</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9964</td>
-<td>-0.0844</td>
-<td>1.0386</td>
-</tr>
-<tr>
-<td class="td-idx">14</td>
-<td>161,587</td>
-<td>Blurry Neon Streetscape</td>
 <td>0.9965</td>
 <td>-0.084</td>
 <td>1.0385</td>
 </tr>
 <tr>
-<td class="td-idx">15</td>
-<td>673,990</td>
+<td class="td-idx">12</td>
+<td>701,083</td>
 <td>Blurry Neon Streetscape</td>
-<td>0.9966</td>
-<td>-0.0829</td>
-<td>1.038</td>
+<td>0.9965</td>
+<td>-0.0841</td>
+<td>1.0385</td>
+</tr>
+<tr>
+<td class="td-idx">13</td>
+<td>774,356</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9965</td>
+<td>-0.0839</td>
+<td>1.0384</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>591,314</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9965</td>
+<td>-0.0838</td>
+<td>1.0384</td>
+</tr>
+<tr>
+<td class="td-idx">15</td>
+<td>540,831</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9965</td>
+<td>-0.0831</td>
+<td>1.0381</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>877,559</td>
-<td>Rustic Wooden Cabin</td>
+<td>508,711</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9965</td>
+<td>-0.0831</td>
+<td>1.0381</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>826,005</td>
+<td>Sharp Neon Skyline</td>
 <td>0.9966</td>
 <td>-0.0819</td>
 <td>1.0376</td>
 </tr>
 <tr>
-<td class="td-idx">17</td>
-<td>476,090</td>
+<td class="td-idx">18</td>
+<td>470,849</td>
 <td>Rustic Wooden Cabin</td>
 <td>0.9967</td>
-<td>-0.0815</td>
-<td>1.0374</td>
-</tr>
-<tr>
-<td class="td-idx">18</td>
-<td>827,401</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.9967</td>
-<td>-0.0815</td>
-<td>1.0374</td>
+<td>-0.0811</td>
+<td>1.0373</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>961,973</td>
+<td>226,403</td>
 <td>Rustic Wooden Cabin</td>
-<td>0.9968</td>
-<td>-0.0802</td>
-<td>1.0369</td>
+<td>0.9967</td>
+<td>-0.0807</td>
+<td>1.0371</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>832,104</td>
+<td>336,819</td>
 <td>Sharp Neon Skyline</td>
-<td>0.9968</td>
-<td>-0.0796</td>
-<td>1.0366</td>
-</tr>
-<tr>
-<td class="td-idx">21</td>
-<td>765,940</td>
-<td>Blurry Neon Streetscape</td>
 <td>0.9969</td>
 <td>-0.0784</td>
 <td>1.0361</td>
 </tr>
 <tr>
+<td class="td-idx">21</td>
+<td>600,505</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9971</td>
+<td>-0.0764</td>
+<td>1.0353</td>
+</tr>
+<tr>
 <td class="td-idx">22</td>
-<td>520,098</td>
+<td>515,247</td>
 <td>Sharp Neon Skyline</td>
-<td>0.997</td>
-<td>-0.0775</td>
-<td>1.0358</td>
+<td>0.9971</td>
+<td>-0.0758</td>
+<td>1.035</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>804,547</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.997</td>
-<td>-0.0768</td>
-<td>1.0355</td>
+<td>746,351</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9972</td>
+<td>-0.0752</td>
+<td>1.0348</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>830,632</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.9971</td>
-<td>-0.0767</td>
-<td>1.0354</td>
+<td>636,201</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9972</td>
+<td>-0.0753</td>
+<td>1.0348</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>226,508</td>
-<td>Rustic Wooden Cabin</td>
-<td>0.9971</td>
-<td>-0.0763</td>
-<td>1.0352</td>
+<td>36,462</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9972</td>
+<td>-0.0744</td>
+<td>1.0344</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
@@ -680,203 +683,203 @@ Results should be ordered as specified.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>720,289</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.993</td>
-<td>-0.1185</td>
-<td>1.0522</td>
+<td>70,247</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9943</td>
+<td>-0.1069</td>
+<td>1.0477</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>724,362</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9937</td>
-<td>-0.1121</td>
-<td>1.0497</td>
+<td>973,262</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9946</td>
+<td>-0.1036</td>
+<td>1.0464</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>962,196</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9947</td>
-<td>-0.1028</td>
-<td>1.0461</td>
+<td>929,218</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9948</td>
+<td>-0.102</td>
+<td>1.0458</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>630,022</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.9949</td>
-<td>-0.1009</td>
-<td>1.0454</td>
+<td>211,608</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9953</td>
+<td>-0.0965</td>
+<td>1.0436</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>666,507</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9951</td>
-<td>-0.0992</td>
-<td>1.0447</td>
+<td>414,256</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9955</td>
+<td>-0.0949</td>
+<td>1.0429</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>879,949</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.9951</td>
-<td>-0.099</td>
-<td>1.0446</td>
+<td>655,767</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9959</td>
+<td>-0.0903</td>
+<td>1.0411</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>411,414</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9955</td>
-<td>-0.0945</td>
-<td>1.0428</td>
+<td>742,808</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.996</td>
+<td>-0.0891</td>
+<td>1.0406</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>106,762</td>
+<td>649,834</td>
 <td>Blurry Neon Streetscape</td>
-<td>0.9961</td>
-<td>-0.0885</td>
-<td>1.0403</td>
-</tr>
-<tr>
-<td class="td-idx">9</td>
-<td>986,598</td>
-<td>Sharp Neon Skyline</td>
 <td>0.9962</td>
-<td>-0.0873</td>
+<td>-0.0872</td>
 <td>1.0398</td>
 </tr>
 <tr>
-<td class="td-idx">10</td>
-<td>594,405</td>
-<td>Sharp Neon Skyline</td>
+<td class="td-idx">9</td>
+<td>104,678</td>
+<td>Rustic Wooden Cabin</td>
 <td>0.9962</td>
-<td>-0.0867</td>
-<td>1.0396</td>
+<td>-0.0866</td>
+<td>1.0395</td>
+</tr>
+<tr>
+<td class="td-idx">10</td>
+<td>515,056</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9963</td>
+<td>-0.0859</td>
+<td>1.0393</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>936,960</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9963</td>
-<td>-0.0854</td>
-<td>1.0391</td>
+<td>701,083</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9965</td>
+<td>-0.0841</td>
+<td>1.0385</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>387,353</td>
+<td>437,438</td>
 <td>Rustic Wooden Cabin</td>
-<td>0.9964</td>
-<td>-0.0845</td>
-<td>1.0387</td>
-</tr>
-<tr>
-<td class="td-idx">13</td>
-<td>415,980</td>
-<td>Sharp Neon Skyline</td>
-<td>0.9964</td>
-<td>-0.0844</td>
-<td>1.0386</td>
-</tr>
-<tr>
-<td class="td-idx">14</td>
-<td>161,587</td>
-<td>Blurry Neon Streetscape</td>
 <td>0.9965</td>
 <td>-0.084</td>
 <td>1.0385</td>
 </tr>
 <tr>
+<td class="td-idx">13</td>
+<td>774,356</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9965</td>
+<td>-0.0839</td>
+<td>1.0384</td>
+</tr>
+<tr>
+<td class="td-idx">14</td>
+<td>591,314</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9965</td>
+<td>-0.0838</td>
+<td>1.0384</td>
+</tr>
+<tr>
 <td class="td-idx">15</td>
-<td>673,990</td>
+<td>508,711</td>
 <td>Blurry Neon Streetscape</td>
-<td>0.9966</td>
-<td>-0.0829</td>
-<td>1.038</td>
+<td>0.9965</td>
+<td>-0.0831</td>
+<td>1.0381</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>877,559</td>
-<td>Rustic Wooden Cabin</td>
+<td>540,831</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9965</td>
+<td>-0.0831</td>
+<td>1.0381</td>
+</tr>
+<tr>
+<td class="td-idx">17</td>
+<td>826,005</td>
+<td>Sharp Neon Skyline</td>
 <td>0.9966</td>
 <td>-0.0819</td>
 <td>1.0376</td>
 </tr>
 <tr>
-<td class="td-idx">17</td>
-<td>827,401</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.9967</td>
-<td>-0.0815</td>
-<td>1.0374</td>
-</tr>
-<tr>
 <td class="td-idx">18</td>
-<td>476,090</td>
+<td>470,849</td>
 <td>Rustic Wooden Cabin</td>
 <td>0.9967</td>
-<td>-0.0815</td>
-<td>1.0374</td>
+<td>-0.0811</td>
+<td>1.0373</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>961,973</td>
+<td>226,403</td>
 <td>Rustic Wooden Cabin</td>
-<td>0.9968</td>
-<td>-0.0802</td>
-<td>1.0369</td>
+<td>0.9967</td>
+<td>-0.0807</td>
+<td>1.0371</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>832,104</td>
+<td>336,819</td>
 <td>Sharp Neon Skyline</td>
-<td>0.9968</td>
-<td>-0.0796</td>
-<td>1.0366</td>
-</tr>
-<tr>
-<td class="td-idx">21</td>
-<td>765,940</td>
-<td>Blurry Neon Streetscape</td>
 <td>0.9969</td>
 <td>-0.0784</td>
 <td>1.0361</td>
 </tr>
 <tr>
+<td class="td-idx">21</td>
+<td>600,505</td>
+<td>Blurry Neon Streetscape</td>
+<td>0.9971</td>
+<td>-0.0764</td>
+<td>1.0353</td>
+</tr>
+<tr>
 <td class="td-idx">22</td>
-<td>520,098</td>
+<td>515,247</td>
 <td>Sharp Neon Skyline</td>
-<td>0.997</td>
-<td>-0.0775</td>
-<td>1.0358</td>
+<td>0.9971</td>
+<td>-0.0758</td>
+<td>1.035</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>804,547</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.997</td>
-<td>-0.0768</td>
-<td>1.0355</td>
+<td>746,351</td>
+<td>Rustic Wooden Cabin</td>
+<td>0.9972</td>
+<td>-0.0752</td>
+<td>1.0348</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>830,632</td>
-<td>Blurry Neon Streetscape</td>
-<td>0.9971</td>
-<td>-0.0767</td>
-<td>1.0354</td>
+<td>636,201</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9972</td>
+<td>-0.0753</td>
+<td>1.0348</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>226,508</td>
-<td>Rustic Wooden Cabin</td>
-<td>0.9971</td>
-<td>-0.0763</td>
-<td>1.0352</td>
+<td>36,462</td>
+<td>Sharp Neon Skyline</td>
+<td>0.9972</td>
+<td>-0.0744</td>
+<td>1.0344</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 1,000,000 total rows.</div>
@@ -893,7 +896,7 @@ Results should be ordered as specified.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:14 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:28 UTC</p>
     </footer>
 
     <script src="../script.js"></script>

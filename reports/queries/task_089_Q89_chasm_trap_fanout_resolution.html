@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task_089_Q89_chasm_trap_fanout_resolution - SQL Frontier Eval Deep-Dive (1M+ Records)</title>
+    <title>task_089_Q89_chasm_trap_fanout_resolution: Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation | SQL-Frontier-Eval (1M+ Records)</title>
+    <meta name="description" content="Technical deep-dive into task_089_Q89_chasm_trap_fanout_resolution (Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation). Category: Warehouse &amp; Statistical. Evaluated on DuckDB 2.0 &amp; PostgreSQL 18+ with 1M+ records. When an order has multiple discounts AND multiple shipment records, joining both child tables directly to the order creates a cros">
+    <meta name="keywords" content="SQL Frontier Eval, Warehouse &amp; Statistical, task_089_Q89_chasm_trap_fanout_resolution, Database Benchmark, Execution Plan, DuckDB, PostgreSQL, Databricks, Aurora, Query Optimization">
+    <link rel="canonical" href="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_089_Q89_chasm_trap_fanout_resolution.html">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+    <!-- OpenGraph / Social Cards -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="SQL-Frontier-Eval Benchmark">
+    <meta property="og:title" content="task_089_Q89_chasm_trap_fanout_resolution: Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation">
+    <meta property="og:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_089_Q89_chasm_trap_fanout_resolution.">
+    <meta property="og:url" content="https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_089_Q89_chasm_trap_fanout_resolution.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="task_089_Q89_chasm_trap_fanout_resolution: Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation">
+    <meta name="twitter:description" content="Empirical query execution plan, 1M+ record benchmarks, and analytical trap diagnostics for task_089_Q89_chasm_trap_fanout_resolution.">
+
+    <!-- Structured Data JSON-LD for AI Agents & Search Engines -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "task_089_Q89_chasm_trap_fanout_resolution: Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation",
+      "identifier": "task_089_Q89_chasm_trap_fanout_resolution",
+      "articleSection": "Warehouse & Statistical",
+      "description": "When an order has multiple discounts AND multiple shipment records, joining both child tables directly to the order creates a cross product that multiplies sales figures by 4x. Pre-aggregating each child table in CTEs before joining preserves financial integrity.",
+      "dependencies": "DuckDB 2.0 In-Memory / PostgreSQL 18.7 / Amazon Aurora Serverless v2",
+      "url": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_089_Q89_chasm_trap_fanout_resolution.html"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Benchmark Home",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Warehouse & Statistical",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "task_089_Q89_chasm_trap_fanout_resolution",
+          "item": "https://sethusrinivasan.github.io/sql-frontier-eval/queries/task_089_Q89_chasm_trap_fanout_resolution.html"
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "task_089_Q89_chasm_trap_fanout_resolution Golden Ground Truth SQL",
+      "programmingLanguage": "SQL",
+      "codeSampleType": "Reference Implementation",
+      "text": "-- Correctly aggregate discounts and shipments without fan-out inflation\n            WITH agg_discounts AS (\n                SELECT order_id, SUM(amount) AS total_discount\n                FROM order_discounts\n                GROUP BY order_id\n            ),\n            agg_shipments AS (\n                SELECT order_id, SUM(fee) AS total_shipping\n                FROM order_shipments\n                GROUP BY order_id\n            )\n            SELECT \n                o.customer_id,\n                SUM(o.base_amount) AS total_gross_sales,\n                COALESCE(SUM(d.total_discount), 0.00) AS total_discount_amount,\n                COALESCE(SUM(s.total_shipping), 0.00) AS total_shipping_fees,\n                ROUND(SUM(o.base_amount) - COALESCE(SUM(d.total_discount), 0.00) + COALESCE(SUM(s.total_shipping), 0.00), 2) AS net_revenue\n            FROM orders o\n            LEFT JOIN agg_discounts d ON o.order_id = d.order_id\n            LEFT JOIN agg_shipments s ON o.order_id = s.order_id\n            GROUP BY o.customer_id;"
+    }
+  ]
+}
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body class="query-detail-page">
@@ -29,8 +93,55 @@
     </header>
 
     <main class="main-container">
+        <!-- Top Action & Share Bar -->
+        <div class="share-export-bar">
+            <div class="share-actions-left">
+                <span class="share-bar-label">Export &amp; Share:</span>
+                <button class="share-action-btn" onclick="copyCurrentUrl(this)" title="Copy direct link to this query deep-dive report to clipboard" aria-label="Copy Link to Clipboard">
+                    <span class="btn-icon">📋</span> Copy Link
+                </button>
+                <button class="share-action-btn" onclick="exportPDF()" title="Download or print this report as a high-fidelity PDF document" aria-label="Download as PDF">
+                    <span class="btn-icon">📄</span> PDF
+                </button>
+                <button class="share-action-btn" onclick="exportQueryDataAsCSV('task_089_Q89_chasm_trap_fanout_resolution')" title="Download underlying query data and execution metrics as an Excel-compatible CSV file" aria-label="Download as CSV">
+                    <span class="btn-icon">📊</span> Excel/CSV
+                </button>
+                <button class="share-action-btn" onclick="exportQueryAsMarkdown('task_089_Q89_chasm_trap_fanout_resolution')" title="Download the full analytical problem, prompt, queries, and diagnostics as Markdown (.md)" aria-label="Download as Markdown">
+                    <span class="btn-icon">📝</span> Markdown
+                </button>
+            </div>
+            <div class="share-actions-right">
+                <span class="share-social-label">Share On:</span>
+                <a href="https://twitter.com/intent/tweet?text=Empirical%20deep-dive%20of%20task_089_Q89_chasm_trap_fanout_resolution%20%28Chasm%20Trap%20Resolution%3A%20Multi-Table%201%3AN%20Aggregation%20without%20Fan-Out%20Inflation%29%20evaluated%20on%201M%2B%20records%20in%20DuckDB%20%26%20Postgres.&amp;url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_089_Q89_chasm_trap_fanout_resolution.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-twitter" title="Share this query deep-dive on X (Twitter)" aria-label="Share on X">
+                    <span class="social-icon">𝕏</span>
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_089_Q89_chasm_trap_fanout_resolution.html" target="_blank" rel="noopener noreferrer" class="social-share-btn share-linkedin" title="Share this analytical analysis on LinkedIn" aria-label="Share on LinkedIn">
+                    <span class="social-icon">in</span>
+                </a>
+                <a href="https://reddit.com/submit?url=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_089_Q89_chasm_trap_fanout_resolution.html&amp;title=task_089_Q89_chasm_trap_fanout_resolution%3A%20Chasm%20Trap%20Resolution%3A%20Multi-Table%201%3AN%20Aggregation%20without%20Fan-Out%20Inflation%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-reddit" title="Share to Reddit /r/SQL or /r/Database" aria-label="Share on Reddit">
+                    <span class="social-icon">🤖</span>
+                </a>
+                <a href="https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fsethusrinivasan.github.io%2Fsql-frontier-eval%2Fqueries%2Ftask_089_Q89_chasm_trap_fanout_resolution.html&amp;t=task_089_Q89_chasm_trap_fanout_resolution%3A%20Chasm%20Trap%20Resolution%3A%20Multi-Table%201%3AN%20Aggregation%20without%20Fan-Out%20Inflation%20%7C%20SQL-Frontier-Eval%20Benchmark" target="_blank" rel="noopener noreferrer" class="social-share-btn share-hn" title="Submit to Hacker News" aria-label="Submit to Hacker News">
+                    <span class="social-icon">Y</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sticky Quick Sub-Nav Anchor Bar -->
+        <nav class="sticky-subnav" aria-label="Page Sections Navigation">
+            <div class="subnav-container">
+                <a href="#hero" class="subnav-link">⚡ Overview</a>
+                <a href="#trap" class="subnav-link">⚠️ Analytical Trap</a>
+                <a href="#fixtures" class="subnav-link">📊 Tables &amp; 1M+ Data</a>
+                <a href="#plan" class="subnav-link">🌲 Execution Plan</a>
+                <a href="#queries" class="subnav-link">📜 Executed SQL</a>
+                <a href="#results" class="subnav-link">🔍 Results Diff</a>
+                <a href="https://github.com/sethusrinivasan/sql-frontier-eval/blob/main/tasks/task_089_Q89_chasm_trap_fanout_resolution.json" target="_blank" rel="noopener noreferrer" class="subnav-link subnav-github">🔗 Raw Task JSON</a>
+            </div>
+        </nav>
+
         <!-- Hero Header -->
-        <section class="task-hero">
+        <section class="task-hero" id="hero">
             <div class="task-hero-top">
                 <div class="task-badge-row">
                     <span class="badge badge-pass">✔ PASS</span>
@@ -41,7 +152,10 @@
                     <span class="badge badge-pass">Scaled: 1M+ Records</span>
                     <span class="badge badge-neutral">Ordered: No</span>
                 </div>
-                <h1 class="task-title">Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation</h1>
+                <h1 class="task-title">
+                    Chasm Trap Resolution: Multi-Table 1:N Aggregation without Fan-Out Inflation
+                    <a href="#hero" class="heading-anchor" title="Direct link to Overview">#</a>
+                </h1>
             </div>
 
             <div class="hero-stats-grid">
@@ -52,12 +166,12 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Candidate Latency (1M Rows)</div>
-                    <div class="stat-val">127.44 ms</div>
-                    <div class="stat-sub"><span class="latency-diff faster">(1.0x faster than golden)</span></div>
+                    <div class="stat-val">159.46 ms</div>
+                    <div class="stat-sub"><span class="latency-diff slower">(1.1x slower than golden)</span></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Golden Latency (1M Rows)</div>
-                    <div class="stat-val">133.52 ms</div>
+                    <div class="stat-val">151.33 ms</div>
                     <div class="stat-sub">DuckDB in-memory engine</div>
                 </div>
                 <div class="stat-box">
@@ -84,15 +198,18 @@
         
 
         <!-- Section 1: What It Means -->
-        <section class="content-section">
+        <section class="content-section" id="trap">
             <div class="section-header">
-                <h2>1. Analytical Significance & What It Means</h2>
-                <span class="section-badge">Scenario & Frontier Trap</span>
+                <h2>
+                    1. Analytical Significance &amp; What It Means
+                    <a href="#trap" class="heading-anchor" title="Direct link to Analytical Trap">#</a>
+                </h2>
+                <span class="section-badge">Scenario &amp; Frontier Trap</span>
             </div>
             <div class="card">
                 <div class="analysis-grid">
                     <div class="analysis-item">
-                        <div class="analysis-subtitle">Business Scenario & Problem</div>
+                        <div class="analysis-subtitle">Business Scenario &amp; Problem</div>
                         <p>When an order has multiple discounts AND multiple shipment records, joining both child tables directly to the order creates a cross product that multiplies sales figures by 4x. Pre-aggregating each child table in CTEs before joining preserves financial integrity.</p>
                     </div>
                     <div class="analysis-item highlight-trap">
@@ -113,9 +230,12 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 2: Underlying Tables & Data Volume -->
-        <section class="content-section">
+        <section class="content-section" id="fixtures">
             <div class="section-header">
-                <h2>2. Underlying Tables, Row Counts & Data Volume</h2>
+                <h2>
+                    2. Underlying Tables, Row Counts &amp; Data Volume
+                    <a href="#fixtures" class="heading-anchor" title="Direct link to Data Fixtures">#</a>
+                </h2>
                 <span class="section-badge">3 Tables (1,002,000 rows &bull; 22.9 MiB)</span>
             </div>
             <p class="section-desc">Production-scale fixtures loaded into the isolated DuckDB 2.0 In-Memory engine (PostgreSQL 18.7 verified) with at least 1,000,000 records per table:</p>
@@ -153,79 +273,79 @@ Row order does not matter.</pre>
 <td class="td-idx">3</td>
 <td>2</td>
 <td>101</td>
-<td>4.22</td>
+<td>9.32</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>3</td>
 <td>102</td>
-<td>4.18</td>
+<td>5.74</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>103</td>
-<td>14.4</td>
+<td>10.76</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>104</td>
-<td>4.21</td>
+<td>6.44</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>105</td>
-<td>4.15</td>
+<td>5.51</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>106</td>
-<td>8.35</td>
+<td>5.97</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>107</td>
-<td>5.12</td>
+<td>8.49</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>108</td>
-<td>8.88</td>
+<td>7.65</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>109</td>
-<td>7.55</td>
+<td>11.17</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>110</td>
-<td>4.94</td>
+<td>2.74</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>111</td>
-<td>9.51</td>
+<td>11.05</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>112</td>
-<td>6.84</td>
+<td>5.69</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>113</td>
-<td>8.33</td>
+<td>9.93</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -265,79 +385,79 @@ Row order does not matter.</pre>
 <td class="td-idx">3</td>
 <td>2</td>
 <td>101</td>
-<td>7.06</td>
+<td>6.93</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>3</td>
 <td>102</td>
-<td>4.77</td>
+<td>3.75</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>4</td>
 <td>103</td>
-<td>6.92</td>
+<td>0.77</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>5</td>
 <td>104</td>
-<td>3.67</td>
+<td>6.37</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>6</td>
 <td>105</td>
-<td>2.14</td>
+<td>6.61</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>7</td>
 <td>106</td>
-<td>4.42</td>
+<td>5.43</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>8</td>
 <td>107</td>
-<td>6.19</td>
+<td>5.43</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>9</td>
 <td>108</td>
-<td>5.16</td>
+<td>4.58</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>10</td>
 <td>109</td>
-<td>5.36</td>
+<td>4.75</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>11</td>
 <td>110</td>
-<td>5.77</td>
+<td>4.34</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>12</td>
 <td>111</td>
-<td>7.15</td>
+<td>4.38</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>13</td>
 <td>112</td>
-<td>3.37</td>
+<td>7.57</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>14</td>
 <td>113</td>
-<td>6.03</td>
+<td>3.33</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -371,85 +491,85 @@ Row order does not matter.</pre>
 <td class="td-idx">2</td>
 <td>101</td>
 <td>1</td>
-<td>113.23</td>
+<td>102.83</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>102</td>
 <td>2</td>
-<td>94.32</td>
+<td>109.41</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>103</td>
 <td>3</td>
-<td>84.23</td>
+<td>101.43</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>104</td>
 <td>4</td>
-<td>131.86</td>
+<td>105.51</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>105</td>
 <td>5</td>
-<td>100.55</td>
+<td>105.82</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>106</td>
 <td>6</td>
-<td>96.21</td>
+<td>84.75</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>107</td>
 <td>7</td>
-<td>80.73</td>
+<td>88.87</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>108</td>
 <td>8</td>
-<td>112.32</td>
+<td>102</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>109</td>
 <td>9</td>
-<td>102.4</td>
+<td>122.98</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>110</td>
 <td>10</td>
-<td>92.26</td>
+<td>103.73</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>111</td>
 <td>11</td>
-<td>75.55</td>
+<td>121.4</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>112</td>
 <td>12</td>
-<td>124.92</td>
+<td>118.24</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>113</td>
 <td>13</td>
-<td>71.07</td>
+<td>97.13</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>114</td>
 <td>14</td>
-<td>104.09</td>
+<td>104.88</td>
 </tr>
 </tbody></table></div>
             </div>
@@ -458,474 +578,42 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 3: Graphical Execution Plan & Cost Breakdown -->
-        <section class="content-section">
+        <section class="content-section" id="plan">
             <div class="section-header">
-                <h2>3. Graphical Query Execution Plan & Cost Bottlenecks</h2>
+                <h2>
+                    3. Graphical Query Execution Plan &amp; Cost Bottlenecks
+                    <a href="#plan" class="heading-anchor" title="Direct link to Execution Plan">#</a>
+                </h2>
                 <span class="section-badge">Physical Operator Tree &bull; DuckDB 2.0 Profiler (AVX2 SIMD)</span>
             </div>
             <p class="section-desc">Visual flowchart of the physical execution pipeline evaluated on <strong>DuckDB 2.0 In-Memory Engine (1M+ Records)</strong>. Operators with high relative costs (&ge; 20% of query runtime or heavy latency) are visually highlighted:</p>
-            
-    <div class="execution-plan-wrapper">
-        <div class="plan-bar-header">
-            <span class="pb-title">Pipeline Latency Distribution (Total Plan Time: 329.81 ms)</span>
-            <span class="pb-sub">Nodes consuming &ge; 20% of query runtime are highlighted with glowing borders</span>
-        </div>
-        <div class="cost-bar-wrap"><div class="cost-bar-seg" style="width: 86.5457166800163%; background: #f85149;" title="HASH_GROUP_BY: 285.43ms (86.5%)"></div><div class="cost-bar-seg" style="width: 3.881004687879328%; background: #f85149;" title="PROJECTION: 12.80ms (3.9%)"></div><div class="cost-bar-seg" style="width: 3.3166398544602163%; background: #3fb950;" title="HASH_JOIN: 10.94ms (3.3%)"></div><div class="cost-bar-seg" style="width: 3.0418874200483237%; background: #d29922;" title="HASH_JOIN: 10.03ms (3.0%)"></div><div class="cost-bar-seg" style="width: 2.429950627495502%; background: #bc8cff;" title="PROJECTION: 8.01ms (2.4%)"></div><div class="cost-bar-seg" style="width: 0.68994940841383%; background: #39c5cf;" title="TABLE_SCAN: 2.28ms (0.7%)"></div></div>
-        <div class="plan-tree-scroll-container">
-            <div class="graphical-plan-tree"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">3.9%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">12.80 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,999</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">64.85 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;customer_id&#x27;, &#x27;total_gross_sales&#x27;">📁 Projections: [&#x27;customer_id&#x27;, &#x27;to...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">2.4%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">8.01 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,999</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.59 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;customer_id&#x27;, &#x27;total_gross_sales&#x27;">📁 Projections: [&#x27;customer_id&#x27;, &#x27;to...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node high-cost">
-            <div class="node-header">
-                <span class="node-icon-title">📊 <strong>HASH_GROUP_BY</strong></span>
-                <span class="high-cost-tag">🔥 86.5% Cost</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">285.43 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">999,999</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">49.84 MB</span></div>
-                
-            </div>
-            <div class="high-cost-banner">⚠️ Heavy Execution Bottleneck (86.5% of query runtime)</div>
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.1%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.18 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">42.20 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;customer_id&#x27;, &#x27;base_amount&#x27;, &#x27;tot">📁 Projections: [&#x27;customer_id&#x27;, &#x27;ba...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
-                <span class="node-cost-tag">3.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">10.03 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">42.20 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">⚡ <strong>HASH_JOIN</strong></span>
-                <span class="node-cost-tag">3.3%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">10.94 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">30.64 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.7%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">2.28 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">15.26 MB</span></div>
-                <div class="nm-tbl" title="memory.main.orders">📁 memory.main.orders</div>
-            </div>
-            
-        </div>
-        </div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">998</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📊 <strong>PERFECT_HASH_GROUP_BY</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.03 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">998</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10,000 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;order_id&#x27;, &#x27;amount&#x27;]">📁 Projections: [&#x27;order_id&#x27;, &#x27;amoun...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10,000 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS SMALLI...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.01 MB</span></div>
-                <div class="nm-tbl" title="memory.main.order_discounts">📁 memory.main.order_discounts</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">998</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS INTEGE...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📊 <strong>PERFECT_HASH_GROUP_BY</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.05 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">998</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.02 MB</span></div>
-                
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10,000 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;order_id&#x27;, &#x27;fee&#x27;]">📁 Projections: [&#x27;order_id&#x27;, &#x27;fee&#x27;]</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">📐 <strong>PROJECTION</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.00 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">10,000 B</span></div>
-                <div class="nm-tbl" title="Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]">📁 Projections: [&#x27;CAST(#0 AS SMALLI...</div>
-            </div>
-            
-        </div>
-        <div class="children-container"><div class="child-branch"><div class="tree-node-wrap">
-        <div class="plan-node">
-            <div class="node-header">
-                <span class="node-icon-title">🔍 <strong>TABLE_SCAN</strong></span>
-                <span class="node-cost-tag">0.0%</span>
-            </div>
-            <div class="node-metrics">
-                <div class="nm-row"><span class="nm-label">Latency:</span> <span class="nm-val">0.02 ms</span></div>
-                <div class="nm-row"><span class="nm-label">Rows In/Out:</span> <span class="nm-val">1,000</span></div>
-                <div class="nm-row"><span class="nm-label">Data Vol:</span> <span class="nm-val">0.01 MB</span></div>
-                <div class="nm-tbl" title="memory.main.order_shipments">📁 memory.main.order_shipments</div>
-            </div>
-            
-        </div>
-        </div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>
-        </div>
-        
-    <div class="table-responsive" style="margin-top: 16px;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Operator</th>
-                    <th>Cost %</th>
-                    <th>Latency</th>
-                    <th>Processed Rows</th>
-                    <th>Data Volume</th>
-                    <th>Details / Table</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-        <tr>
-            <td><strong>HASH_GROUP_BY</strong></td>
-            <td><strong>86.5%</strong></td>
-            <td>285.43 ms</td>
-            <td>999,999</td>
-            <td>49.84 MB</td>
-            <td><small>-</small></td>
-            <td><span class="high-cost-tag">🔥 BOTTLENECK</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>3.9%</strong></td>
-            <td>12.80 ms</td>
-            <td>999,999</td>
-            <td>64.85 MB</td>
-            <td><small>Projections: [&#x27;customer_id&#x27;, &#x27;total_gross_sales&#x27;</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>HASH_JOIN</strong></td>
-            <td><strong>3.3%</strong></td>
-            <td>10.94 ms</td>
-            <td>1,000,000</td>
-            <td>30.64 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>HASH_JOIN</strong></td>
-            <td><strong>3.0%</strong></td>
-            <td>10.03 ms</td>
-            <td>1,000,000</td>
-            <td>42.20 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>2.4%</strong></td>
-            <td>8.01 ms</td>
-            <td>999,999</td>
-            <td>49.59 MB</td>
-            <td><small>Projections: [&#x27;customer_id&#x27;, &#x27;total_gross_sales&#x27;</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.7%</strong></td>
-            <td>2.28 ms</td>
-            <td>1,000,000</td>
-            <td>15.26 MB</td>
-            <td><small>memory.main.orders</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.1%</strong></td>
-            <td>0.18 ms</td>
-            <td>1,000,000</td>
-            <td>42.20 MB</td>
-            <td><small>Projections: [&#x27;customer_id&#x27;, &#x27;base_amount&#x27;, &#x27;tot</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PERFECT_HASH_GROUP_BY</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.05 ms</td>
-            <td>998</td>
-            <td>0.02 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PERFECT_HASH_GROUP_BY</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.03 ms</td>
-            <td>998</td>
-            <td>0.02 MB</td>
-            <td><small>-</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.02 ms</td>
-            <td>1,000</td>
-            <td>0.01 MB</td>
-            <td><small>memory.main.order_discounts</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>TABLE_SCAN</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.02 ms</td>
-            <td>1,000</td>
-            <td>0.01 MB</td>
-            <td><small>memory.main.order_shipments</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.00 ms</td>
-            <td>1,000</td>
-            <td>0.01 MB</td>
-            <td><small>Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.00 ms</td>
-            <td>998</td>
-            <td>0.02 MB</td>
-            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.00 ms</td>
-            <td>998</td>
-            <td>0.02 MB</td>
-            <td><small>Projections: [&#x27;CAST(#0 AS INTEGER)&#x27;, &#x27;#1&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.00 ms</td>
-            <td>1,000</td>
-            <td>0.01 MB</td>
-            <td><small>Projections: [&#x27;CAST(#0 AS SMALLINT)&#x27;, &#x27;#1&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.00 ms</td>
-            <td>1,000</td>
-            <td>0.01 MB</td>
-            <td><small>Projections: [&#x27;order_id&#x27;, &#x27;fee&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-        <tr>
-            <td><strong>PROJECTION</strong></td>
-            <td><strong>0.0%</strong></td>
-            <td>0.00 ms</td>
-            <td>1,000</td>
-            <td>0.01 MB</td>
-            <td><small>Projections: [&#x27;order_id&#x27;, &#x27;amount&#x27;]</small></td>
-            <td><span class="badge badge-neutral">Normal</span></td>
-        </tr>
-        
-            </tbody>
-        </table>
-    </div>
-    
-    </div>
-    
+            <div class="table-empty"><em>Execution plan profiling not available for this query.</em></div>
         </section>
 
         <!-- Section 4: Colored & Formatted Queries -->
-        <section class="content-section">
+        <section class="content-section" id="queries">
             <div class="section-header">
-                <h2>4. Queries Executed (Candidate vs Golden Ground Truth)</h2>
-                <span class="section-badge">Beautified & Syntax Highlighted</span>
+                <h2>
+                    4. Queries Executed (Candidate vs Golden Ground Truth)
+                    <a href="#queries" class="heading-anchor" title="Direct link to Queries">#</a>
+                </h2>
+                <span class="section-badge">Beautified &amp; Syntax Highlighted</span>
             </div>
 
-                        <div class="engine-compat-note">
-                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong>.
+            <div class="engine-compat-note">
+                <strong>Database Engine Context:</strong> This query was executed and profiled on <strong>DuckDB 2.0 In-Memory Engine</strong> with equivalent analytical syntax and execution verification on <strong>PostgreSQL 18.7 + Extensions (Docker Compose)</strong> and <strong>Amazon Aurora Serverless v2 PostgreSQL</strong>.
             </div>
+
             <div class="query-tabs">
                 <div class="tab-header">
                     <button class="tab-btn active" onclick="switchTab(event, 'tab-candidate')">Candidate Query (Tested)</button>
                     <button class="tab-btn" onclick="switchTab(event, 'tab-golden')">Golden Reference Query (Ground Truth)</button>
-                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL & Fixtures</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'tab-setup')">Setup DDL &amp; Fixtures</button>
                 </div>
 
                 <div id="tab-candidate" class="tab-content active">
                     <div class="code-toolbar">
-                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 127.44 ms)</span>
+                        <span class="code-meta">Candidate SQL Executed by <strong>gemini-3.8-flash-low</strong> (Runtime on 1M Rows: 159.46 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-candidate')">Copy SQL</button>
                     </div>
                     <pre id="code-candidate" class="highlight"><code><span class="k">WITH</span><span class="w"> </span><span class="n">customer_orders</span><span class="w"> </span><span class="k">AS</span>
@@ -957,7 +645,7 @@ Row order does not matter.</pre>
 
                 <div id="tab-golden" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 133.52 ms)</span>
+                        <span class="code-meta">Golden Reference Ground Truth SQL (Runtime on 1M Rows: 151.33 ms)</span>
                         <button class="copy-btn" onclick="copyCode('code-golden')">Copy SQL</button>
                     </div>
                     <pre id="code-golden" class="highlight"><code><span class="c1">-- Correctly aggregate discounts and shipments without fan-out inflation</span>
@@ -985,7 +673,7 @@ Row order does not matter.</pre>
 
                 <div id="tab-setup" class="tab-content">
                     <div class="code-toolbar">
-                        <span class="code-meta">DuckDB Fixture Setup DDL & Data Population</span>
+                        <span class="code-meta">DuckDB Fixture Setup DDL &amp; Data Population</span>
                         <button class="copy-btn" onclick="copyCode('code-setup')">Copy SQL</button>
                     </div>
                     <pre id="code-setup" class="highlight"><code><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">orders</span><span class="w"> </span><span class="p">(</span><span class="n">order_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="nb">INT</span><span class="p">,</span><span class="w"> </span><span class="n">base_amount</span><span class="w"> </span><span class="nb">decimal</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">));</span>
@@ -1015,9 +703,12 @@ Row order does not matter.</pre>
         </section>
 
         <!-- Section 5: Query Results Comparison -->
-        <section class="content-section">
+        <section class="content-section" id="results">
             <div class="section-header">
-                <h2>5. Query Results & Expected Ground Truth</h2>
+                <h2>
+                    5. Query Results &amp; Expected Ground Truth
+                    <a href="#results" class="heading-anchor" title="Direct link to Results Diff">#</a>
+                </h2>
                 <span class="section-badge">Tabular Comparison</span>
             </div>
 
@@ -1037,203 +728,203 @@ Row order does not matter.</pre>
 </tr></thead><tbody>
 <tr>
 <td class="td-idx">1</td>
-<td>122,895</td>
-<td>102.94</td>
+<td>368,654</td>
+<td>77.29</td>
 <td>0</td>
 <td>0</td>
-<td>102.94</td>
+<td>77.29</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
-<td>122,897</td>
-<td>78.5</td>
+<td>368,656</td>
+<td>77.91</td>
 <td>0</td>
 <td>0</td>
-<td>78.5</td>
+<td>77.91</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
-<td>122,997</td>
-<td>86.42</td>
+<td>368,667</td>
+<td>87.26</td>
 <td>0</td>
 <td>0</td>
-<td>86.42</td>
+<td>87.26</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
-<td>123,044</td>
-<td>86.11</td>
+<td>368,689</td>
+<td>117.13</td>
 <td>0</td>
 <td>0</td>
-<td>86.11</td>
+<td>117.13</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
-<td>123,069</td>
-<td>79.08</td>
+<td>368,692</td>
+<td>64.93</td>
 <td>0</td>
 <td>0</td>
-<td>79.08</td>
+<td>64.93</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
-<td>123,088</td>
-<td>104.56</td>
+<td>368,730</td>
+<td>97.67</td>
 <td>0</td>
 <td>0</td>
-<td>104.56</td>
+<td>97.67</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
-<td>123,148</td>
-<td>123.19</td>
+<td>368,743</td>
+<td>98.36</td>
 <td>0</td>
 <td>0</td>
-<td>123.19</td>
+<td>98.36</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
-<td>123,237</td>
-<td>101.99</td>
+<td>368,765</td>
+<td>97.05</td>
 <td>0</td>
 <td>0</td>
-<td>101.99</td>
+<td>97.05</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
-<td>123,319</td>
-<td>107.15</td>
+<td>368,769</td>
+<td>99.84</td>
 <td>0</td>
 <td>0</td>
-<td>107.15</td>
+<td>99.84</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
-<td>123,336</td>
-<td>104.83</td>
+<td>368,836</td>
+<td>135.73</td>
 <td>0</td>
 <td>0</td>
-<td>104.83</td>
+<td>135.73</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
-<td>123,400</td>
-<td>102.72</td>
+<td>368,837</td>
+<td>53.33</td>
 <td>0</td>
 <td>0</td>
-<td>102.72</td>
+<td>53.33</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
-<td>123,414</td>
-<td>77.23</td>
+<td>368,849</td>
+<td>117.98</td>
 <td>0</td>
 <td>0</td>
-<td>77.23</td>
+<td>117.98</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
-<td>123,480</td>
-<td>76.06</td>
+<td>368,860</td>
+<td>117.03</td>
 <td>0</td>
 <td>0</td>
-<td>76.06</td>
+<td>117.03</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
-<td>123,511</td>
-<td>124.57</td>
+<td>368,873</td>
+<td>118.46</td>
 <td>0</td>
 <td>0</td>
-<td>124.57</td>
+<td>118.46</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
-<td>123,557</td>
-<td>133.35</td>
+<td>368,887</td>
+<td>98.67</td>
 <td>0</td>
 <td>0</td>
-<td>133.35</td>
+<td>98.67</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
-<td>123,612</td>
-<td>89.74</td>
+<td>368,902</td>
+<td>79.33</td>
 <td>0</td>
 <td>0</td>
-<td>89.74</td>
+<td>79.33</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
-<td>123,615</td>
-<td>128.26</td>
+<td>369,004</td>
+<td>86.57</td>
 <td>0</td>
 <td>0</td>
-<td>128.26</td>
+<td>86.57</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
-<td>123,665</td>
-<td>84.59</td>
+<td>369,016</td>
+<td>87.83</td>
 <td>0</td>
 <td>0</td>
-<td>84.59</td>
+<td>87.83</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
-<td>123,678</td>
-<td>120.71</td>
+<td>369,063</td>
+<td>96.77</td>
 <td>0</td>
 <td>0</td>
-<td>120.71</td>
+<td>96.77</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
-<td>123,701</td>
-<td>90.99</td>
+<td>369,085</td>
+<td>85.93</td>
 <td>0</td>
 <td>0</td>
-<td>90.99</td>
+<td>85.93</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
-<td>123,772</td>
-<td>98.55</td>
+<td>369,118</td>
+<td>104.29</td>
 <td>0</td>
 <td>0</td>
-<td>98.55</td>
+<td>104.29</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
-<td>123,780</td>
-<td>90.57</td>
+<td>369,156</td>
+<td>90.37</td>
 <td>0</td>
 <td>0</td>
-<td>90.57</td>
+<td>90.37</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
-<td>123,783</td>
-<td>88.39</td>
+<td>369,174</td>
+<td>126.07</td>
 <td>0</td>
 <td>0</td>
-<td>88.39</td>
+<td>126.07</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
-<td>123,808</td>
-<td>103.09</td>
+<td>369,187</td>
+<td>115.93</td>
 <td>0</td>
 <td>0</td>
-<td>103.09</td>
+<td>115.93</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
-<td>123,847</td>
-<td>49.53</td>
+<td>369,200</td>
+<td>105.97</td>
 <td>0</td>
 <td>0</td>
-<td>49.53</td>
+<td>105.97</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 999,999 total rows.</div>
@@ -1255,202 +946,202 @@ Row order does not matter.</pre>
 <tr>
 <td class="td-idx">1</td>
 <td>368,650</td>
-<td>102.82</td>
+<td>89.38</td>
 <td>0</td>
 <td>0</td>
-<td>102.82</td>
+<td>89.38</td>
 </tr>
 <tr>
 <td class="td-idx">2</td>
 <td>368,666</td>
-<td>120.45</td>
+<td>96.41</td>
 <td>0</td>
 <td>0</td>
-<td>120.45</td>
+<td>96.41</td>
 </tr>
 <tr>
 <td class="td-idx">3</td>
 <td>368,679</td>
-<td>89.75</td>
+<td>112.61</td>
 <td>0</td>
 <td>0</td>
-<td>89.75</td>
+<td>112.61</td>
 </tr>
 <tr>
 <td class="td-idx">4</td>
 <td>368,720</td>
-<td>72.76</td>
+<td>78.6</td>
 <td>0</td>
 <td>0</td>
-<td>72.76</td>
+<td>78.6</td>
 </tr>
 <tr>
 <td class="td-idx">5</td>
 <td>368,736</td>
-<td>116.1</td>
+<td>82.22</td>
 <td>0</td>
 <td>0</td>
-<td>116.1</td>
+<td>82.22</td>
 </tr>
 <tr>
 <td class="td-idx">6</td>
 <td>368,846</td>
-<td>97.54</td>
+<td>110.31</td>
 <td>0</td>
 <td>0</td>
-<td>97.54</td>
+<td>110.31</td>
 </tr>
 <tr>
 <td class="td-idx">7</td>
 <td>368,866</td>
-<td>97.43</td>
+<td>83.55</td>
 <td>0</td>
 <td>0</td>
-<td>97.43</td>
+<td>83.55</td>
 </tr>
 <tr>
 <td class="td-idx">8</td>
 <td>368,884</td>
-<td>93.15</td>
+<td>87.35</td>
 <td>0</td>
 <td>0</td>
-<td>93.15</td>
+<td>87.35</td>
 </tr>
 <tr>
 <td class="td-idx">9</td>
 <td>368,914</td>
-<td>72.33</td>
+<td>90.03</td>
 <td>0</td>
 <td>0</td>
-<td>72.33</td>
+<td>90.03</td>
 </tr>
 <tr>
 <td class="td-idx">10</td>
 <td>369,035</td>
-<td>75.79</td>
+<td>93.11</td>
 <td>0</td>
 <td>0</td>
-<td>75.79</td>
+<td>93.11</td>
 </tr>
 <tr>
 <td class="td-idx">11</td>
 <td>369,046</td>
-<td>100.41</td>
+<td>93.3</td>
 <td>0</td>
 <td>0</td>
-<td>100.41</td>
+<td>93.3</td>
 </tr>
 <tr>
 <td class="td-idx">12</td>
 <td>369,057</td>
-<td>113.25</td>
+<td>97.33</td>
 <td>0</td>
 <td>0</td>
-<td>113.25</td>
+<td>97.33</td>
 </tr>
 <tr>
 <td class="td-idx">13</td>
 <td>369,060</td>
-<td>119.56</td>
+<td>121.26</td>
 <td>0</td>
 <td>0</td>
-<td>119.56</td>
+<td>121.26</td>
 </tr>
 <tr>
 <td class="td-idx">14</td>
 <td>369,122</td>
-<td>69.86</td>
+<td>92.19</td>
 <td>0</td>
 <td>0</td>
-<td>69.86</td>
+<td>92.19</td>
 </tr>
 <tr>
 <td class="td-idx">15</td>
 <td>369,123</td>
-<td>101.19</td>
+<td>70.59</td>
 <td>0</td>
 <td>0</td>
-<td>101.19</td>
+<td>70.59</td>
 </tr>
 <tr>
 <td class="td-idx">16</td>
 <td>369,142</td>
-<td>112.52</td>
+<td>111.55</td>
 <td>0</td>
 <td>0</td>
-<td>112.52</td>
+<td>111.55</td>
 </tr>
 <tr>
 <td class="td-idx">17</td>
 <td>369,172</td>
-<td>95.41</td>
+<td>106.64</td>
 <td>0</td>
 <td>0</td>
-<td>95.41</td>
+<td>106.64</td>
 </tr>
 <tr>
 <td class="td-idx">18</td>
 <td>369,173</td>
-<td>78.12</td>
+<td>106.34</td>
 <td>0</td>
 <td>0</td>
-<td>78.12</td>
+<td>106.34</td>
 </tr>
 <tr>
 <td class="td-idx">19</td>
 <td>369,188</td>
-<td>86.82</td>
+<td>78.65</td>
 <td>0</td>
 <td>0</td>
-<td>86.82</td>
+<td>78.65</td>
 </tr>
 <tr>
 <td class="td-idx">20</td>
 <td>369,255</td>
-<td>104.2</td>
+<td>90.8</td>
 <td>0</td>
 <td>0</td>
-<td>104.2</td>
+<td>90.8</td>
 </tr>
 <tr>
 <td class="td-idx">21</td>
 <td>369,256</td>
-<td>73.34</td>
+<td>110.07</td>
 <td>0</td>
 <td>0</td>
-<td>73.34</td>
+<td>110.07</td>
 </tr>
 <tr>
 <td class="td-idx">22</td>
 <td>369,364</td>
-<td>120.34</td>
+<td>110.25</td>
 <td>0</td>
 <td>0</td>
-<td>120.34</td>
+<td>110.25</td>
 </tr>
 <tr>
 <td class="td-idx">23</td>
 <td>369,393</td>
-<td>121.07</td>
+<td>111.36</td>
 <td>0</td>
 <td>0</td>
-<td>121.07</td>
+<td>111.36</td>
 </tr>
 <tr>
 <td class="td-idx">24</td>
 <td>369,454</td>
-<td>122.51</td>
+<td>90.25</td>
 <td>0</td>
 <td>0</td>
-<td>122.51</td>
+<td>90.25</td>
 </tr>
 <tr>
 <td class="td-idx">25</td>
 <td>369,500</td>
-<td>105.56</td>
+<td>90.67</td>
 <td>0</td>
 <td>0</td>
-<td>105.56</td>
+<td>90.67</td>
 </tr>
 </tbody></table></div>
 <div class="table-more-note">Showing first 25 of 999,999 total rows.</div>
@@ -1467,7 +1158,7 @@ Row order does not matter.</pre>
     </main>
 
     <footer class="footer">
-        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-09 18:15 UTC</p>
+        <p>SQL-Frontier-Eval Benchmark &bull; Evaluated on DuckDB 2.0 In-Memory Engine (1M+ Records/Table) &bull; Generated: 2026-11-25 18:29 UTC</p>
     </footer>
 
     <script src="../script.js"></script>
