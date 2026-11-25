@@ -14,6 +14,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import time
 import json
+import argparse
 import boto3
 import certifi
 import psycopg
@@ -77,10 +78,43 @@ def cleanup_postgres_categories(conn) -> bool:
     print("PostgreSQL teardown completed successfully.")
     return True
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Aurora Serverless v2 PostgreSQL Evaluation Pipeline")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="offline",
+        help="Evaluated model identifier: 'offline', 'gemini-4-hydrogen-high', 'claude-sonnet-4-6', 'openai/gpt-4o', etc."
+    )
+    parser.add_argument(
+        "--tasks",
+        type=str,
+        default="tasks/*.json",
+        help="Glob pattern or path to task definitions (default: 'tasks/*.json')"
+    )
+    parser.add_argument(
+        "--test-gold",
+        action="store_true",
+        help="Run evaluation against the golden query itself to ensure zero false failures"
+    )
+    parser.add_argument(
+        "--skip-cleanup",
+        action="store_true",
+        help="Skip teardown of PostgreSQL test schemas and IAM roles after run"
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print verbose execution details, plans, and diff diagnostics"
+    )
+    return parser.parse_args()
+
 def main():
+    args = parse_args()
     print("=" * 80)
     print("AURORA SERVERLESS V2 POSTGRESQL EVALUATION PIPELINE")
     print(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
+    print(f"Target Model: {args.model} {'(TESTING GOLDEN BASELINE)' if args.test_gold else ''}")
     print(f"Cluster Endpoint: {DB_HOST}:{DB_PORT}")
     print(f"Total Categories: {len(CATEGORY_SLUG_MAP)}")
     print("=" * 80)
@@ -117,27 +151,37 @@ def main():
     bootstrap_postgres_categories(conn)
 
     # 3. Run Benchmark Evaluation
-    print("\n[Step 3/5] Launching full 120-task benchmark on Aurora PostgreSQL...")
+    print(f"\n[Step 3/5] Launching benchmark on Aurora PostgreSQL for model: {args.model}...")
     import subprocess
     cmd = [
         sys.executable,
         "run_eval.py",
         "--engine", "aurora",
-        "--model", "offline",
+        "--model", args.model,
+        "--tasks", args.tasks,
         "--save-results"
     ]
+    if args.test_gold:
+        cmd.append("--test-gold")
+    if args.verbose:
+        cmd.append("--verbose")
+
     eval_proc = subprocess.run(cmd, capture_output=False)
     if eval_proc.returncode != 0:
         print(f"⚠️ Benchmark run exited with code {eval_proc.returncode}")
 
-    # 4. Teardown Database Artifacts
-    print("\n[Step 4/5] Cleaning up PostgreSQL test artifacts...")
-    cleanup_postgres_categories(conn)
-    conn.close()
+    if args.skip_cleanup:
+        print("\n[Step 4 & 5] Skipping cleanup as requested via --skip-cleanup.")
+        conn.close()
+    else:
+        # 4. Teardown Database Artifacts
+        print("\n[Step 4/5] Cleaning up PostgreSQL test artifacts...")
+        cleanup_postgres_categories(conn)
+        conn.close()
 
-    # 5. Teardown IAM Roles
-    print("\n[Step 5/5] Cleaning up category IAM roles and policies...")
-    cleanup_all_iam_roles()
+        # 5. Teardown IAM Roles
+        print("\n[Step 5/5] Cleaning up category IAM roles and policies...")
+        cleanup_all_iam_roles()
 
     print("\n✅ Aurora Serverless v2 PostgreSQL evaluation pipeline complete!")
 

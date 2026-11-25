@@ -58,7 +58,7 @@ if __name__ == "__main__":
     if success:
         print("Aurora IAM Auth is OPERATIONAL! Launching full eval pipeline...")
         import subprocess
-        res = subprocess.run([sys.executable, "scripts/run_aurora_eval_pipeline.py"])
+        res = subprocess.run([sys.executable, "scripts/run_aurora_eval_pipeline.py"] + sys.argv[1:])
         sys.exit(res.returncode)
     else:
         sys.exit(1)
