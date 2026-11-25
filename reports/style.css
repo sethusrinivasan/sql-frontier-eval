@@ -1455,6 +1455,12 @@ span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 
     box-shadow: 0 0 0 1px var(--accent-cyan), 0 4px 18px rgba(57, 197, 207, 0.2);
 }
 
+.engine-pivot-btn[data-engine="databricks"].active {
+    border-color: #ff5a36;
+    background: rgba(255, 90, 54, 0.12);
+    box-shadow: 0 0 0 1px #ff5a36, 0 4px 18px rgba(255, 90, 54, 0.2);
+}
+
 .engine-pivot-btn .btn-icon-box {
     font-size: 2rem;
     line-height: 1;
@@ -1664,6 +1670,18 @@ span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 
     border-color: rgba(57, 197, 207, 0.3);
 }
 
+.domain-engine-pill.databricks {
+    background: rgba(255, 90, 54, 0.12);
+    color: #ff6f59;
+    border-color: rgba(255, 90, 54, 0.3);
+}
+
+.btn-tag-cloud {
+    background: rgba(255, 90, 54, 0.2);
+    color: #ff6f59;
+    border: 1px solid rgba(255, 90, 54, 0.4);
+}
+
 .engine-table-badge {
     display: inline-flex;
     align-items: center;
@@ -1685,6 +1703,12 @@ span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 
     background: rgba(57, 197, 207, 0.15);
     color: var(--accent-cyan);
     border: 1px solid rgba(57, 197, 207, 0.35);
+}
+
+.badge-databricks {
+    background: rgba(255, 90, 54, 0.15);
+    color: #ff6f59;
+    border: 1px solid rgba(255, 90, 54, 0.35);
 }
 
 .engine-compat-note {

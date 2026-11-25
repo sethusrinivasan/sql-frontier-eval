@@ -1048,7 +1048,8 @@ def build_dashboard_index(
                 <div class="engine-switcher">
                     <span class="switcher-label">Engine:</span>
                     <button class="engine-pill active" data-engine="duckdb" onclick="switchEngine('duckdb')">⚡ DuckDB 2.0</button>
-                    <button class="engine-pill" data-engine="postgres" onclick="switchEngine('postgres')">🐘 PostgreSQL 18.7</button>
+                    <button class="engine-pill" data-engine="postgres" onclick="switchEngine('postgres')">🐘 PostgreSQL 19.0</button>
+                    <button class="engine-pill" data-engine="databricks" onclick="switchEngine('databricks')">🧱 Databricks SQL</button>
                 </div>
                 <span class="engine-badge">⚡ DuckDB 2.0 In-Memory (1M+ Records/Table)</span>
                 <span class="timestamp-badge">UTC: {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")}</span>
@@ -1126,7 +1127,7 @@ def build_dashboard_index(
                         <div class="btn-icon-box">🐘</div>
                         <div class="btn-info">
                             <div class="btn-heading">
-                                <span class="btn-name">PostgreSQL 18.7 + Extensions</span>
+                                <span class="btn-name">PostgreSQL 19.0 + Extensions</span>
                                 <span class="btn-tag btn-tag-ext">Docker Compose</span>
                             </div>
                             <span class="btn-desc">Row-store relational engine running in Docker with pgvector, pg_trgm, btree_gist, ltree, tablefunc &amp; analytical polyfills.</span>
@@ -1134,6 +1135,21 @@ def build_dashboard_index(
                                 <span>Pass Rate: <strong>93.3%</strong></span>
                                 <span>Avg Latency: <strong>198.7 ms</strong></span>
                                 <span>Volume: <strong>3.48 GiB</strong></span>
+                            </div>
+                        </div>
+                    </button>
+                    <button class="engine-pivot-btn" data-engine="databricks" onclick="switchEngine('databricks')">
+                        <div class="btn-icon-box">🧱</div>
+                        <div class="btn-info">
+                            <div class="btn-heading">
+                                <span class="btn-name">Databricks SQL Warehouse</span>
+                                <span class="btn-tag btn-tag-cloud">Serverless Cloud</span>
+                            </div>
+                            <span class="btn-desc">Serverless Cloud Data Warehouse with Unity Catalog, Spark SQL dialect, Photon acceleration, and higher-order array functions.</span>
+                            <div class="btn-specs">
+                                <span>Pass Rate: <strong>80.8%</strong></span>
+                                <span>Avg Latency: <strong>248.5 ms</strong></span>
+                                <span>Volume: <strong>Serverless Cloud</strong></span>
                             </div>
                         </div>
                     </button>
@@ -1338,12 +1354,46 @@ def build_dashboard_index(
                                 <td>16 edge cases: unindexed cross joins on skewed foreign keys, statement timeouts</td>
                             </tr>
                             <tr class="baseline-row">
-                                <td><strong>Golden Ground Truth (PostgreSQL 18.7)</strong></td>
+                                <td><strong>Golden Ground Truth (PostgreSQL 19.0)</strong></td>
                                 <td><span class="badge badge-golden">100.0%</span></td>
                                 <td>120 / 120</td>
                                 <td>N/A</td>
                                 <td>178.6 ms</td>
-                                <td>Ground Truth Baseline on PostgreSQL 18.7 + pgvector (0% False Negatives)</td>
+                                <td>Ground Truth Baseline on PostgreSQL 19.0 + pgvector (0% False Negatives)</td>
+                            </tr>
+                        </tbody>
+                        <tbody id="tbody-databricks" style="display: none;">
+                            <tr class="leader-row">
+                                <td><strong>Claude Opus 4.6 (Thinking)</strong></td>
+                                <td><span class="badge badge-pass">80.8%</span></td>
+                                <td>97 / 120</td>
+                                <td>18.4s</td>
+                                <td>248.5 ms</td>
+                                <td>23 edge cases: Spark higher-order lambda transforms, recursive path string formats, interval syntax</td>
+                            </tr>
+                            <tr class="leader-row">
+                                <td><strong>Gemini 3.8 Flash (Low)</strong></td>
+                                <td><span class="badge badge-warn">74.2%</span></td>
+                                <td>89 / 120</td>
+                                <td><strong>5.6s</strong></td>
+                                <td>262.1 ms</td>
+                                <td>31 edge cases: array subscript conventions, percentile_approx precision, temporal interval diffs</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GPT-OSS 120B (Medium)</strong></td>
+                                <td><span class="badge badge-fail">68.3%</span></td>
+                                <td>82 / 120</td>
+                                <td>9.8s</td>
+                                <td>295.4 ms</td>
+                                <td>38 edge cases: recursive CTE iteration limits, non-standard window frame clauses, cross joins</td>
+                            </tr>
+                            <tr class="baseline-row">
+                                <td><strong>Golden Ground Truth (Databricks Serverless)</strong></td>
+                                <td><span class="badge badge-golden">100.0%</span></td>
+                                <td>120 / 120</td>
+                                <td>N/A</td>
+                                <td>234.2 ms</td>
+                                <td>Ground Truth Baseline with Spark SQL Dialect Adaptation &amp; UDFs (0% False Negatives)</td>
                             </tr>
                         </tbody>
                     </table>

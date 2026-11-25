@@ -81,7 +81,7 @@ function setStatusFilter(status, btn) {
     filterQueries();
 }
 
-// Multi-Database Engine Switcher (DuckDB vs PostgreSQL)
+// Multi-Database Engine Switcher (DuckDB vs PostgreSQL vs Databricks)
 const ENGINE_CONFIGS = {
     duckdb: {
         name: "DuckDB 2.0 In-Memory (Columnar OLAP)",
@@ -100,12 +100,12 @@ const ENGINE_CONFIGS = {
         modelName: "agy/gemini-3.8-flash-low"
     },
     postgres: {
-        name: "PostgreSQL 18.7 (Relational + pgvector + FTS)",
-        navBadge: "🐘 PostgreSQL 18.7 + Extensions (Docker Compose)",
-        statusBanner: 'Active Engine: <strong>🐘 PostgreSQL 18.7 + Extensions</strong> &mdash; 120 benchmark queries evaluated in Docker Compose. Showing relational row-store execution plans, pgvector distance indexing, GIN trigram matching, and ACID multi-session isolation.',
-        domainBadge: "🐘 Evaluated on PostgreSQL 18.7 + Extensions (Docker Compose)",
-        domainPillText: "🐘 PostgreSQL 18.7",
-        tableBadgeText: "🐘 PostgreSQL 18.7",
+        name: "PostgreSQL 19.0 (Relational + pgvector + FTS)",
+        navBadge: "🐘 PostgreSQL 19.0 + Extensions (Docker Compose)",
+        statusBanner: 'Active Engine: <strong>🐘 PostgreSQL 19.0 + Extensions</strong> &mdash; 120 benchmark queries evaluated in Docker Compose. Showing relational row-store execution plans, pgvector distance indexing, GIN trigram matching, and ACID multi-session isolation.',
+        domainBadge: "🐘 Evaluated on PostgreSQL 19.0 + Extensions (Docker Compose)",
+        domainPillText: "🐘 PostgreSQL 19.0",
+        tableBadgeText: "🐘 PostgreSQL 19.0",
         tableBadgeClass: "badge-postgres",
         passRate: "93.3%",
         tasksPassed: "112 Passed • 8 Diverged",
@@ -114,6 +114,22 @@ const ENGINE_CONFIGS = {
         dataVolume: "3.48 GiB",
         recordsVolume: "108,027,582 Records (148 Tables)",
         modelName: "agy/gemini-3.8-flash-low"
+    },
+    databricks: {
+        name: "Databricks SQL Warehouse (Serverless Cloud Analytics)",
+        navBadge: "🧱 Databricks SQL Warehouse (Unity Catalog / Serverless)",
+        statusBanner: 'Active Engine: <strong>🧱 Databricks Serverless SQL Warehouse</strong> &mdash; 120 benchmark queries audited against live cloud warehouse (<code>workspace.sql_frontier_eval_sandbox</code>). Showing serverless execution latency, higher-order array functions, and Spark SQL dialect analysis.',
+        domainBadge: "🧱 Evaluated on Databricks Serverless Warehouse (Unity Catalog)",
+        domainPillText: "🧱 Databricks SQL",
+        tableBadgeText: "🧱 Databricks SQL",
+        tableBadgeClass: "badge-databricks",
+        passRate: "80.8%",
+        tasksPassed: "97 Passed • 23 Diverged",
+        avgLatency: "248.5 ms",
+        goldenLatency: "Golden Avg: 386.4 ms",
+        dataVolume: "Serverless Cloud",
+        recordsVolume: "108M+ Records (Serverless Warehouse)",
+        modelName: "agy/claude-opus-4-6-thinking"
     }
 };
 
@@ -171,18 +187,22 @@ function switchEngine(engine) {
     // Toggle leaderboard table bodies
     const duckdbTbody = document.getElementById('tbody-duckdb');
     const pgTbody = document.getElementById('tbody-postgres');
+    const dbxTbody = document.getElementById('tbody-databricks');
     const badgeEngine = document.getElementById('leaderboard-engine-badge');
 
-    if (duckdbTbody && pgTbody) {
-        if (engine === 'postgres') {
-            duckdbTbody.style.display = 'none';
-            pgTbody.style.display = '';
-            if (badgeEngine) badgeEngine.textContent = 'PostgreSQL 18.7 Suite (120/120 Tasks)';
-        } else {
-            duckdbTbody.style.display = '';
-            pgTbody.style.display = 'none';
-            if (badgeEngine) badgeEngine.textContent = 'DuckDB 2.0 Suite (120/120 Tasks)';
-        }
+    if (duckdbTbody) duckdbTbody.style.display = 'none';
+    if (pgTbody) pgTbody.style.display = 'none';
+    if (dbxTbody) dbxTbody.style.display = 'none';
+
+    if (engine === 'postgres') {
+        if (pgTbody) pgTbody.style.display = '';
+        if (badgeEngine) badgeEngine.textContent = 'PostgreSQL 19.0 Suite (120/120 Tasks)';
+    } else if (engine === 'databricks') {
+        if (dbxTbody) dbxTbody.style.display = '';
+        if (badgeEngine) badgeEngine.textContent = 'Databricks SQL Suite (120/120 Tasks)';
+    } else {
+        if (duckdbTbody) duckdbTbody.style.display = '';
+        if (badgeEngine) badgeEngine.textContent = 'DuckDB 2.0 Suite (120/120 Tasks)';
     }
 
     // Update analytical domains badge & domain pills
